@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-08-03T13:20:47.566Z",
+  "config": {
+    "handle": "@mohucool",
+    "castSheet": "Motu, a chubby golden-brown street dog with one floppy ear and a red collar; and Chotu, a small grumpy grey cat with white paws and green eyes. Both stay exactly this colour and shape in every panel.",
+    "artStyle": "3D Pixar-style animation, soft global illumination, expressive faces, vertical composition",
+    "seed": 4412
+  },
+  "channel": null,
+  "analysis": null,
+  "observations": [
+    "Your three Shorts averaged 4,180 views against 610 for the music uploads — a 6.8x gap on the same channel.",
+    "Only 4 uploads in the last 14 days; the two-week gaps line up with the weakest performers.",
+    "Videos tagged 'hindicomedy' average 5,200 views; 'instrumental' averages 340."
+  ],
+  "suggestions": [
+    "Move the music uploads to unlisted-then-public and lead the week with Shorts instead.",
+    "Drop the 'instrumental' and 'lofi' tags — they are pulling the recommendations toward a saturated pool.",
+    "Post at a fixed time. The gaps are costing more than the quality differences are gaining."
+  ],
+  "clips": [
+    {
+      "title": "मोटू की रोटी चोरी",
+      "beats": [
+        {
+          "line": "मोटू, ये रोटी कहाँ गयी?",
+          "scene": "a guilty chubby brown street dog beside an empty steel plate in a sunlit village courtyard"
+        },
+        {
+          "line": "मैंने नहीं खायी, कसम से!",
+          "scene": "the dog raising one paw dramatically, crumbs on his nose, grey cat squinting suspiciously beside him"
+        },
+        {
+          "line": "तेरी मूँछों पे आटा लगा है।",
+          "scene": "close up of the grey cat pointing a white paw at the dog, both wide eyed, comic reveal moment"
+        }
+      ],
+      "caption": "Motu ka jhooth pakda gaya",
+      "tags": [
+        "funnydogs",
+        "hindicomedy",
+        "shorts",
+        "streetdogs",
+        "desicomedy",
+        "pets",
+        "cartoon",
+        "motuchotu"
+      ],
+      "panels": [
+        "data/panels/0-0.jpg",
+        "data/panels/0-1.jpg",
+        "data/panels/0-2.jpg"
+      ]
+    }
+  ],
+  "panelHealth": {
+    "made": 3,
+    "total": 3
+  }
+}
