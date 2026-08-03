@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-03T13:20:47.566Z",
+  "generatedAt": "2026-08-03T19:27:26.043Z",
   "config": {
     "handle": "@mohucool",
     "castSheet": "Motu, a chubby golden-brown street dog with one floppy ear and a red collar; and Chotu, a small grumpy grey cat with white paws and green eyes. Both stay exactly this colour and shape in every panel.",
@@ -8,6 +8,19 @@
   },
   "channel": null,
   "analysis": null,
+  "calendar": {
+    "dow": "Tuesday",
+    "season": "monsoon",
+    "upcoming": [
+      {
+        "name": "Independence Day",
+        "flavour": "patriotic, tricolour, pride",
+        "days": 11,
+        "date": "2026-08-15"
+      }
+    ]
+  },
+  "trending": null,
   "observations": [
     "Your three Shorts averaged 4,180 views against 610 for the music uploads — a 6.8x gap on the same channel.",
     "Only 4 uploads in the last 14 days; the two-week gaps line up with the weakest performers.",
