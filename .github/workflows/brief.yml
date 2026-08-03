@@ -1,0 +1,66 @@
+name: Nightly brief
+
+on:
+  schedule:
+    # 02:30 UTC = 08:00 IST. Cron on GitHub is UTC and can drift a few minutes.
+    - cron: '30 2 * * *'
+  workflow_dispatch:        # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: brief
+  cancel-in-progress: false
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build today's brief
+        env:
+          GROQ_API_KEY:         ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL:           ${{ vars.GROQ_MODEL }}
+          GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: node scripts/brief.mjs
+
+      - name: Commit the brief
+        run: |
+          git config user.name  "ridge-bot"
+          git config user.email "actions@github.com"
+          git add data
+          if git diff --staged --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -m "brief: $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f data/brief.json ]; then
+            node -e '
+              const b = require("./data/brief.json");
+              const L = [];
+              L.push("## Brief for " + new Date(b.generatedAt).toDateString());
+              if (b.channel) L.push(`**${b.channel.title}** — ${b.channel.subs} subs · ${b.channel.totalViews} views`);
+              L.push(`Panels: ${b.panelHealth.made}/${b.panelHealth.total}`);
+              if (b.observations?.length) L.push("\n### What the numbers say\n" + b.observations.map(o => "- " + o).join("\n"));
+              if (b.suggestions?.length) L.push("\n### Do next\n" + b.suggestions.map(s => "- " + s).join("\n"));
+              if (b.clips?.length) L.push("\n### Ready to film\n" + b.clips.map(c => "- " + c.title).join("\n"));
+              require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, L.join("\n") + "\n");
+            '
+          else
+            echo "No brief was produced — check the log above." >> $GITHUB_STEP_SUMMARY
+          fi
