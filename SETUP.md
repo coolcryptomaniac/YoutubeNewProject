@@ -61,10 +61,26 @@ You need a Google Cloud project so the apps can upload on your behalf.
    click **Advanced → Go to (your app)**. That warning is because it's your own
    unpublished app, which is exactly what it should be.
 
-### Get a Groq key while you're at it
+### Get a writing key
 
 **console.groq.com** → **API Keys** → **Create API Key**. No card needed.
-Paste it into **Setup** alongside the client ID and save.
+Under **Music → Setup → Writing**, pick Groq, paste the key, save. That one setting
+covers both studios.
+
+OpenRouter is there as an alternative if Groq is rate-limiting you — its free models are
+slower but the daily allowance is separate.
+
+### Optional: a faster image source
+
+Pollinations works with no key at all, but it only allows about one image every 15
+seconds — a 15-shot scene pack takes four minutes.
+
+**aistudio.google.com** → **Get API key** → create one. Free, no card,
+**500 images a day with no waiting between them.** Paste it under
+**Music → Setup → Images** and switch the provider to Gemini in the Scenes tab.
+
+Both cap at roughly 1024 pixels on the long edge. No free image API anywhere gives you
+true 4K — the canvas upscales, and the motion hides it.
 
 At this point both studios are fully working. You could stop here.
 
@@ -99,6 +115,7 @@ Add four:
 | Name | Value |
 |---|---|
 | `GROQ_API_KEY` | your `gsk_...` key |
+| `GROQ_MODEL` | *(optional variable, not secret)* — a different model id |
 | `GOOGLE_CLIENT_ID` | from Stage 2 |
 | `GOOGLE_CLIENT_SECRET` | from Stage 2 |
 | `GOOGLE_REFRESH_TOKEN` | from 3a |
@@ -185,3 +202,148 @@ compliance audit in the Cloud Console.
 **Panels came back blank or missing** — the free image service was busy. The job
 retries twice; re-run the workflow if you want them redrawn. Filming still works,
 missing beats reuse the previous panel.
+
+
+---
+
+## What each screen now does
+
+**Today** — channel numbers, what the model reads into them, what to do next, which
+festival is coming, what's trending in India this morning, and the day's clips already
+written and drawn.
+
+**Music studio** — drop a track and it is analysed on the spot: tempo, energy,
+brightness, dynamics. From that it picks one of eight visualisers and a matching palette
+by itself. A quiet dark track gets Strings in violet; a fast bright one gets Pulse. You
+can override any of it.
+
+*Scenes* writes a shot list sized to the track — a three-minute song gets around fifteen
+shots at twelve seconds each — with a single visual thread running through them, then
+generates the images. Stop and restart at any point; it picks up from the shot it
+reached.
+
+**Shorts studio** — unchanged, and now follows whichever writing provider you picked in
+the music studio.
+
+---
+
+## Nothing is lost if it crashes
+
+Audio and finished videos go into the browser's own database, not just memory. Close the
+tab, crash, lose power — reopen and the Tracks screen offers to restore everything. Shot
+lists, metadata and detected moods come back too. Scene images have to be regenerated,
+since storing twenty images per track would fill the vault quickly.
+
+An interrupted **upload** resumes properly rather than starting over: YouTube's session
+URL is kept, and on retry the app asks how many bytes arrived and sends only the rest.
+
+**Publish → Back up to Drive** copies audio and video into a `Ridge` folder in your Google
+Drive — 15 GB free on a standard account. The app uses the `drive.file` scope, which means
+it can only ever see files it created. It cannot read anything else in your Drive.
+
+Empty the local vault any time from **Tracks → Safe storage**.
+
+---
+
+## Tuning the nightly job
+
+`config.json` also feeds the festival and trending awareness. The job knows the date, the
+Indian season, and which festivals fall in the next three weeks, and it pulls YouTube's
+most popular music in India each morning. It is told to work a festival in when one is
+close, never to force it into every clip, and to use trending only to spot a travelling
+format — never to copy a title or imitate a creator.
+
+The festival dates live in the `FESTIVALS` table at the top of `scripts/brief.mjs`. Lunar
+dates shift each year, so they are written out explicitly rather than calculated. The
+table runs to early 2027 — extend it when you get there.
+
+---
+
+## Scheduling releases
+
+**Publish → Release timing** in either studio. Three modes:
+
+- **Publish immediately** — as before.
+- **Space across the best slots** — the app lays your rendered batch across the strongest
+  windows, never more than two in a day, and shows you the plan before you commit.
+- **One specific time** — pick a moment yourself.
+
+Scheduling works by uploading the video as private with a `publishAt` timestamp. YouTube
+holds it and flips it public at that instant. It costs nothing extra and needs no second
+API call.
+
+### How the timing is chosen
+
+When you connect Google, the app reads your last 50 uploads and scores every three-hour
+window by views. Views are **age-adjusted** — otherwise a video from last year would win
+every comparison simply for having had longer to accumulate them.
+
+It refuses to schedule into dead hours. A 2 AM window can top a ranking just because two
+videos happened to land there, and scheduling into it would waste the upload. Dead-hour
+windows have to clear a much higher bar before the app will use one.
+
+Below **good** confidence — roughly 25 long-form videos with at least 4 in the winning
+window — your own data only *leads* and the published defaults fill in behind it. Thin
+evidence trusted blindly is worse than no evidence.
+
+The defaults, for Indian audiences: **long-form** late afternoon Wednesday and Friday,
+mid-morning at weekends. **Shorts** run on a different clock — midday and mid-evening.
+Both aim to publish two to three hours *before* the 6–9 PM IST viewing peak, so YouTube
+has finished indexing by the time people arrive.
+
+### Setting your daily limit
+
+**Publish → Release timing → Daily upload limit.** Four options:
+
+| Setting | Per day | When |
+|---|---|---|
+| Unverified | 12 | No phone verification yet |
+| Verified | 100 | Phone verified, established channel — **yours** |
+| Pacing deliberately | 20 | Verified but staying well inside |
+| Set it myself | your call | — |
+
+Two ceilings sit on top of each other and the lower one binds:
+
+- **The API's Video Uploads bucket** — 100 calls a day. Documented by Google.
+- **YouTube's per-channel daily cap** — undocumented. Community reporting puts unverified
+  channels near 10–15 and verified ones around 100. Since your channel is verified and
+  established, both land in the same place: **100**.
+
+If YouTube does stop you, the app reads the `uploadLimitExceeded` error, pauses uploads
+until the next reset at 12:30 PM IST, records the number you actually reached, and shows
+it next time so you can set a realistic limit. Anything rendered stays rendered — nothing
+is lost, and it is a 24-hour pause, not a strike.
+
+**Scheduling does not raise this ceiling.** `publishAt` only moves when a video goes
+*live*. The upload itself still happens today and still counts. Uploading 100 and
+releasing them across a month is fine; uploading 200 in a day is not possible whatever the
+release dates say.
+
+### Two numbers people misread
+
+**256 GB and 12 hours are per video, not per day.** Google's help page: *"The maximum file
+size you can upload is 256 GB or 12 hours, whichever is less."* That is one file. A
+three-minute music video at 1080p is around 100 MB, so you would need roughly 2,500 of
+them to approach it in a single upload — and you can't, because they're separate files.
+
+**15 minutes for unverified accounts is a length limit, not a count.** It caps how long
+one video may run, not how many you may post.
+
+### The upload ceiling moved
+
+This app was originally built around a limit of six uploads a day. That is out of date.
+Google moved `videos.insert` into its own **Video Uploads** quota bucket: 100 calls a day,
+1 unit each, separate from the 10,000-unit general pool that thumbnails and channel reads
+draw on.
+
+So the six-a-day wall is gone. The limit you will actually meet first is YouTube's own
+per-channel daily upload cap, which Google does not publish and which varies with channel
+age and standing. It arrives as `uploadLimitExceeded`.
+
+The header meter now counts against a **daily target you set yourself**, not a hard cap.
+Set it in Publish → Release timing.
+
+Worth saying plainly: being able to upload a hundred a day is not a reason to. Scheduling
+helps because it separates *when you work* from *when things come out* — batch on Sunday,
+release across the week. That reads as a consistent channel. Uploading thirty in one
+afternoon reads as a dump, and performs like one.

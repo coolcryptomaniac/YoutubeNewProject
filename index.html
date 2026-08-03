@@ -202,13 +202,38 @@ function render(b){
         <a class="btn" style="margin-top:15px" href="./shorts.html?brief=1">Open in the Shorts studio</a>
       </div>` : '';
 
+  const tm = b.timing?.long;
+  const release = tm ? `<div class="card"><h2>When to release</h2>
+      ${tm.slots?.length
+        ? `<p class="sub">From ${tm.n} of your own uploads — ${esc(tm.confidence)} confidence.${
+            tm.confidence!=='good' ? ' Thin sample, so treat it as a lean not a rule.' : ''}</p>
+           <ul class="finds">${tm.slots.map(s=>`<li>${esc(s.label)} — <b style="color:var(--glacier)">${s.index}×</b> the median, ${s.samples} video${s.samples===1?'':'s'}</li>`).join('')}</ul>
+           ${tm.worst?.length ? `<p class="sub" style="margin:12px 0 0">Weakest so far: ${tm.worst.map(w=>esc(w.label)).join(', ')}.</p>` : ''}`
+        : `<p class="sub" style="margin:0">Not enough upload history yet. Until then the studios use the published windows for Indian audiences — late afternoon Wednesday and Friday for long-form, midday and mid-evening for Shorts.</p>`}
+      <p class="note">Views are age-adjusted, so an old video doesn't win just for being old.</p>
+    </div>` : '';
+
+  const cal = b.calendar;
+  const occasion = cal ? `<div class="card"><h2>What's coming up</h2>
+      <p class="sub">${esc(cal.dow)} · Indian ${esc(cal.season)}</p>
+      ${cal.upcoming?.length
+        ? `<ul class="finds">${cal.upcoming.map(f=>`<li>${esc(f.name)} ${f.days<=0?'is today':'in '+f.days+' day'+(f.days===1?'':'s')}</li>`).join('')}</ul>`
+        : `<p class="sub" style="margin:0">No major festival within three weeks — pure content weeks.</p>`}
+    </div>` : '';
+
+  const trend = b.trending ? `<div class="card"><h2>Trending in India</h2>
+      <p class="sub">Pulled from YouTube this morning. For spotting a format, not for copying.</p>
+      ${(b.trending.tags||[]).length ? `<div class="cap" style="margin-bottom:11px">${b.trending.tags.map(t=>'#'+esc(t)).join(' ')}</div>` : ''}
+      ${(b.trending.music||[]).slice(0,6).map(t=>`<div class="top"><a>${esc(t)}</a></div>`).join('')}
+    </div>` : '';
+
   const health = b.panelHealth && b.panelHealth.made < b.panelHealth.total
     ? `<div class="card"><h2>Heads up</h2><p class="sub" style="margin:0">Only ${b.panelHealth.made} of ${b.panelHealth.total} panels came back last night. The missing beats will reuse the previous panel when you film. Re-run the workflow if you want them redrawn.</p></div>` : '';
 
   $('#body').innerHTML =
     `<div class="freshness"><span class="dot ${cls}"></span>Brief built ${ago} · ${when.toLocaleString('en-IN')}</div>` +
     statBlocks(b) +
-    `<div class="cols"><div>${clips}</div><div>${obs}${sug}${top}${health}
+    `<div class="cols"><div>${clips}</div><div>${obs}${sug}${release}${occasion}${top}${trend}${health}
       <div class="card"><h2>Run it again</h2><p class="sub" style="margin-bottom:13px">New numbers, new clips, fresh panels. About three minutes.</p>
       <a class="btn ghost" id="rerun" href="#" target="_blank" rel="noopener">Open the Actions tab</a></div>
     </div></div>`;

@@ -13,6 +13,7 @@ while you sleep.
 | **`music.html`** | **Music video studio** — Suno tracks into audio-reactive videos |
 | **`.github/workflows/brief.yml`** | the nightly job that fills the Today screen |
 | **`config.json`** | your cast, tone and how many clips a day |
+| **`core.js`** | shared engine — mood analysis, providers, vault, Drive |
 
 ## How autonomous is it, really
 
@@ -23,9 +24,11 @@ Every morning around 8:00 IST, without you doing anything, GitHub runs a job tha
    whether upload gaps line up with the weak ones
 3. asks a language model what that means and what to do about it, with instructions to
    name specifics and to be willing to say *stop doing this*
-4. writes three Hindi sketches for tomorrow, informed by what worked
-5. draws all nine panels and commits them
-6. writes `data/brief.json`, which your site reads
+4. checks the calendar — which festival is within three weeks, what season it is
+5. pulls YouTube's most popular music in India that morning
+6. writes three Hindi sketches for tomorrow, informed by all of it
+7. draws all nine panels and commits them
+8. writes `data/brief.json`, which your site reads
 
 You open the site to a finished brief. What's left for you is filming — ten seconds a
 clip, in your own voice if you want it — and pressing publish. Roughly fifteen minutes.
@@ -89,9 +92,16 @@ Scene art and thumbnails come from **Pollinations** — free, no key, no account
 takes 3 minutes. Six songs is roughly 20 minutes with the tab open and *visible* —
 background tabs get throttled and the recording stalls.
 
-**Six uploads a day, hard ceiling.** Each Cloud project gets 10,000 quota units per day;
-`videos.insert` costs 1,600 and `thumbnails.set` costs 50. The header tracks it. Resets at
-midnight Pacific — 12:30 PM IST.
+**A hundred uploads a day, not six.** Google moved `videos.insert` into its own
+*Video Uploads* quota bucket — 100 calls a day, costing 1 unit each, separate from the
+10,000-unit general pool. The old six-a-day ceiling is gone. The real limit you will meet
+first is YouTube's own per-channel daily upload cap, which is undocumented and varies with
+channel age and standing; you will see it as `uploadLimitExceeded`. The app tracks both,
+pauses itself for 24 hours when YouTube says stop, and remembers the number you actually
+reached. Everything resets at midnight Pacific — 12:30 PM IST.
+
+Note that scheduling does not raise this. `publishAt` moves when a video goes live, not
+when it uploads — the upload still happens today and still counts against the day.
 
 **Your uploads will land as private.** YouTube restricts videos uploaded through un-audited
 API projects to private viewing. Either apply for an API compliance audit in the Cloud

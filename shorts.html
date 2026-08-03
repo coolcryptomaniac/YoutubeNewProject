@@ -108,6 +108,7 @@ canvas{display:block;width:100%;height:auto}
 .pill.art,.pill.recording,.pill.uploading{color:var(--lamp);border-color:rgba(255,194,87,.4)}
 .pill.filmed{color:var(--snow);border-color:var(--snow)}
 .pill.done{color:var(--glacier);border-color:rgba(143,217,201,.45)}
+.pill.scheduled{color:#5AC8FA;border-color:rgba(90,200,250,.45)}
 .pill.failed{color:var(--dawn);border-color:rgba(255,122,156,.45)}
 
 .panels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
@@ -295,6 +296,15 @@ canvas{display:block;width:100%;height:auto}
         </div>
         <label class="chk"><input type="checkbox" id="synth" checked><span>Declare altered or synthetic media</span></label>
         <label class="chk"><input type="checkbox" id="kids"><span>Made for kids<small>Leave off unless you mean it — it disables comments and most monetisation.</small></span></label>
+        <div class="f"><label>Release timing</label>
+          <select id="relMode">
+            <option value="now" selected>Publish immediately</option>
+            <option value="spread">Space across the best Shorts slots</option>
+            <option value="custom">One specific time</option>
+          </select>
+        </div>
+        <div class="f" id="relWhenWrap" style="display:none"><label>Go live at — your local time</label><input type="datetime-local" id="relWhen"></div>
+        <p class="note" id="relNote">Shorts peak at different hours from long-form — midday and mid-evening IST.</p>
         <button class="btn" id="btnConnect">Connect YouTube</button>
         <button class="btn" id="btnUpload" style="margin-top:9px" disabled>Publish filmed clips</button>
         <div class="bar"><i id="upBar"></i></div>
@@ -320,7 +330,7 @@ canvas{display:block;width:100%;height:auto}
     <div>
       <div class="card">
         <h2>Keys</h2>
-        <p class="sub">Shared with the music video app — set them in either place.</p>
+        <p class="sub">Shared with the music video app. Set the writing provider and model over there; whatever you choose applies here too.</p>
         <div class="f"><label>Google OAuth client ID</label><input type="text" id="clientId" placeholder="....apps.googleusercontent.com"></div>
         <div class="f"><label>Groq API key</label><input type="password" id="groqKey" placeholder="gsk_..."></div>
         <div class="f"><label>Model</label>
@@ -359,7 +369,7 @@ const PRESETS = {
 };
 
 const S = { cast:'dogcat', ref:null, clips:[], sel:null, token:null, busy:false, generating:false, bed:null };
-const MAX_CLIPS = 3;
+const MAX_CLIPS = 3;   // self-imposed; the API bucket allows 100 uploads a day
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -374,9 +384,24 @@ const store = {
   get: k => { try { return JSON.parse(localStorage.getItem('ridge.'+k)); } catch { return null; } },
   set: (k,v) => { try { localStorage.setItem('ridge.'+k, JSON.stringify(v)); } catch {} }
 };
+// Shares the same daily budget as the music studio — the cap is per
+// channel, so Shorts and long-form uploads draw on one pool.
 const todayKey = () => new Date().toISOString().slice(0,10);
+const TIERS={unverified:12,verified:100,cautious:20};
+const dailyLimit=()=>{ const t=store.get('accountTier')||'verified';
+  return Math.min(t==='custom'?(Number(store.get('customLimit'))||20):(TIERS[t]||100),100); };
+const uploadsToday=()=>(store.get('uploads')||{})[todayKey()]||0;
 const postedToday = () => (store.get('shorts') || {})[todayKey()] || 0;
-function bumpPosted(){ const d=store.get('shorts')||{}; d[todayKey()]=(d[todayKey()]||0)+1; store.set('shorts',d); paintStrip(); }
+function coolingDown(){
+  const u=store.get('uploadCooldown'); if(!u) return null;
+  const d=new Date(u); if(d<=new Date()){ store.set('uploadCooldown',null); return null; }
+  return d;
+}
+function bumpPosted(){
+  const d=store.get('shorts')||{}; d[todayKey()]=(d[todayKey()]||0)+1; store.set('shorts',d);
+  const u=store.get('uploads')||{}; u[todayKey()]=(u[todayKey()]||0)+1; store.set('uploads',u);
+  paintStrip();
+}
 
 function paintStrip(){
   const used = postedToday(), host = $('#slots'); host.innerHTML='';
@@ -388,7 +413,10 @@ function paintStrip(){
     else if (i<S.clips.length) d.classList.add('queued');
     d.innerHTML=`<i>${i+1}</i>`; host.append(d);
   }
-  $('#quotaLabel').textContent = `${used} / ${MAX_CLIPS} posted today`;
+  const cd=coolingDown();
+  $('#quotaLabel').textContent = cd
+    ? `Uploads paused until ${istLabel(cd)}`
+    : `${used} / ${MAX_CLIPS} clips today · ${uploadsToday()} of ${dailyLimit()} channel uploads used`;
 }
 
 $('#nav').addEventListener('click', e => {
@@ -453,15 +481,23 @@ $('#btnRef').onclick = async () => {
 };
 
 /* ── groq ── */
+// Mirrors the provider choice made in the music studio, so one key set covers both.
+const TEXT_PROVIDERS={
+  groq:{ keyName:'groqKey', url:'https://api.groq.com/openai/v1/chat/completions', fallback:'openai/gpt-oss-120b' },
+  openrouter:{ keyName:'orKey', url:'https://openrouter.ai/api/v1/chat/completions', fallback:'meta-llama/llama-3.3-70b-instruct:free' }
+};
 async function groq(messages){
-  const key=store.get('groqKey'); if(!key) throw new Error('No Groq key saved');
-  const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+  const which=store.get('textProvider')||'groq';
+  const p=TEXT_PROVIDERS[which]||TEXT_PROVIDERS.groq;
+  const key=store.get(p.keyName);
+  if(!key) throw new Error(`No ${which} key saved — add one under Setup`);
+  const r=await fetch(p.url,{
     method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
-    body: JSON.stringify({ model: store.get('groqModel')||'openai/gpt-oss-120b',
+    body: JSON.stringify({ model: store.get('textModel')||store.get('groqModel')||p.fallback,
       messages, temperature:0.95, response_format:{type:'json_object'} })
   });
   if(!r.ok){ const b=await r.text();
-    throw new Error(r.status===401?'Groq rejected the key':r.status===429?'Groq rate limit — wait a minute':b.slice(0,140)); }
+    throw new Error(r.status===401?`${which} rejected the key`:r.status===429?`${which} rate limit — wait a minute`:b.slice(0,140)); }
   return JSON.parse((await r.json()).choices[0].message.content);
 }
 
@@ -785,13 +821,59 @@ $('#btnConnect').onclick=()=>{
   }).requestAccessToken();
 };
 
-async function upload(c){
+// Shorts peak midday and mid-evening IST, unlike long-form's late afternoon.
+const SHORT_SLOTS=[{dow:3,hour:12},{dow:5,hour:19},{dow:6,hour:13},{dow:0,hour:19},{dow:1,hour:12}];
+function nextSlotLocal(slot,after){
+  const floor=new Date(after.getTime()+20*60000);
+  for(let add=0;add<21;add++){
+    const probe=new Date(floor.getTime()+add*864e5);
+    const ist=new Date(probe.getTime()+(330+probe.getTimezoneOffset())*60000);
+    if(ist.getDay()!==slot.dow) continue;
+    ist.setHours(slot.hour,0,0,0);
+    const back=new Date(ist.getTime()-(330+probe.getTimezoneOffset())*60000);
+    if(back>floor) return back;
+  }
+  return new Date(floor.getTime()+864e5);
+}
+function planShorts(n){
+  const out=[]; let cursor=new Date(Date.now()+20*60000); const perDay={};
+  while(out.length<n){
+    let placed=false;
+    for(const s of SHORT_SLOTS){
+      if(out.length>=n) break;
+      const when=nextSlotLocal(s,cursor);
+      const k=when.toISOString().slice(0,10);
+      if((perDay[k]||0)>=2) continue;
+      if(out.some(o=>Math.abs(o-when)<3*3600e3)) continue;
+      perDay[k]=(perDay[k]||0)+1; out.push(when); placed=true;
+    }
+    if(!placed) cursor=new Date(cursor.getTime()+864e5);
+    if(cursor-Date.now()>40*864e5) break;
+  }
+  return out.sort((a,b)=>a-b).slice(0,n);
+}
+const istLabel=d=>new Date(d).toLocaleString('en-IN',
+  {timeZone:'Asia/Kolkata',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+
+$('#relMode').addEventListener('change',()=>{
+  $('#relWhenWrap').style.display=$('#relMode').value==='custom'?'block':'none';
+  if($('#relMode').value==='spread'){
+    const n=S.clips.filter(c=>c.state==='filmed').length||3;
+    $('#relNote').innerHTML=planShorts(n).map((d,i)=>`${i+1}. ${istLabel(d)}`).join('<br>');
+  } else $('#relNote').textContent='Shorts peak at different hours from long-form — midday and mid-evening IST.';
+});
+
+async function upload(c,when){
   c.state='uploading'; paintClips();
+  const at=when||(($('#relMode').value==='custom'&&$('#relWhen').value)?new Date($('#relWhen').value):null);
+  const scheduled=at&&at>new Date(Date.now()+60000);
   const desc = `${c.caption}\n\n${c.beats.map(b=>b.line).join(' ')}\n\n${c.tags.map(t=>'#'+t).join(' ')} #shorts`;
   const meta={ snippet:{ title:c.title.slice(0,100), description:desc.slice(0,5000),
       tags:c.tags.concat('shorts'), categoryId:'23' },
-    status:{ privacyStatus:$('#priv').value, selfDeclaredMadeForKids:$('#kids').checked,
-      containsSyntheticMedia:$('#synth').checked } };
+    status:{ privacyStatus: scheduled?'private':$('#priv').value,
+      selfDeclaredMadeForKids:$('#kids').checked,
+      containsSyntheticMedia:$('#synth').checked,
+      ...(scheduled?{publishAt:at.toISOString()}:{}) } };
 
   const init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{
     method:'POST', headers:{Authorization:'Bearer '+S.token,'Content-Type':'application/json',
@@ -812,8 +894,10 @@ async function upload(c){
     x.onerror=()=>rej(new Error('network dropped'));
     x.send(c.blob);
   });
-  c.videoId=video.id; c.state='done'; bumpPosted();
-  log(`Published “${c.title}” → youtube.com/shorts/${video.id}`,'ok');
+  c.videoId=video.id; bumpPosted();
+  c.state=scheduled?'scheduled':'done';
+  log(scheduled?`Scheduled “${c.title}” for ${istLabel(at)}`
+               :`Published “${c.title}” → youtube.com/shorts/${video.id}`,'ok');
   paintClips();
 }
 
@@ -821,10 +905,29 @@ $('#btnUpload').onclick=async()=>{
   if(S.busy) return;
   const todo=S.clips.filter(c=>c.state==='filmed'&&c.blob);
   if(!todo.length){ log('Nothing filmed yet.','er'); return; }
+  const cd=coolingDown();
+  if(cd){ const m=`YouTube has paused uploads on this channel until ${istLabel(cd)}.`;
+    log(m,'er'); $('#upNote').textContent=m; return; }
+  const room=dailyLimit()-uploadsToday();
+  if(room<=0){ const m=`Daily upload limit of ${dailyLimit()} reached. Scheduling will not help — the upload itself still counts today.`;
+    log(m,'er'); $('#upNote').textContent=m; return; }
   S.busy=true; $('#btnUpload').disabled=true;
-  for(const c of todo){
-    try{ await upload(c); }
-    catch(e){ c.state='failed'; c.err=e.message; log(`${c.title}: ${e.message}`,'er'); paintClips(); }
+  const plan=$('#relMode').value==='spread'?planShorts(todo.length):null;
+  for(const [i,c] of todo.entries()){
+    if(i>=room){ log(`Only ${room} uploads left today — stopping here.`); break; }
+    try{ await upload(c, plan?plan[i]:null); }
+    catch(e){
+      c.state='failed'; c.err=e.message;
+      if(/uploadLimitExceeded|exceeded the number of videos/i.test(e.message)){
+        const pac=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
+        const mid=new Date(pac); mid.setHours(24,0,0,0);
+        const until=new Date(Date.now()+(mid-pac));
+        store.set('uploadCooldown',until.toISOString());
+        const m=`YouTube stopped uploads after ${uploadsToday()} today. Not a strike — they unlock at ${istLabel(until)}.`;
+        log(m,'er'); $('#upNote').textContent=m; paintClips(); paintStrip(); break;
+      }
+      log(`${c.title}: ${e.message}`,'er'); paintClips();
+    }
   }
   S.busy=false; $('#btnUpload').disabled=false;
   $('#upBar').style.width='0%'; $('#upNote').textContent='Finished.';

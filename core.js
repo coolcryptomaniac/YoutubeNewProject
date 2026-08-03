@@ -1,0 +1,601 @@
+/* ═══════════════════════════════════════════════════════════
+   Ridge core — shared by music.html and shorts.html
+   Mood analysis · providers · vault (IndexedDB) · Drive backup
+   ═══════════════════════════════════════════════════════════ */
+'use strict';
+
+export const store = {
+  get: k => { try { return JSON.parse(localStorage.getItem('ridge.' + k)); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem('ridge.' + k, JSON.stringify(v)); } catch {} }
+};
+
+export const sleep = ms => new Promise(r => setTimeout(r, ms));
+export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ───────────────── mood analysis ─────────────────
+   Runs on the decoded AudioBuffer. Everything here is plain
+   arithmetic over the samples — no FFT library, no network. */
+
+export function analyseAudio(buf){
+  const ch = buf.getChannelData(0);
+  const sr = buf.sampleRate;
+  const win = Math.floor(sr * 0.046);           // ~46 ms windows
+  const hop = Math.floor(win / 2);
+  const frames = Math.floor((ch.length - win) / hop);
+  if (frames < 8) return fallbackMood();
+
+  const rms = new Float32Array(frames);
+  const zcr = new Float32Array(frames);
+
+  for (let f = 0; f < frames; f++){
+    const s = f * hop;
+    let sum = 0, cross = 0, prev = ch[s];
+    for (let i = 0; i < win; i++){
+      const v = ch[s + i];
+      sum += v * v;
+      if ((v >= 0) !== (prev >= 0)) cross++;
+      prev = v;
+    }
+    rms[f] = Math.sqrt(sum / win);
+    zcr[f] = cross / win;
+  }
+
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const std = (a, m) => Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length);
+
+  const rMean = mean(rms), rStd = std(rms, rMean);
+  const zMean = mean(zcr);
+
+  // onset envelope: positive energy flux
+  const flux = new Float32Array(frames - 1);
+  for (let f = 1; f < frames; f++) flux[f - 1] = Math.max(0, rms[f] - rms[f - 1]);
+  const fMean = mean(flux);
+
+  // A sustained pad has almost no onset flux. Autocorrelating that just
+  // finds noise, so decide first whether there is any beat to look for.
+  const percussive = fMean / (rMean || 1e-6);
+  let bpm = 0;
+
+  if (percussive > 0.035){
+    const fps = sr / hop;
+    const scores = [];
+    for (let cand = 60; cand <= 180; cand++){
+      const lag = Math.round(fps * 60 / cand);
+      if (lag < 2 || lag >= flux.length) continue;
+      let acc = 0;
+      for (let i = 0; i + lag < flux.length; i++) acc += flux[i] * flux[i + lag];
+      scores.push({ cand, score: acc / (flux.length - lag) });
+    }
+    if (scores.length){
+      const best = scores.reduce((a, b) => b.score > a.score ? b : a);
+      const avg = mean(scores.map(s => s.score));
+      // only trust it if the peak genuinely stands out from the field
+      if (best.score > avg * 1.18) bpm = best.cand;
+    }
+  }
+
+  // normalised 0..1 descriptors
+  const energy     = clamp(rMean * 5.5, 0, 1);
+  const brightness = clamp(zMean * 14, 0, 1);
+  const dynamics   = clamp(rStd / (rMean || 1e-6), 0, 1.6) / 1.6;
+  // no detectable beat means the track is never "fast", whatever else it is
+  const pace       = bpm ? clamp((bpm - 60) / 120, 0, 1) : clamp(energy * 0.45, 0, 0.45);
+
+  return { bpm, energy, brightness, dynamics, pace, ...classify({ bpm, energy, brightness, dynamics, pace }) };
+}
+
+function fallbackMood(){
+  return { bpm: 0, energy: .5, brightness: .5, dynamics: .5, pace: .5,
+           mood: 'cinematic', label: 'Cinematic', visual: 'nebula',
+           palette: ['#7C6CFF', '#FF7A9C'], sceneMood: 'wide cinematic landscapes, soft haze, golden hour' };
+}
+
+/* mood → a visualiser, a palette and a scene direction */
+const MOODS = {
+  serene:    { label:'Serene',     visual:'aurora',  palette:['#8FD9C9','#7C6CFF'],
+               sceneMood:'still misty landscapes at dawn, soft pastel light, wide empty space, calm' },
+  melancholy:{ label:'Melancholy', visual:'strings', palette:['#7C6CFF','#5AC8FA'],
+               sceneMood:'rain on windows, empty streets at blue hour, muted desaturated palette, solitude' },
+  cinematic: { label:'Cinematic',  visual:'nebula',  palette:['#FF7A9C','#FFC257'],
+               sceneMood:'sweeping mountain vistas, volumetric light, dramatic clouds, golden hour, epic scale' },
+  warm:      { label:'Warm',       visual:'ridge',   palette:['#FFC257','#FF7A9C'],
+               sceneMood:'sunlit interiors, warm analogue film grain, terracotta and amber, nostalgic' },
+  driving:   { label:'Driving',    visual:'bars',    palette:['#FF7A9C','#FFC257'],
+               sceneMood:'motion blur, night highways, neon reflections, kinetic energy, long exposure' },
+  electric:  { label:'Electric',   visual:'grid',    palette:['#5AC8FA','#FF7A9C'],
+               sceneMood:'chrome and neon, synthwave horizon, laser grids, high contrast, retro-futurist' },
+  euphoric:  { label:'Euphoric',   visual:'pulse',   palette:['#FF7A9C','#8FD9C9'],
+               sceneMood:'festival crowds, confetti light, bright saturated colour, celebration, bloom' },
+  hypnotic:  { label:'Hypnotic',   visual:'orbit',   palette:['#8FD9C9','#5AC8FA'],
+               sceneMood:'slow geometric patterns, kaleidoscopic symmetry, deep space, meditative' }
+};
+
+export function classify(d){
+  const { energy, brightness, dynamics, pace } = d;
+  let key;
+  if (energy < .3 && pace < .35)                    key = brightness < .4 ? 'melancholy' : 'serene';
+  else if (energy < .45 && dynamics > .55)          key = 'cinematic';
+  else if (energy < .5)                             key = brightness > .55 ? 'hypnotic' : 'warm';
+  else if (pace > .65 && brightness > .55)          key = energy > .75 ? 'euphoric' : 'electric';
+  else if (pace > .5)                               key = 'driving';
+  else                                              key = dynamics > .5 ? 'cinematic' : 'warm';
+  return { mood: key, ...MOODS[key] };
+}
+
+export const MOOD_LIST = Object.entries(MOODS).map(([k, v]) => ({ key: k, ...v }));
+
+/* ───────────────── providers ─────────────────
+   Every one of these was checked as browser-reachable.
+   Cerebras is deliberately absent — its API blocks CORS. */
+
+export const IMAGE_PROVIDERS = {
+  pollinations: {
+    label: 'Pollinations — free, no key',
+    needsKey: false,
+    maxEdge: 1024,
+    pace: 15500,
+    async make(prompt, w, h, seed){
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+                  `?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('Pollinations ' + r.status);
+      const b = await r.blob();
+      if (!b.type.startsWith('image/')) throw new Error('Pollinations returned an error page');
+      return b;
+    }
+  },
+  gemini: {
+    label: 'Gemini 2.5 Flash Image — free key, 500/day',
+    needsKey: 'geminiKey',
+    maxEdge: 1024,
+    pace: 1200,
+    async make(prompt, w, h, seed){
+      const key = store.get('geminiKey');
+      if (!key) throw new Error('No Gemini key saved');
+      const ratio = w > h ? '16:9' : h > w ? '9:16' : '1:1';
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`,
+        { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            contents:[{ parts:[{ text: `${prompt}\n\nAspect ratio ${ratio}. No text, letters or watermark anywhere in the image.` }] }],
+            generationConfig:{ responseModalities:['IMAGE'] }
+          }) });
+      if (!r.ok){
+        const t = await r.text();
+        throw new Error(r.status === 429 ? 'Gemini daily quota reached' : 'Gemini ' + r.status + ' ' + t.slice(0,90));
+      }
+      const j = await r.json();
+      const part = j.candidates?.[0]?.content?.parts?.find(p => p.inlineData || p.inline_data);
+      const inline = part?.inlineData || part?.inline_data;
+      if (!inline) throw new Error('Gemini returned no image');
+      const bin = atob(inline.data);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      return new Blob([buf], { type: inline.mimeType || inline.mime_type || 'image/png' });
+    }
+  }
+};
+
+export const TEXT_PROVIDERS = {
+  groq: {
+    label: 'Groq — free key, fastest',
+    keyName: 'groqKey', keyPrefix: 'gsk_',
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b']
+  },
+  openrouter: {
+    label: 'OpenRouter — free models',
+    keyName: 'orKey', keyPrefix: 'sk-or-',
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    models: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free', 'qwen/qwen3-235b-a22b:free']
+  }
+};
+
+export async function think(messages, { temperature = 0.85 } = {}){
+  const which = store.get('textProvider') || 'groq';
+  const p = TEXT_PROVIDERS[which];
+  const key = store.get(p.keyName);
+  if (!key) throw new Error(`No ${which} key saved — add one under Setup`);
+  const model = store.get('textModel') || p.models[0];
+
+  const r = await fetch(p.url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + key },
+    body: JSON.stringify({ model, messages, temperature, response_format:{ type:'json_object' } })
+  });
+  if (!r.ok){
+    const t = await r.text();
+    if (r.status === 401) throw new Error(`${which} rejected the key`);
+    if (r.status === 429) throw new Error(`${which} rate limit — wait a minute`);
+    throw new Error(`${which} ${r.status}: ${t.slice(0,120)}`);
+  }
+  const j = await r.json();
+  const txt = j.choices?.[0]?.message?.content || '';
+  return JSON.parse(txt.replace(/^```json\s*|\s*```$/g, ''));
+}
+
+export async function makeImage(prompt, w, h, seed, tries = 3){
+  const which = store.get('imageProvider') || 'pollinations';
+  const p = IMAGE_PROVIDERS[which] || IMAGE_PROVIDERS.pollinations;
+  let last;
+  for (let a = 0; a < tries; a++){
+    try { return await p.make(prompt, w, h, seed); }
+    catch (e){
+      last = e;
+      if (/quota|No .* key/i.test(e.message)) throw e;   // no point retrying these
+      if (a < tries - 1) await sleep(6000 * (a + 1));
+    }
+  }
+  throw last;
+}
+export const imagePace = () =>
+  (IMAGE_PROVIDERS[store.get('imageProvider') || 'pollinations'] || IMAGE_PROVIDERS.pollinations).pace;
+
+/* ───────────────── vault: survive a crash ─────────────────
+   IndexedDB holds audio, rendered video and job state so a
+   refresh, a crash or a closed laptop doesn't lose the work. */
+
+const DB = 'ridge-vault', VER = 1;
+let _db;
+function db(){
+  if (_db) return _db;
+  _db = new Promise((res, rej) => {
+    const q = indexedDB.open(DB, VER);
+    q.onupgradeneeded = () => {
+      const d = q.result;
+      if (!d.objectStoreNames.contains('blobs'))  d.createObjectStore('blobs');
+      if (!d.objectStoreNames.contains('state'))  d.createObjectStore('state');
+    };
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+  return _db;
+}
+async function tx(name, mode, fn){
+  const d = await db();
+  return new Promise((res, rej) => {
+    const t = d.transaction(name, mode);
+    const s = t.objectStore(name);
+    const out = fn(s);
+    t.oncomplete = () => res(out?.result ?? out);
+    t.onerror = () => rej(t.error);
+  });
+}
+
+export const vault = {
+  putBlob:  (k, b) => tx('blobs', 'readwrite', s => s.put(b, k)),
+  getBlob:  k      => tx('blobs', 'readonly',  s => s.get(k)),
+  delBlob:  k      => tx('blobs', 'readwrite', s => s.delete(k)),
+  keys:     ()     => tx('blobs', 'readonly',  s => s.getAllKeys()),
+  putState: (k, v) => tx('state', 'readwrite', s => s.put(v, k)),
+  getState: k      => tx('state', 'readonly',  s => s.get(k)),
+  async clear(){
+    await tx('blobs', 'readwrite', s => s.clear());
+    await tx('state', 'readwrite', s => s.clear());
+  },
+  async usage(){
+    if (!navigator.storage?.estimate) return null;
+    const e = await navigator.storage.estimate();
+    return { used: e.usage || 0, quota: e.quota || 0 };
+  },
+  // ask the browser not to evict this data under storage pressure
+  persist: () => navigator.storage?.persist ? navigator.storage.persist() : Promise.resolve(false)
+};
+
+/* ───────────────── Google Drive backup ─────────────────
+   Scope drive.file — the app can only ever see files it made. */
+
+export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+export async function driveFolder(token, name = 'Ridge'){
+  const q = encodeURIComponent(
+    `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const found = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`,
+    { headers:{ Authorization:'Bearer ' + token } }).then(r => r.json());
+  if (found.files?.length) return found.files[0].id;
+
+  const made = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method:'POST',
+    headers:{ Authorization:'Bearer ' + token, 'Content-Type':'application/json' },
+    body: JSON.stringify({ name, mimeType:'application/vnd.google-apps.folder' })
+  }).then(r => r.json());
+  if (!made.id) throw new Error('Could not create the Drive folder');
+  return made.id;
+}
+
+export async function driveUpload(token, folderId, name, blob, onProgress){
+  const meta = { name, parents:[folderId] };
+  const init = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,webViewLink', {
+      method:'POST',
+      headers:{ Authorization:'Bearer ' + token, 'Content-Type':'application/json',
+                'X-Upload-Content-Type': blob.type || 'application/octet-stream',
+                'X-Upload-Content-Length': String(blob.size) },
+      body: JSON.stringify(meta)
+    });
+  if (!init.ok) throw new Error('Drive rejected the upload: ' + (await init.text()).slice(0,120));
+  const url = init.headers.get('Location') || init.headers.get('location');
+  if (!url) throw new Error('Drive did not return an upload URL');
+
+  return new Promise((res, rej) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url, true);
+    x.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+    x.upload.onprogress = e => e.lengthComputable && onProgress?.(e.loaded / e.total);
+    x.onload = () => x.status < 300 ? res(JSON.parse(x.responseText)) : rej(new Error('Drive upload failed, status ' + x.status));
+    x.onerror = () => rej(new Error('network dropped during the Drive upload'));
+    x.send(blob);
+  });
+}
+
+export async function driveQuota(token){
+  const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=storageQuota',
+    { headers:{ Authorization:'Bearer ' + token } });
+  if (!r.ok) return null;
+  const q = (await r.json()).storageQuota || {};
+  return { used: Number(q.usage || 0), limit: Number(q.limit || 0) };
+}
+
+/* ───────────────── resumable YouTube upload ─────────────────
+   The session URL is durable for a week. Store it and an
+   interrupted upload picks up from the byte it stopped at. */
+
+export async function ytSession(token, blob, meta){
+  const r = await fetch(
+    'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+      method:'POST',
+      headers:{ Authorization:'Bearer ' + token, 'Content-Type':'application/json',
+                'X-Upload-Content-Type': blob.type || 'video/webm',
+                'X-Upload-Content-Length': String(blob.size) },
+      body: JSON.stringify(meta)
+    });
+  if (!r.ok){
+    const t = await r.text();
+    throw new Error(r.status === 403 ? 'quota spent or upload not permitted' : t.slice(0,160));
+  }
+  const url = r.headers.get('Location') || r.headers.get('location');
+  if (!url) throw new Error('YouTube did not return an upload URL');
+  return url;
+}
+
+/** Ask YouTube how many bytes it already has. Returns -1 if the session is dead. */
+export async function ytProgress(url, size){
+  const r = await fetch(url, { method:'PUT', headers:{ 'Content-Range': `bytes */${size}` } });
+  if (r.status === 200 || r.status === 201) return size;          // already finished
+  if (r.status !== 308) return -1;                                 // expired or gone
+  const range = r.headers.get('Range');
+  return range ? Number(range.split('-')[1]) + 1 : 0;
+}
+
+export function ytPut(url, blob, from, onProgress){
+  return new Promise((res, rej) => {
+    const slice = from > 0 ? blob.slice(from) : blob;
+    const x = new XMLHttpRequest();
+    x.open('PUT', url, true);
+    x.setRequestHeader('Content-Type', blob.type || 'video/webm');
+    if (from > 0) x.setRequestHeader('Content-Range', `bytes ${from}-${blob.size - 1}/${blob.size}`);
+    x.upload.onprogress = e => e.lengthComputable && onProgress?.((from + e.loaded) / blob.size);
+    x.onload = () => x.status < 300 ? res(JSON.parse(x.responseText))
+                                    : rej(new Error('upload failed, status ' + x.status));
+    x.onerror = () => rej(new Error('network dropped'));
+    x.send(slice);
+  });
+}
+
+/* ───────────────── release timing ─────────────────
+   Two sources: what actually worked on this channel, and the
+   published consensus for Indian audiences. Own data wins once
+   there is enough of it. All hours are IST. */
+
+// India peaks 18:00–21:00. Publish 2–3h before so indexing finishes first.
+export const DEFAULT_SLOTS = {
+  long:   [{ dow:3, hour:16 }, { dow:5, hour:16 }, { dow:0, hour:10 }, { dow:6, hour:11 }, { dow:2, hour:17 }],
+  shorts: [{ dow:3, hour:12 }, { dow:5, hour:19 }, { dow:6, hour:13 }, { dow:0, hour:19 }, { dow:1, hour:12 }]
+};
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+const istParts = iso => {
+  const d = new Date(iso);
+  const s = new Date(d.getTime() + (330 + d.getTimezoneOffset()) * 60000);
+  return { dow: s.getDay(), hour: s.getHours() };
+};
+
+/**
+ * Rank publishing slots from this channel's own history.
+ * Views are age-normalised — a video from last year has had far longer
+ * to accumulate views than one from Tuesday, and comparing them raw
+ * would just rank "oldest" first.
+ */
+export function bestSlots(videos, { shorts = null } = {}){
+  const pool = (videos || []).filter(v =>
+    v.published && Number.isFinite(v.views) && (shorts === null || !!v.isShort === shorts));
+  if (pool.length < 6) return { slots: null, confidence: 'none', n: pool.length };
+
+  const scored = pool.map(v => {
+    const ageDays = Math.max(1, (Date.now() - new Date(v.published)) / 864e5);
+    return { ...istParts(v.published), rate: v.views / Math.pow(ageDays, 0.6) };
+  });
+
+  const all = scored.map(s => s.rate).sort((a, b) => a - b);
+  const median = all[Math.floor(all.length / 2)] || 1;
+
+  const bucket = {};
+  for (const s of scored){
+    const band = Math.floor(s.hour / 3) * 3;                 // 3-hour bands
+    const k = `${s.dow}:${band}`;
+    (bucket[k] ||= { dow: s.dow, band, n: 0, total: 0 });
+    bucket[k].n++; bucket[k].total += s.rate;
+  }
+
+  const ranked = Object.values(bucket)
+    .map(b => ({ ...b, index: (b.total / b.n) / (median || 1) }))
+    .filter(b => b.n >= 2)
+    .sort((a, b) => b.index - a.index);
+
+  if (!ranked.length) return { slots: null, confidence: 'none', n: pool.length };
+
+  const confidence = pool.length >= 25 && ranked[0].n >= 4 ? 'good'
+                   : pool.length >= 12 ? 'thin' : 'weak';
+
+  // A band can top the ranking simply because few videos landed there.
+  // Nobody in India is watching at 2am, so a dead-hour slot has to clear a
+  // much higher bar than a plausible one before it is worth scheduling into.
+  const dead = b => b.band < 7 || b.band >= 23;
+  const usable = ranked.filter(b => !dead(b) || (b.index > 1.6 && b.n >= 4 && confidence === 'good'));
+  if (!usable.length) return { slots: null, confidence: 'none', n: pool.length, reason: 'only dead-hour slots ranked' };
+
+  return {
+    confidence, n: pool.length,
+    slots: usable.slice(0, 5).map(b => ({
+      dow: b.dow, hour: b.band + 1, samples: b.n,
+      index: Number(b.index.toFixed(2)),
+      label: `${DOW[b.dow]} ${String(b.band).padStart(2,'0')}:00–${String(b.band+3).padStart(2,'0')}:00`
+    })),
+    worst: ranked.slice(-2).map(b => ({
+      label: `${DOW[b.dow]} ${String(b.band).padStart(2,'0')}:00–${String(b.band+3).padStart(2,'0')}:00`,
+      index: Number(b.index.toFixed(2))
+    }))
+  };
+}
+
+/** Next occurrence of a {dow,hour} slot in IST, as a real Date. */
+export function nextSlot(slot, after = new Date(), minLeadMinutes = 20){
+  const floor = new Date(after.getTime() + minLeadMinutes * 60000);
+  for (let add = 0; add < 21; add++){
+    const probe = new Date(floor.getTime() + add * 864e5);
+    const ist = new Date(probe.getTime() + (330 + probe.getTimezoneOffset()) * 60000);
+    if (add === 0 || ist.getDay() === slot.dow){
+      if (ist.getDay() !== slot.dow) continue;
+      ist.setHours(slot.hour, 0, 0, 0);
+      const back = new Date(ist.getTime() - (330 + probe.getTimezoneOffset()) * 60000);
+      if (back > floor) return back;
+    }
+  }
+  return new Date(floor.getTime() + 864e5);
+}
+
+/**
+ * Lay n videos across the best slots without stacking two in one day —
+ * a burst on one day reads as a dump and performs worse than a trickle.
+ */
+export function planReleases(n, slots, { from = new Date(), perDay = 2, confidence = 'good', kind = 'long' } = {}){
+  const fallback = DEFAULT_SLOTS[kind] || DEFAULT_SLOTS.long;
+  // Thin evidence is worse than no evidence if trusted blindly, so below
+  // "good" the channel's own slots only lead and the defaults fill in.
+  const lead = !slots || !slots.length ? [] : confidence === 'good' ? slots : slots.slice(0, 2);
+  // Even a strong single slot needs company — one slot means one release a
+  // week, which spreads a batch over months instead of days.
+  const use = [...lead];
+  for (const f of fallback)
+    if (use.length < 5 && !use.some(s => s.dow === f.dow && Math.abs(s.hour - f.hour) < 3)) use.push(f);
+  if (!use.length) use.push(...fallback);
+  const out = [];
+  let cursor = new Date(from.getTime() + 20 * 60000);
+  const perDayCount = {};
+
+  while (out.length < n){
+    let placed = false;
+    for (const s of use){
+      if (out.length >= n) break;
+      const when = nextSlot(s, cursor);
+      const dayKey = when.toISOString().slice(0, 10);
+      if ((perDayCount[dayKey] || 0) >= perDay) continue;
+      if (out.some(o => Math.abs(o.at - when) < 3 * 3600e3)) continue;  // keep 3h apart
+      perDayCount[dayKey] = (perDayCount[dayKey] || 0) + 1;
+      out.push({ at: when, slot: s });
+      placed = true;
+    }
+    if (!placed) cursor = new Date(cursor.getTime() + 864e5);
+    if (cursor - from > 40 * 864e5) break;
+  }
+  return out.sort((a, b) => a.at - b.at).slice(0, n);
+}
+
+export const istLabel = d => new Date(d).toLocaleString('en-IN',
+  { timeZone:'Asia/Kolkata', weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+
+/* ───────────────── daily upload budget ─────────────────
+   Two separate ceilings sit on top of each other:
+
+   1. The API's Video Uploads bucket — 100 calls a day, documented.
+   2. YouTube's per-channel daily cap — undocumented, varies with account
+      age and standing. Community reporting puts it near 10-15 for
+      unverified channels and around 100 once verified.
+
+   Whichever is lower binds. Going past it returns uploadLimitExceeded and
+   locks uploads for 24 hours — not a ban, but a wasted day.
+
+   Scheduling does NOT get around this. publishAt only moves when a video
+   goes live; the upload itself still happens today and still counts. */
+
+export const API_UPLOAD_BUCKET = 100;
+
+export const ACCOUNT_TIERS = {
+  unverified: { label:'Unverified — no phone verification', limit: 12,
+                note:'Community reports put unverified channels near 10–15 a day. 12 leaves headroom.' },
+  verified:   { label:'Verified — phone verified, established', limit: 100,
+                note:'Matches the API bucket, so both ceilings land in the same place.' },
+  cautious:   { label:'Verified but pacing deliberately', limit: 20,
+                note:'Well inside every limit. Spam review looks at rate, not just totals.' },
+  custom:     { label:'Set it myself', limit: null, note:'' }
+};
+
+const dayKey = d => new Date(d).toISOString().slice(0, 10);
+/** YouTube's day rolls at midnight Pacific — 12:30 PM IST. */
+export function nextReset(now = new Date()){
+  const pac = new Date(now.toLocaleString('en-US', { timeZone:'America/Los_Angeles' }));
+  const midnight = new Date(pac); midnight.setHours(24, 0, 0, 0);
+  return new Date(now.getTime() + (midnight - pac));
+}
+
+export const budget = {
+  limit(){
+    const tier = store.get('accountTier') || 'verified';
+    const set = tier === 'custom' ? Number(store.get('customLimit')) || 20
+                                  : ACCOUNT_TIERS[tier]?.limit || 100;
+    return Math.min(set, API_UPLOAD_BUCKET);
+  },
+  usedToday(){ return (store.get('uploads') || {})[dayKey(Date.now())] || 0; },
+  record(){
+    const d = store.get('uploads') || {};
+    d[dayKey(Date.now())] = (d[dayKey(Date.now())] || 0) + 1;
+    // keep a fortnight so the pattern is visible, drop the rest
+    for (const k of Object.keys(d)) if ((Date.now() - new Date(k)) > 14 * 864e5) delete d[k];
+    store.set('uploads', d);
+  },
+  remaining(){ return Math.max(0, this.limit() - this.usedToday() - (this.cooldown() ? 1e6 : 0)); },
+  /** Returns the Date uploads unlock, or null if not blocked. */
+  cooldown(){
+    const until = store.get('uploadCooldown');
+    if (!until) return null;
+    const d = new Date(until);
+    if (d <= new Date()){ store.set('uploadCooldown', null); return null; }
+    return d;
+  },
+  /** Called when YouTube itself says stop. Believe it over our own count. */
+  startCooldown(){
+    const until = nextReset();
+    store.set('uploadCooldown', until.toISOString());
+    // whatever we thought the limit was, the channel's real one is lower
+    const observed = this.usedToday();
+    if (observed > 0 && observed < this.limit()){
+      store.set('observedLimit', observed);
+    }
+    return until;
+  },
+  observed(){ return Number(store.get('observedLimit')) || null; },
+  /** Why an upload can't run right now, or null if it can. */
+  block(){
+    const cd = this.cooldown();
+    if (cd) return { reason:'cooldown', until: cd,
+      message:`YouTube has paused uploads on this channel. They unlock at ${istLabel(cd)}.` };
+    const left = this.limit() - this.usedToday();
+    if (left <= 0) return { reason:'limit', until: nextReset(),
+      message:`You've hit your ${this.limit()}-a-day setting. Resets at ${istLabel(nextReset())}.` };
+    return null;
+  }
+};
+
+/** YouTube's own signal that the channel is done for the day. */
+export const isUploadLimit = err =>
+  /uploadLimitExceeded|exceeded the number of videos/i.test(String(err?.message || err));
