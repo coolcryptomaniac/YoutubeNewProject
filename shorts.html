@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridge Shorts — 9:16 comedy clips</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --night:#0E1220;--deep:#161C2E;--panel:#1B2236;--line:#2E3854;
+  --snow:#EDF0F7;--mist:#8792AE;
+  --dawn:#FF7A9C;--glacier:#8FD9C9;--lamp:#FFC257;--dusk:#7C6CFF;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter Tight',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --hi:'Noto Sans Devanagari',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--night);color:var(--snow);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:3px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
+
+header{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#121729,var(--night));padding:20px 24px 0}
+.brandrow{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;max-width:1440px;margin:0 auto}
+h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.03em;margin:0;line-height:1}
+h1 span{color:var(--dawn)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--mist);letter-spacing:.14em;text-transform:uppercase;margin-top:7px;display:block}
+.acct{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mist);flex-wrap:wrap;justify-content:flex-end}
+.acct img{width:28px;height:28px;border-radius:50%;border:1px solid var(--line)}
+.acct b{color:var(--snow);font-weight:600}
+.acct a{color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+.acct a:hover{color:var(--snow)}
+
+.strip{max-width:1440px;margin:18px auto 0;padding-bottom:14px}
+.striphead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;gap:14px}
+.striphead span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist)}
+.slots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.slot{height:34px;background:var(--deep);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden}
+.slot::after{content:'';position:absolute;left:0;bottom:0;width:100%;height:3px;background:var(--line);transition:background .4s}
+.slot.queued::after{background:var(--dusk)}
+.slot.working::after{background:var(--lamp)}
+.slot.done::after{background:var(--glacier)}
+.slot.done{background:rgba(143,217,201,.07)}
+.slot i{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-style:normal;color:var(--mist)}
+
+nav{max-width:1440px;margin:0 auto;display:flex;gap:2px;overflow-x:auto}
+nav button{padding:11px 15px;font-size:13.5px;font-weight:500;color:var(--mist);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+nav button:hover{color:var(--snow)}
+nav button[aria-selected="true"]{color:var(--snow);border-bottom-color:var(--dawn)}
+
+main{max-width:1440px;margin:0 auto;padding:22px 24px 80px}
+.panes>section{display:none}
+.panes>section.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:22px;align-items:start}
+@media(max-width:940px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}
+.card+.card{margin-top:14px}
+h2{font-family:var(--display);font-size:17px;font-weight:600;margin:0 0 3px}
+.sub{color:var(--mist);font-size:13px;margin:0 0 16px}
+code{font-family:var(--mono);font-size:12px;background:var(--deep);padding:2px 6px;border-radius:3px;color:var(--glacier)}
+
+label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--mist);margin:0 0 6px}
+.f{margin-bottom:15px}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--deep);border:1px solid var(--line);border-radius:4px;padding:9px 11px;font-size:13.5px}
+input:focus,select:focus,textarea:focus{border-color:var(--dawn);outline:none}
+textarea{resize:vertical;min-height:70px;line-height:1.55}
+.hi{font-family:var(--hi)}
+
+.btn{background:var(--dawn);color:#20101A;font-weight:600;padding:11px 18px;border-radius:5px;font-size:14px;width:100%;display:block;text-align:center;text-decoration:none}
+.btn:hover:not(:disabled){filter:brightness(1.1)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--snow);font-weight:500}
+.btn.ghost:hover:not(:disabled){border-color:var(--snow);filter:none}
+.btn.sm{width:auto;padding:6px 12px;font-size:12px;display:inline-block}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.presets button{padding:11px 6px;background:var(--deep);border:1px solid var(--line);border-radius:4px;font-size:12px;color:var(--mist);line-height:1.35}
+.presets button:hover{color:var(--snow)}
+.presets button.on{border-color:var(--dawn);color:var(--snow);background:rgba(255,122,156,.09)}
+.presets b{display:block;font-weight:600;font-size:12.5px}
+.presets small{font-size:10.5px;opacity:.75}
+
+.stage{background:#000;border:1px solid var(--line);border-radius:6px;overflow:hidden;position:relative;max-width:330px;margin:0 auto}
+canvas{display:block;width:100%;height:auto}
+.rec{position:absolute;top:10px;left:10px;display:none;align-items:center;gap:7px;background:rgba(14,18,32,.85);padding:5px 10px;border-radius:20px;font-family:var(--mono);font-size:10.5px}
+.rec.on{display:flex}
+.rec b{width:7px;height:7px;border-radius:50%;background:var(--dawn);animation:blip 1.1s infinite}
+@keyframes blip{50%{opacity:.25}}
+
+.clip{background:var(--deep);border:1px solid var(--line);border-radius:5px;padding:13px;margin-top:10px}
+.clip.sel{border-color:var(--dawn)}
+.clip h3{font-family:var(--display);font-size:14.5px;font-weight:600;margin:0 0 8px}
+.beat{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:5px 0;align-items:start}
+.beat i{font-family:var(--mono);font-size:10px;font-style:normal;color:var(--dawn);padding-top:3px}
+.beat p{margin:0;font-family:var(--hi);font-size:14px;line-height:1.5}
+.beat small{display:block;font-family:var(--body);color:var(--mist);font-size:11.5px;margin-top:2px}
+.cliptop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:3.5px 8px;border-radius:20px;border:1px solid var(--line);color:var(--mist);white-space:nowrap}
+.pill.ready{color:var(--dusk);border-color:rgba(124,108,255,.4)}
+.pill.art,.pill.recording,.pill.uploading{color:var(--lamp);border-color:rgba(255,194,87,.4)}
+.pill.filmed{color:var(--snow);border-color:var(--snow)}
+.pill.done{color:var(--glacier);border-color:rgba(143,217,201,.45)}
+.pill.failed{color:var(--dawn);border-color:rgba(255,122,156,.45)}
+
+.panels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
+.pnl{aspect-ratio:9/16;border-radius:4px;overflow:hidden;border:1px solid var(--line);background:var(--night);display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:var(--mist)}
+.pnl img{width:100%;height:100%;object-fit:cover}
+
+.bar{height:5px;background:var(--deep);border-radius:3px;overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;background:var(--lamp);width:0;transition:width .2s}
+.note{font-family:var(--mono);font-size:11.5px;color:var(--mist);margin-top:8px;line-height:1.65}
+.warn{background:rgba(255,194,87,.07);border:1px solid rgba(255,194,87,.3);border-radius:5px;padding:13px 15px;font-size:13px;line-height:1.6;margin-bottom:14px}
+.warn b{color:var(--lamp);font-weight:600}
+.warn.bad{background:rgba(255,122,156,.06);border-color:rgba(255,122,156,.3)}
+.warn.bad b{color:var(--dawn)}
+.chk{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px;cursor:pointer}
+.chk input{accent-color:var(--dawn);width:15px;height:15px;flex:none;margin-top:3px}
+.chk span{font-size:13px}
+.chk small{color:var(--mist);font-size:12px;display:block;margin-top:1px}
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.75;max-height:200px;overflow-y:auto;background:var(--night);border:1px solid var(--line);border-radius:4px;padding:11px}
+.log .ok{color:var(--glacier)}
+.log .er{color:var(--dawn)}
+.log div{color:var(--mist)}
+.empty{text-align:center;padding:30px 18px;color:var(--mist);font-size:13.5px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:s;position:relative;padding:0 0 14px 32px;font-size:13.5px;line-height:1.6;color:var(--mist)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:21px;height:21px;border:1px solid var(--line);border-radius:50%;font-family:var(--mono);font-size:10.5px;display:grid;place-items:center;color:var(--dawn)}
+.steps b{color:var(--snow);font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brandrow">
+    <div><h1>Ridge Shorts<span>.</span></h1><span class="tag">9:16 · 10 seconds · Hindi</span></div>
+    <div class="acct" id="acct"><a href="./index.html">Today</a><a href="./music.html">Music</a><span>Not connected to YouTube</span></div>
+  </div>
+  <div class="strip">
+    <div class="striphead"><span>Today's clips</span><span id="quotaLabel">0 / 3</span></div>
+    <div class="slots" id="slots"></div>
+  </div>
+  <nav id="nav">
+    <button aria-selected="true" data-p="cast">Cast</button>
+    <button aria-selected="false" data-p="script">Script</button>
+    <button aria-selected="false" data-p="take">Take</button>
+    <button aria-selected="false" data-p="publish">Publish</button>
+    <button aria-selected="false" data-p="setup">Setup</button>
+  </nav>
+</header>
+
+<main class="panes">
+
+<!-- ═══ CAST ═══ -->
+<section id="p-cast" class="on">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Lock your cast</h2>
+        <p class="sub">The same description and seed go into every panel of every clip. That's what keeps the characters recognisable day after day.</p>
+        <div class="f">
+          <label>Who's in it</label>
+          <div class="presets" id="presets">
+            <button data-k="dogcat" class="on"><b>Dog &amp; cat</b><small>classic duo</small></button>
+            <button data-k="pups"><b>Street pups</b><small>gang of three</small></button>
+            <button data-k="kids"><b>Cartoon kids</b><small>read the note</small></button>
+          </div>
+        </div>
+        <div class="f"><label>Cast sheet — keep this exact wording</label><textarea id="castSheet" style="min-height:96px"></textarea></div>
+        <div class="f"><label>Art style</label>
+          <select id="artStyle">
+            <option value="3D Pixar-style animation, soft global illumination, expressive faces, vertical composition">3D animated — Pixar-ish</option>
+            <option value="hand-painted watercolour storybook illustration, warm paper texture, vertical composition">Watercolour storybook</option>
+            <option value="claymation stop-motion, visible fingerprints in the clay, studio lighting, vertical composition">Claymation</option>
+            <option value="flat 2D vector cartoon, bold outlines, bright flat colours, vertical composition">Flat 2D cartoon</option>
+          </select>
+        </div>
+        <div class="f"><label>Seed — same number keeps the look stable</label><input type="number" id="castSeed" value="4412"></div>
+        <div class="row">
+          <button class="btn sm" id="btnRef">Generate reference frame</button>
+          <button class="btn ghost sm" id="btnReseed">New seed</button>
+        </div>
+        <p class="note" id="castNote">Generate one reference frame and check you like the characters before writing scripts.</p>
+      </div>
+    </div>
+    <div>
+      <div class="stage"><canvas id="refc" width="1080" height="1920"></canvas></div>
+      <div class="card" style="margin-top:14px">
+        <div class="warn" id="kidWarn" style="display:none">
+          <b>About the kids preset.</b> Photoreal AI children draw heavy platform scrutiny, and anything YouTube reads as children's content gets flagged <b>Made for Kids</b> — which switches off comments, notifications and most monetisation. This preset is locked to a clearly cartoon style for that reason. Animal casts avoid the problem entirely and tend to travel further.
+        </div>
+        <h2>Why consistency is hard</h2>
+        <p class="sub" style="margin-bottom:0">Image models redraw from scratch every time. A fixed cast sheet plus a fixed seed gets you close — same breed, colours, proportions, style — but not identical. Treat it like a comic strip drawn by hand, not a rendered 3D character.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SCRIPT ═══ -->
+<section id="p-script">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Write today's clips</h2>
+        <p class="sub">Three beats per clip, Hindi dialogue in Devanagari, roughly ten seconds end to end.</p>
+        <div class="f"><label>Situation or running joke — optional</label><input type="text" id="theme" placeholder="Motu chori karta hai khana, Chotu pakad leta hai"></div>
+        <div class="row">
+          <div style="flex:1;min-width:130px"><label>How many clips</label>
+            <select id="clipCount"><option>1</option><option selected>2</option><option>3</option></select>
+          </div>
+          <div style="flex:1;min-width:130px"><label>Humour</label>
+            <select id="tone"><option value="warm slapstick, family safe">Warm slapstick</option><option value="dry deadpan, gentle sarcasm">Dry deadpan</option><option value="silly wordplay and puns">Silly wordplay</option></select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn sm" id="btnWrite">Write clips now</button>
+          <button class="btn ghost sm" id="btnBrief">Load today's brief</button>
+        </div>
+        <p class="note" id="writeNote">Add a Groq key under Setup to switch this on.</p>
+      </div>
+      <div id="clipList"></div>
+    </div>
+    <div class="card">
+      <h2>How a day runs</h2>
+      <ol class="steps" style="margin-top:14px">
+        <li>Lock the <b>cast</b> once. Reuse it for weeks.</li>
+        <li><b>Write clips</b> — Hindi dialogue and panel prompts.</li>
+        <li><b>Take</b>: generate three panels, then film the ten seconds. Talk over it live if you want your own voice.</li>
+        <li><b>Publish</b> to Shorts. Instagram is a download-and-post step — see Setup for why.</li>
+      </ol>
+      <p class="note">Two or three clips a day is the sweet spot. Beyond that Shorts starts reading the channel as a content farm.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ TAKE ═══ -->
+<section id="p-take">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Film the take</h2>
+        <p class="sub" id="takeWho">No clip selected. Pick one under Script.</p>
+        <div class="row">
+          <button class="btn ghost sm" id="btnPanels">Generate panels</button>
+          <button class="btn ghost sm" id="btnRehearse">Rehearse</button>
+          <button class="btn sm" id="btnFilm" style="margin-left:auto">Film 10 seconds</button>
+        </div>
+        <div class="panels" id="panelGrid"></div>
+        <div class="bar"><i id="takeBar"></i></div>
+        <p class="note" id="takeNote">Panels first, then film.</p>
+      </div>
+      <div class="card">
+        <h2>Sound</h2>
+        <div class="f"><label>Where the audio comes from</label>
+          <select id="audioMode">
+            <option value="mic">My voice — speak while it films</option>
+            <option value="file">An audio file I drop in</option>
+            <option value="none">Silent</option>
+          </select>
+        </div>
+        <div class="f" id="bedWrap" style="display:none"><label>Audio bed</label><input type="file" id="bedFile" accept="audio/*"></div>
+        <p class="note">Shorts with no sound get buried. Your own Hindi voice is the cheapest way to stand out from generated-caption clips.</p>
+      </div>
+    </div>
+    <div>
+      <div class="stage"><canvas id="cv" width="1080" height="1920"></canvas><div class="rec" id="rec"><b></b><span id="recTime">0.0s</span></div></div>
+      <div class="card" style="margin-top:14px">
+        <div class="f"><label>Clip length</label>
+          <select id="dur"><option value="8">8 seconds</option><option value="10" selected>10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option></select>
+        </div>
+        <label class="chk"><input type="checkbox" id="showCaps" checked><span>Burn Hindi captions into the video<small>Most Shorts play muted at first.</small></span></label>
+        <label class="chk"><input type="checkbox" id="showHandle" checked><span>Show channel handle</span></label>
+        <div class="f"><label>Handle</label><input type="text" id="handle" value="@mohucool"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PUBLISH ═══ -->
+<section id="p-publish">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>YouTube Shorts</h2>
+        <p class="sub">A 9:16 video under 60 seconds is filed as a Short automatically. No special flag needed.</p>
+        <div class="f"><label>Visibility</label>
+          <select id="priv"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select>
+        </div>
+        <label class="chk"><input type="checkbox" id="synth" checked><span>Declare altered or synthetic media</span></label>
+        <label class="chk"><input type="checkbox" id="kids"><span>Made for kids<small>Leave off unless you mean it — it disables comments and most monetisation.</small></span></label>
+        <button class="btn" id="btnConnect">Connect YouTube</button>
+        <button class="btn" id="btnUpload" style="margin-top:9px" disabled>Publish filmed clips</button>
+        <div class="bar"><i id="upBar"></i></div>
+        <p class="note" id="upNote">Not connected.</p>
+      </div>
+      <div class="card">
+        <h2>Instagram</h2>
+        <div class="warn bad">
+          <b>This one can't be one click from a static page.</b> Instagram's publishing API doesn't accept a file — it wants a public URL to fetch, in MP4 with H.264 and AAC. This app renders WebM in your browser with nowhere to host it. It also needs a Business account, a linked Facebook Page, a Meta app, and approved <code>instagram_content_publish</code> permission, which is a two-to-four week review.
+        </div>
+        <p class="sub">The honest workflow: download the clip, then post it from your phone. Ten seconds of tapping, and the caption is already written for you.</p>
+        <button class="btn ghost" id="btnDownloadAll">Download filmed clips</button>
+        <button class="btn ghost" id="btnCopyCaps" style="margin-top:9px">Copy all captions</button>
+      </div>
+    </div>
+    <div class="card"><h2>Activity</h2><div class="log" id="log"><div>Ready.</div></div></div>
+  </div>
+</section>
+
+<!-- ═══ SETUP ═══ -->
+<section id="p-setup">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Keys</h2>
+        <p class="sub">Shared with the music video app — set them in either place.</p>
+        <div class="f"><label>Google OAuth client ID</label><input type="text" id="clientId" placeholder="....apps.googleusercontent.com"></div>
+        <div class="f"><label>Groq API key</label><input type="password" id="groqKey" placeholder="gsk_..."></div>
+        <div class="f"><label>Model</label>
+          <select id="groqModel">
+            <option value="openai/gpt-oss-120b" selected>GPT-OSS 120B</option>
+            <option value="openai/gpt-oss-20b">GPT-OSS 20B — faster</option>
+            <option value="qwen/qwen3.6-27b">Qwen 3.6 27B</option>
+          </select>
+        </div>
+        <button class="btn ghost" id="btnSaveKeys">Save</button>
+        <p class="note">Authorized JavaScript origin for the OAuth client: <code id="origin"></code></p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="warn">
+          <b>Google Flow can't drive this.</b> Flow's free daily credits only work inside Flow's own web interface — there's no public API, and Google bills Flow credits and API usage as separate systems, so the credits can't be spent programmatically. The Gemini and Vertex routes to Veo do have an API, but video generation there is paid per second with no free tier. Unofficial bridges that log into Flow for you exist, cost money, and break whenever Google changes the page.
+        </div>
+        <h2>So where do the pictures come from</h2>
+        <p class="sub">Pollinations — free, no key, no account. It makes still panels, not motion, so this app animates them: slow push-ins, cuts on the dialogue beats, captions timed to the lines. It's a comic strip that moves rather than generated footage, and for ten-second comedy that difference matters less than you'd think.</p>
+        <p class="sub" style="margin-bottom:0">If you ever want true Veo motion, generate the clips by hand in Flow with your free credits, download them, and post from your phone. This app won't get in the way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+'use strict';
+
+const PRESETS = {
+  dogcat: "Motu, a chubby golden-brown street dog with one floppy ear and a red collar; and Chotu, a small grumpy grey cat with white paws and green eyes. Both stay exactly this colour and shape in every panel.",
+  pups: "Three scruffy Indian street puppies: Bhura, light brown with a black patch over one eye; Kaali, all black with a white chest spot; and Titu, cream coloured and smallest. Same three puppies, same markings, in every panel.",
+  kids: "Two cartoon Indian children in a village courtyard: Guddu, a round-faced boy in a yellow kurta with messy hair; and Pinki, a girl in a green frock with two braids. Clearly stylised cartoon characters, never photorealistic. Same design in every panel."
+};
+
+const S = { cast:'dogcat', ref:null, clips:[], sel:null, token:null, busy:false, generating:false, bed:null };
+const MAX_CLIPS = 3;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+const sleep = ms => new Promise(r => setTimeout(r,ms));
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function log(m,k){ const d=document.createElement('div'); if(k)d.className=k;
+  d.textContent=`${new Date().toTimeString().slice(0,8)}  ${m}`; $('#log').append(d); $('#log').scrollTop=1e6; }
+
+const store = {
+  get: k => { try { return JSON.parse(localStorage.getItem('ridge.'+k)); } catch { return null; } },
+  set: (k,v) => { try { localStorage.setItem('ridge.'+k, JSON.stringify(v)); } catch {} }
+};
+const todayKey = () => new Date().toISOString().slice(0,10);
+const postedToday = () => (store.get('shorts') || {})[todayKey()] || 0;
+function bumpPosted(){ const d=store.get('shorts')||{}; d[todayKey()]=(d[todayKey()]||0)+1; store.set('shorts',d); paintStrip(); }
+
+function paintStrip(){
+  const used = postedToday(), host = $('#slots'); host.innerHTML='';
+  const working = S.clips.some(c => ['art','recording','uploading'].includes(c.state));
+  for (let i=0;i<MAX_CLIPS;i++){
+    const d=document.createElement('div'); d.className='slot';
+    if (i<used) d.classList.add('done');
+    else if (working && i===used) d.classList.add('working');
+    else if (i<S.clips.length) d.classList.add('queued');
+    d.innerHTML=`<i>${i+1}</i>`; host.append(d);
+  }
+  $('#quotaLabel').textContent = `${used} / ${MAX_CLIPS} posted today`;
+}
+
+$('#nav').addEventListener('click', e => {
+  const b=e.target.closest('button'); if(!b) return;
+  $$('#nav button').forEach(x=>x.setAttribute('aria-selected',String(x===b)));
+  $$('.panes > section').forEach(s=>s.classList.toggle('on', s.id==='p-'+b.dataset.p));
+});
+
+/* ── cast ── */
+$('#castSheet').value = PRESETS.dogcat;
+$('#presets').addEventListener('click', e => {
+  const b=e.target.closest('button'); if(!b) return;
+  S.cast=b.dataset.k;
+  $$('#presets button').forEach(x=>x.classList.toggle('on',x===b));
+  $('#castSheet').value = PRESETS[S.cast];
+  $('#kidWarn').style.display = S.cast==='kids' ? 'block' : 'none';
+  if (S.cast==='kids') $('#artStyle').value = $('#artStyle').options[0].value;
+});
+$('#btnReseed').onclick = () => { $('#castSeed').value = Math.floor(Math.random()*99999); };
+
+const styleOf = () => $('#artStyle').value;
+const sheetOf = () => $('#castSheet').value.trim();
+const seedOf  = () => Number($('#castSeed').value) || 4412;
+
+function panelPrompt(scene){
+  return `${sheetOf()} ${scene}. ${styleOf()}. No text, no letters, no watermark, no speech bubbles.`;
+}
+async function makeImage(prompt, w, h, seed, tries = 3){
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+  let last;
+  for (let a = 0; a < tries; a++){
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('image service returned '+r.status);
+      const blob = await r.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('service returned an error page');
+      return await createImageBitmap(blob);
+    } catch(e){
+      last = e;
+      if (a < tries-1){ log(`Image attempt ${a+1} failed, retrying…`); await sleep(8000*(a+1)); }
+    }
+  }
+  throw last;
+}
+
+function coverDraw(ctx,img,W,H,zoom,drift,alpha){
+  const r=Math.max(W/img.width,H/img.height)*zoom, w=img.width*r, h=img.height*r;
+  ctx.globalAlpha=alpha; ctx.drawImage(img,(W-w)/2+drift*W*0.04,(H-h)/2-drift*H*0.01,w,h); ctx.globalAlpha=1;
+}
+
+$('#btnRef').onclick = async () => {
+  $('#btnRef').disabled=true; $('#castNote').textContent='Generating reference — about 15 seconds…';
+  try {
+    S.ref = await makeImage(panelPrompt('standing together, full body, neutral background, character reference sheet'), 1080, 1920, seedOf());
+    const c=$('#refc'), x=c.getContext('2d');
+    x.fillStyle='#000'; x.fillRect(0,0,c.width,c.height);
+    coverDraw(x,S.ref,c.width,c.height,1,0,1);
+    $('#castNote').textContent='Happy with them? Move on to Script. Not happy? Edit the sheet or roll a new seed.';
+    log('Reference frame ready.','ok');
+  } catch(e){ $('#castNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnRef').disabled=false;
+};
+
+/* ── groq ── */
+async function groq(messages){
+  const key=store.get('groqKey'); if(!key) throw new Error('No Groq key saved');
+  const r=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},
+    body: JSON.stringify({ model: store.get('groqModel')||'openai/gpt-oss-120b',
+      messages, temperature:0.95, response_format:{type:'json_object'} })
+  });
+  if(!r.ok){ const b=await r.text();
+    throw new Error(r.status===401?'Groq rejected the key':r.status===429?'Groq rate limit — wait a minute':b.slice(0,140)); }
+  return JSON.parse((await r.json()).choices[0].message.content);
+}
+
+$('#btnWrite').onclick = async () => {
+  const n=Number($('#clipCount').value);
+  $('#btnWrite').disabled=true; $('#writeNote').textContent='Writing…';
+  try {
+    const out = await groq([
+      { role:'system', content:
+        'You write ten-second vertical comedy sketches in Hindi for YouTube Shorts. ' +
+        'Reply with JSON only: {"clips":[{"title","beats":[{"line","scene"}],"caption","tags"}]}. ' +
+        'Exactly 3 beats per clip. ' +
+        '"line" is one short spoken Hindi sentence in Devanagari script, at most 9 words, funny and natural — not translated English. ' +
+        '"scene" is an English visual description of that moment for an image generator: what the characters are doing, their expression, the setting. Never mention text or speech bubbles. ' +
+        '"title" is a short Hindi or Hinglish title under 60 characters. ' +
+        '"caption" is a one-line Hinglish caption for Instagram and Shorts. ' +
+        '"tags" is an array of 8 lowercase hashtag words without the # symbol. ' +
+        'The three beats must form setup, escalation, punchline. Keep it family safe.' },
+      { role:'user', content:
+        `Cast: ${sheetOf()}\nHumour: ${$('#tone').value}\n` +
+        ($('#theme').value.trim() ? `Situation: ${$('#theme').value.trim()}\n` : '') +
+        `Write ${n} clips.` }
+    ]);
+    const arr = Array.isArray(out.clips) ? out.clips : [out];
+    S.clips = arr.slice(0,n).map(c => ({
+      id: crypto.randomUUID(),
+      title: String(c.title||'Untitled').slice(0,90),
+      beats: (c.beats||[]).slice(0,3).map(b=>({ line:String(b.line||''), scene:String(b.scene||'') })),
+      caption: String(c.caption||''),
+      tags: Array.isArray(c.tags)?c.tags.map(String):[],
+      imgs: [], blob:null, videoId:null, state:'ready', err:null
+    }));
+    S.sel = S.clips[0]?.id || null;
+    paintClips(); $('#writeNote').textContent = `${S.clips.length} clips written. Open Take to film them.`;
+    log(`Wrote ${S.clips.length} clips.`,'ok');
+  } catch(e){ $('#writeNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnWrite').disabled=false;
+};
+
+async function loadBrief(auto){
+  $('#writeNote').textContent = 'Loading today\u2019s brief\u2026';
+  let b;
+  try {
+    const r = await fetch('./data/brief.json', { cache:'no-store' });
+    if (!r.ok) throw new Error('no brief yet');
+    b = await r.json();
+  } catch(e){
+    $('#writeNote').textContent = 'No brief on the server yet — run the Nightly brief workflow, or just write clips here.';
+    if (!auto) log('No data/brief.json found.','er');
+    return;
+  }
+
+  if (b.config){
+    if (b.config.castSheet) $('#castSheet').value = b.config.castSheet;
+    if (b.config.seed) $('#castSeed').value = b.config.seed;
+    if (b.config.handle) $('#handle').value = b.config.handle;
+    if (b.config.artStyle){
+      const opt = [...$('#artStyle').options].find(o => o.value === b.config.artStyle);
+      if (opt) $('#artStyle').value = b.config.artStyle;
+    }
+  }
+
+  S.clips = (b.clips||[]).map(c => ({
+    id: crypto.randomUUID(),
+    title: String(c.title||'Untitled').slice(0,90),
+    beats: (c.beats||[]).slice(0,3).map(x => ({ line:String(x.line||''), scene:String(x.scene||'') })),
+    caption: String(c.caption||''),
+    tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
+    panelUrls: Array.isArray(c.panels) ? c.panels : [],
+    imgs: [], blob:null, videoId:null, state:'ready', err:null
+  }));
+  S.sel = S.clips[0]?.id || null;
+  paintClips(); paintTake();
+
+  let got = 0;
+  for (const c of S.clips){
+    for (const u of c.panelUrls){
+      try {
+        const r = await fetch(u, { cache:'force-cache' });
+        if (!r.ok) continue;
+        c.imgs.push(await createImageBitmap(await r.blob()));
+        got++;
+      } catch {}
+    }
+    paintTake();
+  }
+
+  const age = b.generatedAt ? Math.round((Date.now() - new Date(b.generatedAt))/36e5) : null;
+  $('#writeNote').textContent =
+    `${S.clips.length} clips loaded with ${got} panels already drawn` +
+    (age !== null ? ` — built ${age < 1 ? 'just now' : age + ' hours ago'}.` : '.') +
+    ' Go straight to Take.';
+  log(`Loaded brief: ${S.clips.length} clips, ${got} panels.`,'ok');
+  paintClips();
+}
+$('#btnBrief').onclick = () => loadBrief(false);
+
+function paintClips(){
+  const host=$('#clipList'); host.innerHTML='';
+  if(!S.clips.length){ host.innerHTML='<div class="card"><div class="empty">No clips yet.</div></div>'; paintStrip(); return; }
+  S.clips.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='clip'+(c.id===S.sel?' sel':'');
+    d.innerHTML=`<div class="cliptop"><h3>${esc(c.title)}</h3><span class="pill ${c.state}">${c.state}</span></div>` +
+      c.beats.map((b,j)=>`<div class="beat"><i>${j+1}</i><div><p class="hi">${esc(b.line)}</p><small>${esc(b.scene)}</small></div></div>`).join('') +
+      `<div class="note">${esc(c.caption)} ${c.tags.map(t=>'#'+esc(t)).join(' ')}</div>` +
+      (c.videoId?`<div style="margin-top:9px"><a class="btn ghost sm" target="_blank" rel="noopener" href="https://youtube.com/shorts/${c.videoId}">Open on YouTube</a></div>`:'');
+    d.onclick=e=>{ if(!e.target.closest('a')){ S.sel=c.id; paintClips(); paintTake(); } };
+    host.append(d);
+  });
+  paintStrip();
+}
+const selClip = () => S.clips.find(c=>c.id===S.sel);
+
+function paintTake(){
+  const c=selClip();
+  $('#takeWho').textContent = c ? `“${c.title}” — three beats, ${$('#dur').value} seconds.` : 'No clip selected. Pick one under Script.';
+  const g=$('#panelGrid'); g.innerHTML='';
+  if(!c) return;
+  c.beats.forEach((b,i)=>{
+    const cell=document.createElement('div'); cell.className='pnl';
+    if(c.imgs[i]){
+      const cc=document.createElement('canvas'); cc.width=180; cc.height=320;
+      cc.getContext('2d').drawImage(c.imgs[i],0,0,180,320);
+      cell.innerHTML=`<img src="${cc.toDataURL('image/jpeg',.8)}" alt="Panel ${i+1}">`;
+    } else cell.textContent=`panel ${i+1}`;
+    g.append(cell);
+  });
+}
+$('#dur').addEventListener('change', paintTake);
+
+/* ── panels ── */
+$('#btnPanels').onclick = async () => {
+  const c=selClip(); if(!c){ log('Select a clip first.','er'); return; }
+  $('#btnPanels').disabled=true; $('#btnFilm').disabled=true; S.generating=true;
+  c.state='art'; paintClips();
+  c.imgs=[];
+  for(let i=0;i<c.beats.length;i++){
+    $('#takeNote').textContent=`Generating panel ${i+1} of ${c.beats.length} — about 15 seconds each.`;
+    try { c.imgs.push(await makeImage(panelPrompt(c.beats[i].scene), 1080, 1920, seedOf()+i)); paintTake(); }
+    catch(e){ log(`Panel ${i+1}: ${e.message}`,'er'); }
+    if(i<c.beats.length-1) await sleep(15500);
+  }
+  const full = c.imgs.length === c.beats.length;
+  c.state = c.imgs.length ? 'ready' : 'failed';
+  $('#takeNote').textContent = full
+    ? `${c.imgs.length} panels ready. Film when you are.`
+    : `Only ${c.imgs.length} of ${c.beats.length} panels came back. You can film anyway — the missing beats reuse the last panel — or press Generate panels again.`;
+  S.generating=false; $('#btnPanels').disabled=false; $('#btnFilm').disabled=false; paintClips();
+  log(full ? 'Panels ready.' : `${c.imgs.length}/${c.beats.length} panels generated.`, full ? 'ok' : 'er');
+};
+
+/* ── drawing ── */
+function wrap(ctx,text,maxW){
+  const words=text.split(/\s+/), lines=[]; let line='';
+  for(const w of words){ const t=line?line+' '+w:w;
+    if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w;} else line=t; }
+  if(line)lines.push(line); return lines;
+}
+function frame(ctx,W,H,c,prog){
+  ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
+  const n=c.beats.length, seg=1/n;
+  const i=clamp(Math.floor(prog/seg),0,n-1);
+  const local=clamp((prog-i*seg)/seg,0,1);
+
+  const art = k => c.imgs[k] || c.imgs[c.imgs.length-1] || c.imgs[0] || null;
+  const cur = art(i), nxt = art(i+1);
+  if(cur) coverDraw(ctx,cur,W,H,1.03+local*0.09,local-0.5,1);
+  if(local>0.88 && nxt && nxt!==cur) coverDraw(ctx,nxt,W,H,1.03,-0.5,(local-0.88)/0.12);
+
+  if($('#showCaps').checked){
+    const line=c.beats[i].line;
+    ctx.font=`700 68px 'Noto Sans Devanagari', sans-serif`;
+    const lines=wrap(ctx,line,W*0.84);
+    const lh=88, boxH=lines.length*lh+70;
+    const pop=clamp(local*7,0,1);
+    const g=ctx.createLinearGradient(0,H,0,H-boxH-190);
+    g.addColorStop(0,'rgba(10,13,22,.94)'); g.addColorStop(1,'rgba(10,13,22,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,H-boxH-190,W,boxH+190);
+
+    let y=H-260-(lines.length-1)*lh;
+    ctx.textAlign='center';
+    ctx.globalAlpha=pop;
+    for(const ln of lines){
+      ctx.lineWidth=12; ctx.strokeStyle='rgba(10,13,22,.85)';
+      ctx.strokeText(ln,W/2,y);
+      ctx.fillStyle='#EDF0F7'; ctx.fillText(ln,W/2,y);
+      y+=lh;
+    }
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle='#FF7A9C';
+    const bw=W*0.13, bx=(W-bw)/2, by=H-190;
+    ctx.fillRect(bx,by,bw,5);
+    ctx.fillStyle='rgba(255,122,156,.3)';
+    ctx.fillRect(bx,by,bw*(i+local)/n,5);
+    ctx.textAlign='left';
+  }
+  if($('#showHandle').checked){
+    ctx.textAlign='center'; ctx.fillStyle='rgba(237,240,247,.7)';
+    ctx.font=`600 34px 'JetBrains Mono', monospace`;
+    ctx.fillText($('#handle').value,W/2,H-110);
+    ctx.textAlign='left';
+  }
+}
+
+let AC=null; const ac=()=>AC||(AC=new (window.AudioContext||window.webkitAudioContext)());
+$('#audioMode').addEventListener('change',()=>{ $('#bedWrap').style.display = $('#audioMode').value==='file'?'block':'none'; });
+$('#bedFile').addEventListener('change', async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{ S.bed=await ac().decodeAudioData(await f.arrayBuffer()); log('Audio bed loaded.','ok'); }
+  catch{ log('Could not decode that audio.','er'); }
+});
+
+let rehearsing=null;
+$('#btnRehearse').onclick=()=>{
+  const c=selClip(); if(!c) return;
+  if(rehearsing){ cancelAnimationFrame(rehearsing); rehearsing=null; return; }
+  const cv=$('#cv'), ctx=cv.getContext('2d'), D=Number($('#dur').value)*1000, t0=performance.now();
+  const loop=()=>{ const p=(performance.now()-t0)/D;
+    if(p>=1){ rehearsing=null; return; }
+    frame(ctx,cv.width,cv.height,c,p); rehearsing=requestAnimationFrame(loop); };
+  loop();
+};
+
+/* ── film ── */
+const pickMime=()=>['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+  .find(m=>MediaRecorder.isTypeSupported(m))||'';
+
+async function film(c){
+  if(!c.imgs.length){ log('Generate the panels first.','er'); return; }
+  if(rehearsing){ cancelAnimationFrame(rehearsing); rehearsing=null; }
+  const cv=$('#cv'), ctx=cv.getContext('2d');
+  const D=Number($('#dur').value)*1000;
+  const mode=$('#audioMode').value;
+  const mime=pickMime();
+  if(!mime){ log('This browser cannot record WebM. Use Chrome or Edge.','er'); return; }
+
+  c.state='recording'; paintClips();
+  await ac().resume();
+  const tracks=[...cv.captureStream(30).getVideoTracks()];
+  let micStream=null, src=null;
+
+  if(mode!=='none'){
+    const dest=ac().createMediaStreamDestination();
+    if(mode==='mic'){
+      try{
+        micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+        ac().createMediaStreamSource(micStream).connect(dest);
+      }catch(e){ log('Microphone blocked — filming silent.','er'); }
+    } else if(S.bed){
+      src=ac().createBufferSource(); src.buffer=S.bed; src.loop=true; src.connect(dest);
+    }
+    tracks.push(...dest.stream.getAudioTracks());
+  }
+
+  const rec=new MediaRecorder(new MediaStream(tracks),{mimeType:mime,videoBitsPerSecond:6e6,audioBitsPerSecond:160e3});
+  const chunks=[]; rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+
+  $('#rec').classList.add('on');
+  const t0=performance.now(); let raf;
+  const loop=()=>{
+    const el=performance.now()-t0, p=el/D;
+    frame(ctx,cv.width,cv.height,c,clamp(p,0,0.999));
+    $('#takeBar').style.width=clamp(p*100,0,100)+'%';
+    $('#recTime').textContent=(el/1000).toFixed(1)+'s';
+    if(p<1) raf=requestAnimationFrame(loop);
+  };
+  rec.start(500); if(src)src.start(); loop();
+
+  await new Promise(res=>{
+    setTimeout(()=>{ try{rec.stop();}catch{} },D+250);
+    rec.onstop=()=>{ cancelAnimationFrame(raf); res(); };
+  });
+  if(src){try{src.stop();}catch{}}
+  if(micStream) micStream.getTracks().forEach(t=>t.stop());
+  $('#rec').classList.remove('on');
+
+  c.blob=new Blob(chunks,{type:mime.split(';')[0]});
+  c.state='filmed';
+  $('#takeBar').style.width='0%';
+  $('#takeNote').textContent=`Filmed — ${(c.blob.size/1048576).toFixed(1)} MB.`;
+  log(`Filmed “${c.title}”.`,'ok'); paintClips();
+}
+$('#btnFilm').onclick=async()=>{ const c=selClip(); if(!c){log('Select a clip first.','er');return;}
+  if(S.generating){log('Panels are still generating — wait for them to finish.','er');return;}
+  S.busy=true; $('#btnFilm').disabled=true; await film(c); S.busy=false; $('#btnFilm').disabled=false; };
+
+/* ── keys ── */
+$('#origin').textContent=location.origin;
+$('#clientId').value=store.get('clientId')||'';
+$('#groqKey').value=store.get('groqKey')||'';
+if(store.get('groqModel')) $('#groqModel').value=store.get('groqModel');
+if(store.get('groqKey')) $('#writeNote').textContent='Ready.';
+$('#btnSaveKeys').onclick=()=>{
+  const cid=$('#clientId').value.trim(), gk=$('#groqKey').value.trim();
+  if(cid) store.set('clientId',cid);
+  if(gk) store.set('groqKey',gk);
+  store.set('groqModel',$('#groqModel').value);
+  $('#writeNote').textContent='Ready.'; log('Saved.','ok');
+};
+
+/* ── youtube ── */
+$('#btnConnect').onclick=()=>{
+  const id=store.get('clientId');
+  if(!id){ log('Add your OAuth client ID under Setup first.','er'); return; }
+  if(!window.google?.accounts?.oauth2){ log('Google sign-in has not loaded yet.','er'); return; }
+  google.accounts.oauth2.initTokenClient({
+    client_id:id,
+    scope:'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    callback: async resp=>{
+      if(resp.error){ log('Sign-in failed: '+resp.error,'er'); return; }
+      S.token=resp.access_token; $('#btnUpload').disabled=false;
+      $('#upNote').textContent='Connected.'; log('YouTube connected.','ok');
+      try{
+        const r=await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:'Bearer '+S.token}});
+        const ch=(await r.json()).items?.[0];
+        if(ch) $('#acct').innerHTML=`<a href="./index.html">Today</a><a href="./music.html">Music</a><img src="${ch.snippet.thumbnails.default.url}" alt=""><span>Publishing to <b>${esc(ch.snippet.title)}</b></span>`;
+      }catch{}
+    }
+  }).requestAccessToken();
+};
+
+async function upload(c){
+  c.state='uploading'; paintClips();
+  const desc = `${c.caption}\n\n${c.beats.map(b=>b.line).join(' ')}\n\n${c.tags.map(t=>'#'+t).join(' ')} #shorts`;
+  const meta={ snippet:{ title:c.title.slice(0,100), description:desc.slice(0,5000),
+      tags:c.tags.concat('shorts'), categoryId:'23' },
+    status:{ privacyStatus:$('#priv').value, selfDeclaredMadeForKids:$('#kids').checked,
+      containsSyntheticMedia:$('#synth').checked } };
+
+  const init=await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{
+    method:'POST', headers:{Authorization:'Bearer '+S.token,'Content-Type':'application/json',
+      'X-Upload-Content-Type':c.blob.type||'video/webm','X-Upload-Content-Length':String(c.blob.size)},
+    body:JSON.stringify(meta) });
+  if(!init.ok){ const t=await init.text();
+    throw new Error(init.status===403?'quota spent or upload not permitted':t.slice(0,160)); }
+  const url=init.headers.get('Location')||init.headers.get('location');
+  if(!url) throw new Error('YouTube did not return an upload URL');
+
+  const video=await new Promise((res,rej)=>{
+    const x=new XMLHttpRequest(); x.open('PUT',url,true);
+    x.setRequestHeader('Content-Type',c.blob.type||'video/webm');
+    x.upload.onprogress=e=>{ if(!e.lengthComputable)return;
+      const p=e.loaded/e.total*100; $('#upBar').style.width=p+'%';
+      $('#upNote').textContent=`Uploading “${c.title}” — ${p.toFixed(0)}%`; };
+    x.onload=()=>x.status<300?res(JSON.parse(x.responseText)):rej(new Error('upload failed, status '+x.status));
+    x.onerror=()=>rej(new Error('network dropped'));
+    x.send(c.blob);
+  });
+  c.videoId=video.id; c.state='done'; bumpPosted();
+  log(`Published “${c.title}” → youtube.com/shorts/${video.id}`,'ok');
+  paintClips();
+}
+
+$('#btnUpload').onclick=async()=>{
+  if(S.busy) return;
+  const todo=S.clips.filter(c=>c.state==='filmed'&&c.blob);
+  if(!todo.length){ log('Nothing filmed yet.','er'); return; }
+  S.busy=true; $('#btnUpload').disabled=true;
+  for(const c of todo){
+    try{ await upload(c); }
+    catch(e){ c.state='failed'; c.err=e.message; log(`${c.title}: ${e.message}`,'er'); paintClips(); }
+  }
+  S.busy=false; $('#btnUpload').disabled=false;
+  $('#upBar').style.width='0%'; $('#upNote').textContent='Finished.';
+};
+
+$('#btnDownloadAll').onclick=()=>{
+  const todo=S.clips.filter(c=>c.blob);
+  if(!todo.length){ log('Nothing filmed yet.','er'); return; }
+  todo.forEach((c,i)=>setTimeout(()=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(c.blob);
+    a.download=c.title.replace(/[^\w\u0900-\u097F ]/g,'').trim().slice(0,50)+'.webm';
+    a.click();
+  }, i*600));
+  log(`Downloading ${todo.length} clips.`,'ok');
+};
+$('#btnCopyCaps').onclick=async()=>{
+  if(!S.clips.length) return;
+  const txt=S.clips.map(c=>`${c.title}\n${c.caption}\n${c.tags.map(t=>'#'+t).join(' ')} #reels #shorts`).join('\n\n———\n\n');
+  try{ await navigator.clipboard.writeText(txt); log('Captions copied.','ok'); }
+  catch{ log('Clipboard blocked by the browser.','er'); }
+};
+
+/* ── boot ── */
+document.fonts.load("700 68px 'Noto Sans Devanagari'").then(()=>{
+  const cv=$('#cv'), x=cv.getContext('2d');
+  x.fillStyle='#0A0D16'; x.fillRect(0,0,cv.width,cv.height);
+  x.textAlign='center'; x.fillStyle='#2E3854';
+  x.font="700 74px 'Noto Sans Devanagari', sans-serif";
+  x.fillText('यहाँ आपकी क्लिप', cv.width/2, cv.height/2);
+  x.textAlign='left';
+});
+paintClips(); paintTake(); paintStrip();
+if (new URLSearchParams(location.search).get('brief')){
+  $$('#nav button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.p === 'take')));
+  $$('.panes > section').forEach(s => s.classList.toggle('on', s.id === 'p-take'));
+  loadBrief(true);
+}
+window.addEventListener('beforeunload',e=>{ if(S.busy){e.preventDefault();e.returnValue='';} });
+</script>
+</body>
+</html>

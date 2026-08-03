@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridge — music video studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{
+  --night:#0E1220; --deep:#161C2E; --panel:#1B2236; --line:#2E3854;
+  --snow:#EDF0F7; --mist:#8792AE;
+  --dawn:#FF7A9C; --glacier:#8FD9C9; --lamp:#FFC257; --dusk:#7C6CFF;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter Tight',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--night);color:var(--snow);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:3px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
+
+header{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#121729 0%,var(--night) 100%);padding:20px 24px 0}
+.brandrow{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;max-width:1440px;margin:0 auto}
+h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.03em;margin:0;line-height:1}
+h1 span{color:var(--dawn)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--mist);letter-spacing:.14em;text-transform:uppercase;margin-top:7px;display:block}
+.acct{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mist)}
+.acct img{width:28px;height:28px;border-radius:50%;border:1px solid var(--line)}
+.acct b{color:var(--snow);font-weight:600}
+
+.ridge{max-width:1440px;margin:18px auto 0;padding-bottom:14px}
+.ridgehead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;gap:14px}
+.ridgehead span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist)}
+.slots{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.slot{height:38px;background:var(--deep);border:1px solid var(--line);border-radius:3px;position:relative;overflow:hidden}
+.slot svg{position:absolute;inset:0;width:100%;height:100%}
+.slot path{fill:none;stroke:var(--line);stroke-width:1.5;transition:stroke .5s}
+.slot.queued path{stroke:var(--dusk)}
+.slot.rendering path{stroke:var(--lamp)}
+.slot.done path{stroke:var(--glacier)}
+.slot.done{background:rgba(143,217,201,.07)}
+.slot i{position:absolute;bottom:3px;left:5px;font-family:var(--mono);font-size:9px;font-style:normal;color:var(--mist)}
+
+nav{max-width:1440px;margin:0 auto;display:flex;gap:2px;overflow-x:auto}
+nav button{padding:11px 15px;font-size:13.5px;font-weight:500;color:var(--mist);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;white-space:nowrap}
+nav button:hover{color:var(--snow)}
+nav button[aria-selected="true"]{color:var(--snow);border-bottom-color:var(--dawn)}
+nav button em{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--dawn);margin-left:5px}
+
+main{max-width:1440px;margin:0 auto;padding:22px 24px 80px}
+.panes>section{display:none}
+.panes>section.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:22px;align-items:start}
+@media(max-width:940px){.grid{grid-template-columns:1fr}}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:18px}
+.card+.card{margin-top:14px}
+h2{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0 0 3px}
+.sub{color:var(--mist);font-size:13px;margin:0 0 16px}
+code{font-family:var(--mono);font-size:12px;background:var(--deep);padding:2px 6px;border-radius:3px;color:var(--glacier);word-break:break-all}
+
+.drop{border:1.5px dashed var(--line);border-radius:6px;padding:38px 22px;text-align:center;transition:border-color .18s,background .18s;cursor:pointer;background:var(--deep)}
+.drop:hover,.drop.hot{border-color:var(--dawn);background:rgba(255,122,156,.05)}
+.drop h3{font-family:var(--display);font-size:16px;font-weight:600;margin:0 0 5px}
+.drop p{color:var(--mist);font-size:13px;margin:0}
+
+.track{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:13px;align-items:center;padding:12px 13px;background:var(--deep);border:1px solid var(--line);border-radius:5px;margin-top:9px}
+.track.sel{border-color:var(--dawn)}
+.num{font-family:var(--mono);font-size:12px;color:var(--mist);text-align:center}
+.tname{font-weight:500;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tmeta{font-family:var(--mono);font-size:11px;color:var(--mist);margin-top:2px}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:3.5px 8px;border-radius:20px;border:1px solid var(--line);color:var(--mist);white-space:nowrap}
+.pill.queued{color:var(--dusk);border-color:rgba(124,108,255,.4)}
+.pill.rendering,.pill.uploading{color:var(--lamp);border-color:rgba(255,194,87,.4)}
+.pill.rendered{color:var(--snow);border-color:var(--snow)}
+.pill.done{color:var(--glacier);border-color:rgba(143,217,201,.45)}
+.pill.failed{color:var(--dawn);border-color:rgba(255,122,156,.45)}
+.rowbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line);flex:none}
+.dot.on{background:var(--glacier)}
+
+.stage{background:#000;border:1px solid var(--line);border-radius:5px;overflow:hidden;position:relative}
+canvas{display:block;width:100%;height:auto}
+.rec{position:absolute;top:10px;left:10px;display:none;align-items:center;gap:7px;background:rgba(14,18,32,.85);padding:5px 10px;border-radius:20px;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em}
+.rec.on{display:flex}
+.rec b{width:7px;height:7px;border-radius:50%;background:var(--dawn);animation:blip 1.1s infinite}
+@keyframes blip{50%{opacity:.25}}
+
+label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--mist);margin:0 0 6px}
+.f{margin-bottom:15px}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--deep);border:1px solid var(--line);border-radius:4px;padding:9px 11px;font-size:13.5px;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--dawn);outline:none}
+textarea{resize:vertical;min-height:76px;line-height:1.55}
+.styles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.styles button{padding:9px 4px;background:var(--deep);border:1px solid var(--line);border-radius:4px;font-size:12px;color:var(--mist);transition:all .15s}
+.styles button:hover{color:var(--snow)}
+.styles button.on{border-color:var(--dawn);color:var(--snow);background:rgba(255,122,156,.09)}
+.swatches{display:flex;gap:7px;flex-wrap:wrap}
+.sw{width:30px;height:30px;border-radius:5px;border:2px solid transparent;transition:border-color .15s}
+.sw.on{border-color:var(--snow)}
+.chk{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px;cursor:pointer}
+.chk input{accent-color:var(--dawn);width:15px;height:15px;flex:none;margin-top:3px}
+.chk span{font-size:13px}
+.chk small{color:var(--mist);font-size:12px;display:block;margin-top:1px}
+
+.btn{background:var(--dawn);color:#20101A;font-weight:600;padding:11px 18px;border-radius:5px;font-size:14px;transition:filter .15s;width:100%;text-align:center;display:block;text-decoration:none}
+.btn:hover:not(:disabled){filter:brightness(1.1)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--snow);font-weight:500}
+.btn.ghost:hover:not(:disabled){border-color:var(--snow);filter:none}
+.btn.sm{width:auto;padding:6px 12px;font-size:12px;display:inline-block}
+
+.bar{height:5px;background:var(--deep);border-radius:3px;overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;background:var(--lamp);width:0;transition:width .25s}
+.note{font-family:var(--mono);font-size:11.5px;color:var(--mist);margin-top:8px;line-height:1.6}
+
+.warn{background:rgba(255,194,87,.07);border:1px solid rgba(255,194,87,.3);border-radius:5px;padding:13px 15px;font-size:13px;line-height:1.6;margin-bottom:15px}
+.warn b{color:var(--lamp);font-weight:600}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:s;position:relative;padding:0 0 15px 34px;font-size:13.5px;line-height:1.6;color:var(--mist)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0;width:22px;height:22px;border:1px solid var(--line);border-radius:50%;font-family:var(--mono);font-size:11px;display:grid;place-items:center;color:var(--dawn)}
+.steps b{color:var(--snow);font-weight:600}
+
+.log{font-family:var(--mono);font-size:11.5px;line-height:1.75;max-height:190px;overflow-y:auto;background:var(--night);border:1px solid var(--line);border-radius:4px;padding:11px}
+.log div{color:var(--mist)}
+.log .ok{color:var(--glacier)}
+.log .er{color:var(--dawn)}
+.empty{text-align:center;padding:34px 18px;color:var(--mist);font-size:13.5px}
+
+.scenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:9px;margin-top:12px}
+.scene{position:relative;aspect-ratio:16/9;border-radius:4px;overflow:hidden;border:1px solid var(--line);background:var(--deep)}
+.scene img{width:100%;height:100%;object-fit:cover;display:block}
+.scene span{position:absolute;top:4px;left:5px;font-family:var(--mono);font-size:9px;background:rgba(14,18,32,.8);padding:2px 5px;border-radius:3px}
+.scene.load{display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:var(--mist)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brandrow">
+    <div><h1>Ridge<span>.</span></h1><span class="tag">Music video studio</span></div>
+    <div class="acct" id="acct"><a href="./index.html" style="color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px">Today</a><a href="./shorts.html" style="color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px">Shorts</a><span>Not connected to YouTube</span></div>
+  </div>
+  <div class="ridge">
+    <div class="ridgehead"><span>Today's slots</span><span id="quotaLabel">0 / 6 uploaded</span></div>
+    <div class="slots" id="slots"></div>
+  </div>
+  <nav id="nav">
+    <button aria-selected="true" data-p="tracks">Tracks<em id="nTracks"></em></button>
+    <button aria-selected="false" data-p="look">Look</button>
+    <button aria-selected="false" data-p="assist">Assist</button>
+    <button aria-selected="false" data-p="publish">Publish</button>
+    <button aria-selected="false" data-p="setup">Setup</button>
+  </nav>
+</header>
+
+<main class="panes">
+
+<!-- ═══ TRACKS ═══ -->
+<section id="p-tracks" class="on">
+  <div class="grid">
+    <div class="card">
+      <h2>Add your Suno tracks</h2>
+      <p class="sub">Download the MP3s from Suno, then drop them here. Order sets the upload order.</p>
+      <div class="drop" id="drop"><h3>Drop audio files</h3><p>MP3, WAV, M4A or OGG — or click to browse</p></div>
+      <input type="file" id="file" accept="audio/*" multiple hidden>
+      <div id="list"></div>
+    </div>
+    <div class="card">
+      <h2>How a day runs</h2>
+      <ol class="steps" style="margin-top:14px">
+        <li>Generate songs in <b>Suno</b> and download them.</li>
+        <li>Drop them in, then let <b>Assist</b> write the titles, tags and scene art.</li>
+        <li>Pick a look and hit <b>Render all</b>. Rendering is real time — a 3-minute track takes 3 minutes.</li>
+        <li>Connect YouTube once, then <b>Publish all</b>.</li>
+      </ol>
+      <p class="note">Keep this tab visible while rendering. Browsers throttle background tabs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ LOOK ═══ -->
+<section id="p-look">
+  <div class="grid">
+    <div>
+      <div class="stage">
+        <canvas id="cv" width="1280" height="720"></canvas>
+        <div class="rec" id="rec"><b></b><span id="recTime">00:00</span></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+          <button class="btn ghost sm" id="btnPreview">Preview selected</button>
+          <button class="btn ghost sm" id="btnStopPrev">Stop</button>
+          <button class="btn sm" id="btnRenderAll" style="margin-left:auto">Render all queued</button>
+        </div>
+        <div class="bar"><i id="renderBar"></i></div>
+        <p class="note" id="renderNote">Nothing rendering.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Visual</h2>
+        <p class="sub">Drawn live from the audio itself.</p>
+        <div class="f"><label>Style</label>
+          <div class="styles" id="styleBtns"><button data-s="ridge" class="on">Ridge</button><button data-s="bars">Bars</button><button data-s="orbit">Orbit</button></div>
+        </div>
+        <div class="f"><label>Accent</label><div class="swatches" id="swatches"></div></div>
+        <div class="f"><label>Resolution</label>
+          <select id="res"><option value="1280x720">1280 × 720 · 720p</option><option value="1920x1080" selected>1920 × 1080 · 1080p</option></select>
+        </div>
+        <label class="chk"><input type="checkbox" id="showTitle" checked><span>Show track title</span></label>
+        <label class="chk"><input type="checkbox" id="showChannel" checked><span>Show channel handle</span></label>
+        <div class="f"><label>Channel handle</label><input type="text" id="handle" value="@mohucool"></div>
+      </div>
+      <div class="card">
+        <h2>Scene art</h2>
+        <p class="sub">AI backdrops that pan and cross-fade through the song.</p>
+        <div class="f"><label>Scene prompt</label><textarea id="scenePrompt" placeholder="misty Himalayan ridge at dawn, film grain, wide cinematic">misty Himalayan ridge at dawn, layered blue mountains, soft film grain, cinematic wide shot</textarea></div>
+        <div class="f"><label>How many scenes</label>
+          <select id="sceneCount"><option>0</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+        </div>
+        <button class="btn ghost" id="btnScenes">Generate scenes</button>
+        <div class="scenes" id="sceneGrid"></div>
+        <p class="note" id="sceneNote">Set to 0 for a plain dark backdrop.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ASSIST ═══ -->
+<section id="p-assist">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Write the metadata</h2>
+        <p class="sub">A language model drafts a title, description, hashtags, thumbnail headline and scene prompt for each track. Everything stays editable.</p>
+        <div class="f"><label>Mood or genre hint — optional</label><input type="text" id="hint" placeholder="lofi, Kumaoni folk, late-night study"></div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn sm" id="btnWriteAll">Write for all tracks</button>
+          <button class="btn ghost sm" id="btnWriteOne">Write for selected only</button>
+        </div>
+        <p class="note" id="aiNote">Add a Groq key under Setup to switch this on.</p>
+      </div>
+      <div class="card">
+        <h2>Selected track</h2>
+        <div class="f"><label>Title</label><input type="text" id="mTitle" placeholder="—"></div>
+        <div class="f"><label>Description</label><textarea id="mDesc" placeholder="—"></textarea></div>
+        <div class="f"><label>Tags</label><input type="text" id="mTags" placeholder="—"></div>
+        <div class="f"><label>Thumbnail headline</label><input type="text" id="mHook" placeholder="—"></div>
+        <button class="btn ghost sm" id="btnSaveMeta">Save to track</button>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Thumbnail</h2>
+        <p class="sub">1280 × 720, built from the scene art and the headline.</p>
+        <div class="stage"><canvas id="th" width="1280" height="720"></canvas></div>
+        <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
+          <button class="btn ghost sm" id="btnThumb">Build thumbnail</button>
+          <button class="btn ghost sm" id="btnThumbAll">Build for all</button>
+          <button class="btn ghost sm" id="btnThumbSave">Save PNG</button>
+        </div>
+        <label class="chk" style="margin-top:13px"><input type="checkbox" id="thumbLayout" checked><span>Dark scrim behind the headline<small>Keeps text readable on busy art.</small></span></label>
+        <p class="note">YouTube only accepts custom thumbnails on phone-verified channels.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PUBLISH ═══ -->
+<section id="p-publish">
+  <div class="grid">
+    <div class="card">
+      <h2>Fallback template</h2>
+      <p class="sub">Used for any track Assist hasn't written. <code>{title}</code> is the filename, <code>{date}</code> is today.</p>
+      <div class="f"><label>Title template</label><input type="text" id="tTitle" value="{title} — original AI music"></div>
+      <div class="f"><label>Description</label><textarea id="tDesc">Original track written and produced with AI tools.
+
+Follow @mohucool for new music.
+#aimusic #originalmusic</textarea></div>
+      <div class="f"><label>Tags — comma separated</label><input type="text" id="tTags" value="ai music, original music, lofi, instrumental"></div>
+      <div class="f"><label>Visibility</label>
+        <select id="tPriv"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select>
+      </div>
+      <label class="chk"><input type="checkbox" id="tSynth" checked><span>Declare altered or synthetic media<small>Required by YouTube for realistic AI-generated content.</small></span></label>
+      <label class="chk"><input type="checkbox" id="tKids"><span>Made for kids</span></label>
+      <label class="chk"><input type="checkbox" id="tThumb" checked><span>Upload thumbnails too<small>Costs 50 extra quota units per video.</small></span></label>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Publish</h2>
+        <p class="sub">Rendered tracks go up one at a time.</p>
+        <button class="btn" id="btnConnect">Connect YouTube</button>
+        <button class="btn" id="btnUploadAll" style="margin-top:9px" disabled>Publish all rendered</button>
+        <div class="bar"><i id="upBar"></i></div>
+        <p class="note" id="upNote">Not connected.</p>
+      </div>
+      <div class="card"><h2>Activity</h2><div class="log" id="log"><div>Ready.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SETUP ═══ -->
+<section id="p-setup">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>YouTube access</h2>
+        <p class="sub">One-time setup. Everything below stays in this browser.</p>
+        <ol class="steps">
+          <li>Open <b>console.cloud.google.com</b> and create a project.</li>
+          <li><b>APIs &amp; Services → Library</b> → enable <b>YouTube Data API v3</b>.</li>
+          <li><b>OAuth consent screen</b> → External. Add your own Google account under <b>Test users</b>, and add the scope <code>youtube.upload</code>.</li>
+          <li><b>Credentials → Create credentials → OAuth client ID → Web application.</b></li>
+          <li>Add this exact <b>Authorized JavaScript origin</b>: <code id="origin"></code></li>
+        </ol>
+        <div class="f"><label>OAuth client ID</label><input type="text" id="clientId" placeholder="1234567890-abc.apps.googleusercontent.com"></div>
+        <button class="btn ghost" id="btnSaveId">Save client ID</button>
+      </div>
+      <div class="card">
+        <h2>Writing assistant</h2>
+        <p class="sub">Groq's free tier writes your titles and descriptions. Get a key at <b>console.groq.com</b> — no card needed.</p>
+        <div class="f"><label>Groq API key</label><input type="password" id="groqKey" placeholder="gsk_..."></div>
+        <div class="f"><label>Model</label>
+          <select id="groqModel">
+            <option value="openai/gpt-oss-120b" selected>GPT-OSS 120B — best writing</option>
+            <option value="openai/gpt-oss-20b">GPT-OSS 20B — fastest</option>
+            <option value="qwen/qwen3.6-27b">Qwen 3.6 27B</option>
+          </select>
+        </div>
+        <button class="btn ghost" id="btnSaveGroq">Save key</button>
+        <p class="note">The key sits in this browser's storage and goes only to Groq. Anyone with access to this device can read it — use a key you can rotate.</p>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="warn">
+          <b>Six uploads a day, hard ceiling.</b> The API gives each project 10,000 quota units daily; an upload costs 1,600 and a thumbnail 50. Resets at 12:30 PM IST.
+        </div>
+        <div class="warn">
+          <b>Uploads arrive private.</b> YouTube locks videos from un-audited API projects to private. Either apply for a compliance audit, or flip each one public in YouTube Studio.
+        </div>
+        <h2>What runs where</h2>
+        <p class="sub" style="margin-bottom:0">
+          Scene art and thumbnails come from <b>Pollinations</b> — free, no key, rate-limited to roughly one image every 15 seconds.
+          Writing comes from <b>Groq</b> with your own free key.
+          Suno stays manual: it has no public API, and browser security stops any page here from touching your suno.com session.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+'use strict';
+
+const S = {
+  tracks: [], sel: null,
+  style: 'ridge', accent: '#FF7A9C',
+  scenes: [], token: null, busy: false
+};
+const ACCENTS = ['#FF7A9C','#8FD9C9','#FFC257','#7C6CFF','#5AC8FA','#F2F5FC'];
+const UPLOAD_COST = 1600, THUMB_COST = 50, DAILY_UNITS = 10000, MAX_UPLOADS = 6;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function log(msg, kind){
+  const el = document.createElement('div');
+  if (kind) el.className = kind;
+  el.textContent = `${new Date().toTimeString().slice(0,8)}  ${msg}`;
+  $('#log').append(el); $('#log').scrollTop = 1e6;
+}
+
+const store = {
+  get: k => { try { return JSON.parse(localStorage.getItem('ridge.'+k)); } catch { return null; } },
+  set: (k,v) => { try { localStorage.setItem('ridge.'+k, JSON.stringify(v)); } catch {} }
+};
+const todayKey = () => new Date().toISOString().slice(0,10);
+const uploadsToday = () => (store.get('uploads') || {})[todayKey()] || 0;
+function bumpUploads(){
+  const d = store.get('uploads') || {};
+  d[todayKey()] = (d[todayKey()] || 0) + 1;
+  store.set('uploads', d); paintRidge();
+}
+
+/* ── the ridge: six slots, one per available upload ── */
+function ridgePath(seed, amp){
+  let r = seed * 9301 + 49297;
+  const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+  const pts = [];
+  for (let i = 0; i <= 14; i++) pts.push(`${((i/14)*100).toFixed(1)},${(34 - (0.28 + rnd()*0.72) * amp * 26).toFixed(1)}`);
+  return `M0,38 L${pts.join(' L')} L100,38`;
+}
+function paintRidge(){
+  const used = uploadsToday();
+  const done = S.tracks.filter(t => t.state === 'done').length;
+  const working = S.tracks.some(t => t.state === 'rendering' || t.state === 'uploading');
+  const host = $('#slots'); host.innerHTML = '';
+  for (let i = 0; i < MAX_UPLOADS; i++){
+    const d = document.createElement('div'); d.className = 'slot';
+    const filled = i < Math.max(used, done);
+    if (filled) d.classList.add('done');
+    else if (working && i === Math.max(used, done)) d.classList.add('rendering');
+    else if (i < S.tracks.length) d.classList.add('queued');
+    d.innerHTML = `<svg viewBox="0 0 100 38" preserveAspectRatio="none"><path d="${ridgePath(i+3, filled?1:0.55)}"/></svg><i>${i+1}</i>`;
+    host.append(d);
+  }
+  $('#quotaLabel').textContent = `${used} / ${MAX_UPLOADS} uploaded · ${(DAILY_UNITS - used*UPLOAD_COST).toLocaleString()} units left`;
+}
+
+$('#nav').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  $$('#nav button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  $$('.panes > section').forEach(s => s.classList.toggle('on', s.id === 'p-' + b.dataset.p));
+  if (b.dataset.p === 'assist') fillMetaForm();
+});
+
+/* ── files ── */
+const drop = $('#drop');
+drop.addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => addFiles(e.target.files));
+['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hot'); }));
+drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
+
+let AC = null;
+const ac = () => AC || (AC = new (window.AudioContext || window.webkitAudioContext)());
+
+async function addFiles(fileList){
+  const audio = [...fileList].filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|ogg|flac)$/i.test(f.name));
+  if (!audio.length){ log('Those are not audio files. Drop MP3, WAV, M4A or OGG.', 'er'); return; }
+  for (const f of audio){
+    S.tracks.push({
+      id: crypto.randomUUID(), file: f,
+      name: f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),
+      dur: 0, buf: null, state: 'queued', blob: null, thumb: null,
+      meta: null, videoId: null, err: null
+    });
+    if (!S.sel) S.sel = S.tracks[S.tracks.length-1].id;
+  }
+  paintTracks();
+  log(`Added ${audio.length} track${audio.length>1?'s':''}.`, 'ok');
+  for (const t of S.tracks) if (!t.buf && t.state !== 'failed') await decode(t);
+  paintTracks();
+}
+async function decode(t){
+  try { t.buf = await ac().decodeAudioData(await t.file.arrayBuffer()); t.dur = t.buf.duration; }
+  catch { t.state = 'failed'; t.err = 'could not decode'; log(`${t.name}: could not decode.`, 'er'); }
+}
+
+function paintTracks(){
+  const host = $('#list'); host.innerHTML = '';
+  if (!S.tracks.length) host.innerHTML = '<div class="empty">No tracks yet.</div>';
+  S.tracks.forEach((t,i) => {
+    const row = document.createElement('div');
+    row.className = 'track' + (t.id === S.sel ? ' sel' : '');
+    row.innerHTML = `
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="tname">${esc(t.meta?.title || t.name)}</div>
+        <div class="tmeta">${t.dur ? mmss(t.dur) : '—'} · ${(t.file.size/1048576).toFixed(1)} MB${t.err ? ' · ' + esc(t.err) : ''}</div>
+      </div>
+      <div class="rowbtns">
+        <span class="dot ${t.meta?'on':''}" title="metadata written"></span>
+        <span class="dot ${t.thumb?'on':''}" title="thumbnail built"></span>
+        <span class="pill ${t.state}">${t.state}</span>
+        ${t.videoId ? `<a class="btn ghost sm" target="_blank" rel="noopener" href="https://youtu.be/${t.videoId}">Open</a>` : ''}
+        ${t.blob ? `<button class="btn ghost sm" data-dl="${t.id}">Save</button>` : ''}
+        <button class="btn ghost sm" data-rm="${t.id}">Remove</button>
+      </div>`;
+    row.addEventListener('click', e => { if (!e.target.closest('button,a')){ S.sel = t.id; paintTracks(); fillMetaForm(); } });
+    host.append(row);
+  });
+  host.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+    S.tracks = S.tracks.filter(x => x.id !== b.dataset.rm);
+    if (S.sel === b.dataset.rm) S.sel = S.tracks[0]?.id || null;
+    paintTracks();
+  });
+  host.querySelectorAll('[data-dl]').forEach(b => b.onclick = () => {
+    const t = S.tracks.find(x => x.id === b.dataset.dl);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(t.blob); a.download = t.name + '.webm'; a.click();
+  });
+  $('#nTracks').textContent = S.tracks.length || '';
+  paintRidge();
+}
+const selTrack = () => S.tracks.find(t => t.id === S.sel);
+
+/* ── look controls ── */
+$('#styleBtns').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.style = b.dataset.s;
+  $$('#styleBtns button').forEach(x => x.classList.toggle('on', x === b));
+});
+ACCENTS.forEach((c,i) => {
+  const b = document.createElement('button');
+  b.className = 'sw' + (i===0?' on':''); b.style.background = c;
+  b.setAttribute('aria-label','Accent '+c);
+  b.onclick = () => { S.accent = c; $$('.sw').forEach(x => x.classList.toggle('on', x===b)); };
+  $('#swatches').append(b);
+});
+$('#res').addEventListener('change', () => {
+  const [w,h] = $('#res').value.split('x').map(Number);
+  $('#cv').width = w; $('#cv').height = h;
+});
+$('#res').dispatchEvent(new Event('change'));
+
+/* ── scene art via Pollinations (free, keyless) ── */
+async function makeImage(prompt, w, h, seed){
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('image service returned ' + r.status);
+  return await createImageBitmap(await r.blob());
+}
+
+$('#btnScenes').onclick = async () => {
+  const n = Number($('#sceneCount').value);
+  const prompt = $('#scenePrompt').value.trim();
+  S.scenes = []; $('#sceneGrid').innerHTML = '';
+  if (!n){ $('#sceneNote').textContent = 'Plain dark backdrop.'; return; }
+  if (!prompt){ log('Write a scene prompt first.', 'er'); return; }
+  $('#btnScenes').disabled = true;
+  for (let i = 0; i < n; i++){
+    const cell = document.createElement('div');
+    cell.className = 'scene load'; cell.textContent = `${i+1} …`;
+    $('#sceneGrid').append(cell);
+    $('#sceneNote').textContent = `Generating scene ${i+1} of ${n} — about 15 seconds each.`;
+    try {
+      const bmp = await makeImage(prompt, 1280, 720, 1000 + i * 97);
+      S.scenes.push(bmp);
+      const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+      c.getContext('2d').drawImage(bmp, 0, 0, 320, 180);
+      cell.className = 'scene';
+      cell.innerHTML = `<img src="${c.toDataURL('image/jpeg',.8)}" alt="Scene ${i+1}"><span>${i+1}</span>`;
+    } catch(e){
+      cell.textContent = 'failed'; log(`Scene ${i+1}: ${e.message}`, 'er');
+    }
+    if (i < n-1) await sleep(15500);   // anonymous rate limit
+  }
+  $('#btnScenes').disabled = false;
+  $('#sceneNote').textContent = `${S.scenes.length} scene${S.scenes.length===1?'':'s'} ready. They pan and cross-fade across the song.`;
+  log(`${S.scenes.length} scenes ready.`, 'ok');
+};
+
+/* ── drawing ── */
+function coverDraw(ctx, img, W, H, zoom, drift, alpha){
+  const r = Math.max(W/img.width, H/img.height) * zoom;
+  const w = img.width*r, h = img.height*r;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(img, (W-w)/2 + drift*W*0.03, (H-h)/2, w, h);
+  ctx.globalAlpha = 1;
+}
+function drawScenes(ctx, W, H, prog){
+  const n = S.scenes.length; if (!n) return false;
+  const seg = 1/n;
+  const i = clamp(Math.floor(prog/seg), 0, n-1);
+  const local = clamp((prog - i*seg)/seg, 0, 1);
+  coverDraw(ctx, S.scenes[i], W, H, 1.04 + local*0.10, local - 0.5, 1);
+  if (local > 0.85 && i < n-1)
+    coverDraw(ctx, S.scenes[i+1], W, H, 1.04, -0.5, (local-0.85)/0.15);
+  ctx.fillStyle = 'rgba(10,13,22,.52)'; ctx.fillRect(0,0,W,H);
+  return true;
+}
+
+function draw(ctx, W, H, freq, wave, title, prog){
+  const A = S.accent;
+  ctx.fillStyle = '#0A0D16'; ctx.fillRect(0,0,W,H);
+  const hasArt = drawScenes(ctx, W, H, prog || 0);
+
+  const N = freq.length;
+  const energy = freq.reduce((a,b)=>a+b,0) / (N*255);
+
+  if (S.style === 'ridge'){
+    for (let layer = 3; layer >= 0; layer--){
+      const depth = layer/3;
+      const base = H * (0.62 + depth*0.16);
+      const amp = H * 0.30 * (1 - depth*0.55);
+      ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 4){
+        const v = (freq[Math.floor((x/W)*(N*0.55))] || 0)/255;
+        ctx.lineTo(x, base - v*amp - Math.sin(x*0.004 + layer*2.1)*amp*0.28);
+      }
+      ctx.lineTo(W,H); ctx.closePath();
+      ctx.fillStyle = layer===0 ? A : shade(A, 0.16 + depth*0.12);
+      ctx.globalAlpha = hasArt ? (layer===0?0.8:0.55) : (layer===0?0.95:0.8);
+      ctx.fill(); ctx.globalAlpha = 1;
+    }
+  } else if (S.style === 'bars'){
+    const count = 72, gap = W/count;
+    for (let i = 0; i < count; i++){
+      const v = (freq[Math.floor(i/count*N*0.6)] || 0)/255;
+      const h = Math.pow(v,1.35) * H * 0.62;
+      const g = ctx.createLinearGradient(0, H/2-h/2, 0, H/2+h/2);
+      g.addColorStop(0, A); g.addColorStop(1, shade(A,0.35));
+      ctx.fillStyle = g;
+      ctx.fillRect(i*gap + gap*0.19, H/2-h/2, gap*0.62, Math.max(3,h));
+    }
+  } else {
+    const cx = W/2, cy = H/2, R = Math.min(W,H)*0.24;
+    ctx.strokeStyle = shade(A,0.3); ctx.lineWidth = Math.max(1,W/900);
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+    for (let i = 0; i < 128; i++){
+      const v = (freq[Math.floor(i/128*N*0.55)] || 0)/255;
+      const a = (i/128)*Math.PI*2 - Math.PI/2;
+      const len = R*0.12 + v*R*0.95;
+      ctx.strokeStyle = A; ctx.globalAlpha = 0.35 + v*0.65;
+      ctx.lineWidth = Math.max(1.5, W/620);
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(a)*R, cy+Math.sin(a)*R);
+      ctx.lineTo(cx+Math.cos(a)*(R+len), cy+Math.sin(a)*(R+len));
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = hasArt ? 'rgba(10,13,22,.55)' : shade(A, 0.18 + energy*0.25);
+    ctx.beginPath(); ctx.arc(cx,cy,R*(0.82+energy*0.1),0,Math.PI*2); ctx.fill();
+  }
+
+  const pad = W*0.045;
+  if ($('#showTitle').checked && title){
+    ctx.fillStyle = '#EDF0F7';
+    ctx.font = `600 ${Math.round(W/26)}px 'Bricolage Grotesque', sans-serif`;
+    ctx.fillText(title.slice(0,42), pad, H - pad - (S.style==='ridge' ? W/34 : 0));
+  }
+  if ($('#showChannel').checked){
+    ctx.fillStyle = 'rgba(237,240,247,.62)';
+    ctx.font = `400 ${Math.round(W/68)}px 'JetBrains Mono', monospace`;
+    ctx.fillText($('#handle').value, pad, H - pad + W/70);
+  }
+}
+function shade(hex,k){
+  const n = parseInt(hex.slice(1),16);
+  return `rgb(${Math.round(((n>>16)&255)*k)},${Math.round(((n>>8)&255)*k)},${Math.round((n&255)*k)})`;
+}
+
+/* ── preview ── */
+let previewStop = null;
+$('#btnPreview').onclick = async () => {
+  const t = selTrack();
+  if (!t?.buf){ log('Select a decoded track first.', 'er'); return; }
+  stopPreview(); await ac().resume();
+  const src = ac().createBufferSource(); src.buffer = t.buf;
+  const an = ac().createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.78;
+  src.connect(an); an.connect(ac().destination);
+  const freq = new Uint8Array(an.frequencyBinCount), wave = new Uint8Array(an.fftSize);
+  const cv = $('#cv'), ctx = cv.getContext('2d');
+  const t0 = performance.now(); let raf;
+  const loop = () => {
+    an.getByteFrequencyData(freq); an.getByteTimeDomainData(wave);
+    draw(ctx, cv.width, cv.height, freq, wave, t.meta?.title || t.name, (performance.now()-t0)/1000/t.dur);
+    raf = requestAnimationFrame(loop);
+  };
+  src.start(); loop();
+  previewStop = () => { cancelAnimationFrame(raf); try{src.stop();}catch{} previewStop = null; };
+  src.onended = () => previewStop && previewStop();
+};
+const stopPreview = () => previewStop && previewStop();
+$('#btnStopPrev').onclick = stopPreview;
+
+/* ── render ── */
+const pickMime = () => ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+  .find(m => MediaRecorder.isTypeSupported(m)) || '';
+
+async function renderTrack(t){
+  if (!t.buf) return;
+  stopPreview(); await ac().resume();
+  t.state = 'rendering'; paintTracks();
+
+  const cv = $('#cv'), ctx = cv.getContext('2d');
+  const src = ac().createBufferSource(); src.buffer = t.buf;
+  const an = ac().createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.78;
+  const dest = ac().createMediaStreamDestination();
+  src.connect(an); an.connect(dest);
+
+  const mime = pickMime();
+  if (!mime){ t.state='failed'; t.err='recorder unsupported'; log('This browser cannot record WebM. Use Chrome or Edge.','er'); paintTracks(); return; }
+  const mixed = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+  const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: cv.width>=1920?9e6:5e6, audioBitsPerSecond: 192e3 });
+  const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+
+  const freq = new Uint8Array(an.frequencyBinCount), wave = new Uint8Array(an.fftSize);
+  const t0 = performance.now(); let raf, peak = 0, peakFrame = null;
+  const loop = () => {
+    an.getByteFrequencyData(freq); an.getByteTimeDomainData(wave);
+    const el = (performance.now()-t0)/1000;
+    draw(ctx, cv.width, cv.height, freq, wave, t.meta?.title || t.name, el/t.dur);
+    const e = freq.reduce((a,b)=>a+b,0);
+    if (e > peak && el > t.dur*0.15){ peak = e; peakFrame = el; }
+    $('#renderBar').style.width = clamp(el/t.dur*100,0,100)+'%';
+    $('#recTime').textContent = mmss(el);
+    $('#renderNote').textContent = `Rendering “${t.meta?.title || t.name}” — ${mmss(el)} of ${mmss(t.dur)}`;
+    raf = requestAnimationFrame(loop);
+  };
+
+  $('#rec').classList.add('on');
+  rec.start(1000); src.start(); loop(); paintRidge();
+  await new Promise(res => {
+    src.onended = () => setTimeout(() => { try{rec.stop();}catch{} }, 350);
+    rec.onstop = () => { cancelAnimationFrame(raf); res(); };
+  });
+  $('#rec').classList.remove('on');
+
+  t.blob = new Blob(chunks, { type: mime.split(';')[0] });
+  t.state = 'rendered';
+  log(`Rendered “${t.meta?.title || t.name}” — ${(t.blob.size/1048576).toFixed(1)} MB.`, 'ok');
+  paintTracks();
+}
+
+$('#btnRenderAll').onclick = async () => {
+  if (S.busy) return;
+  const todo = S.tracks.filter(t => t.state === 'queued' && t.buf);
+  if (!todo.length){ log('Nothing queued to render.', 'er'); return; }
+  S.busy = true; $('#btnRenderAll').disabled = true;
+  log(`Rendering ${todo.length} tracks — about ${mmss(todo.reduce((a,t)=>a+t.dur,0))} in real time.`);
+  for (const t of todo) await renderTrack(t);
+  S.busy = false; $('#btnRenderAll').disabled = false;
+  $('#renderNote').textContent = 'All queued tracks rendered.';
+  $('#renderBar').style.width = '0%';
+};
+
+/* ── Groq: write the words ── */
+async function groq(messages){
+  const key = store.get('groqKey');
+  if (!key) throw new Error('No Groq key saved');
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+key },
+    body: JSON.stringify({
+      model: store.get('groqModel') || 'openai/gpt-oss-120b',
+      messages, temperature: 0.85,
+      response_format: { type:'json_object' }
+    })
+  });
+  if (!r.ok){
+    const b = await r.text();
+    throw new Error(r.status === 401 ? 'Groq rejected the key' : r.status === 429 ? 'Groq rate limit — wait a minute' : b.slice(0,140));
+  }
+  const j = await r.json();
+  return JSON.parse(j.choices[0].message.content);
+}
+
+async function writeFor(t){
+  const hint = $('#hint').value.trim();
+  const out = await groq([
+    { role:'system', content:
+      'You write YouTube metadata for an independent musician who releases original AI-assisted music. ' +
+      'Reply with JSON only, no prose, using exactly these keys: title, description, tags, hook, scenePrompt. ' +
+      'title: under 70 characters, specific and human, no clickbait, no ALL CAPS, no emoji spam. ' +
+      'description: 2 to 4 short paragraphs, ending with 3 to 6 relevant hashtags on their own line. ' +
+      'tags: an array of 8 to 12 lowercase search terms, no "#". ' +
+      'hook: 2 to 4 words for a thumbnail, title case. ' +
+      'scenePrompt: one vivid image-generation prompt describing a cinematic backdrop that suits the mood.' },
+    { role:'user', content:
+      `Track filename: "${t.name}"\nChannel: ${$('#handle').value}\n` +
+      (hint ? `Mood or genre: ${hint}\n` : '') +
+      'Write the metadata.' }
+  ]);
+  t.meta = {
+    title: String(out.title || t.name).slice(0,100),
+    description: String(out.description || '').slice(0,5000),
+    tags: Array.isArray(out.tags) ? out.tags.map(String) : [],
+    hook: String(out.hook || '').slice(0,40),
+    scenePrompt: String(out.scenePrompt || '')
+  };
+  return t.meta;
+}
+
+$('#btnWriteOne').onclick = async () => {
+  const t = selTrack(); if (!t){ log('Select a track first.','er'); return; }
+  $('#aiNote').textContent = 'Writing…';
+  try { await writeFor(t); log(`Wrote metadata for “${t.meta.title}”.`,'ok'); paintTracks(); fillMetaForm();
+        $('#aiNote').textContent = 'Done. Edit anything below.'; }
+  catch(e){ log(e.message,'er'); $('#aiNote').textContent = e.message; }
+};
+$('#btnWriteAll').onclick = async () => {
+  if (!S.tracks.length){ log('No tracks yet.','er'); return; }
+  $('#btnWriteAll').disabled = true;
+  for (const t of S.tracks){
+    $('#aiNote').textContent = `Writing for “${t.name}”…`;
+    try { await writeFor(t); paintTracks(); }
+    catch(e){ log(`${t.name}: ${e.message}`,'er'); break; }
+    await sleep(1200);
+  }
+  $('#btnWriteAll').disabled = false;
+  $('#aiNote').textContent = 'Finished. Select any track to edit.';
+  fillMetaForm(); log('Metadata written for all tracks.','ok');
+};
+
+function fillMetaForm(){
+  const t = selTrack();
+  const m = t?.meta;
+  $('#mTitle').value = m?.title || '';
+  $('#mDesc').value = m?.description || '';
+  $('#mTags').value = (m?.tags || []).join(', ');
+  $('#mHook').value = m?.hook || '';
+  if (t?.meta?.scenePrompt && !$('#scenePrompt').dataset.touched) $('#scenePrompt').value = t.meta.scenePrompt;
+  drawThumb();
+}
+$('#scenePrompt').addEventListener('input', e => e.target.dataset.touched = '1');
+$('#btnSaveMeta').onclick = () => {
+  const t = selTrack(); if (!t) return;
+  t.meta = Object.assign({}, t.meta, {
+    title: $('#mTitle').value.trim(),
+    description: $('#mDesc').value,
+    tags: $('#mTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+    hook: $('#mHook').value.trim()
+  });
+  paintTracks(); drawThumb(); log('Saved to track.','ok');
+};
+
+/* ── thumbnail ── */
+function wrapText(ctx, text, maxW){
+  const words = text.split(/\s+/), lines = []; let line = '';
+  for (const w of words){
+    const test = line ? line+' '+w : w;
+    if (ctx.measureText(test).width > maxW && line){ lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function drawThumb(){
+  const t = selTrack();
+  const cv = $('#th'), ctx = cv.getContext('2d'), W = 1280, H = 720;
+  ctx.fillStyle = '#0A0D16'; ctx.fillRect(0,0,W,H);
+  if (S.scenes.length) coverDraw(ctx, S.scenes[0], W, H, 1.02, 0, 1);
+
+  if ($('#thumbLayout').checked){
+    const g = ctx.createLinearGradient(0,H,0,H*0.15);
+    g.addColorStop(0,'rgba(10,13,22,.94)'); g.addColorStop(1,'rgba(10,13,22,0)');
+    ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  }
+
+  const hook = (t?.meta?.hook || t?.name || 'Untitled').toUpperCase();
+  ctx.font = `800 108px 'Bricolage Grotesque', sans-serif`;
+  let lines = wrapText(ctx, hook, W*0.82);
+  if (lines.length > 3){ ctx.font = `800 78px 'Bricolage Grotesque', sans-serif`; lines = wrapText(ctx, hook, W*0.82).slice(0,3); }
+  const size = lines.length > 2 ? 78 : 108, lh = size*1.05;
+  ctx.font = `800 ${size}px 'Bricolage Grotesque', sans-serif`;
+
+  let y = H - 118 - (lines.length-1)*lh;
+  ctx.fillStyle = S.accent;
+  ctx.fillRect(64, y - size*0.82, 8, lines.length*lh - lh*0.12);
+  ctx.fillStyle = '#EDF0F7';
+  for (const ln of lines){ ctx.fillText(ln, 92, y); y += lh; }
+
+  ctx.font = `600 30px 'JetBrains Mono', monospace`;
+  ctx.fillStyle = 'rgba(237,240,247,.72)';
+  ctx.fillText($('#handle').value, 92, H - 62);
+}
+$('#thumbLayout').addEventListener('change', drawThumb);
+$('#handle').addEventListener('input', drawThumb);
+
+$('#btnThumb').onclick = async () => {
+  const t = selTrack(); if (!t){ log('Select a track first.','er'); return; }
+  drawThumb();
+  t.thumb = await new Promise(r => $('#th').toBlob(r, 'image/jpeg', 0.92));
+  paintTracks(); log(`Thumbnail built for “${t.meta?.title || t.name}”.`,'ok');
+};
+$('#btnThumbAll').onclick = async () => {
+  if (!S.tracks.length) return;
+  const keep = S.sel;
+  for (const t of S.tracks){
+    S.sel = t.id; drawThumb();
+    t.thumb = await new Promise(r => $('#th').toBlob(r, 'image/jpeg', 0.92));
+  }
+  S.sel = keep; drawThumb(); paintTracks();
+  log('Thumbnails built for all tracks.','ok');
+};
+$('#btnThumbSave').onclick = () => {
+  const t = selTrack();
+  $('#th').toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b); a.download = (t?.name || 'thumbnail') + '.jpg'; a.click();
+  }, 'image/jpeg', 0.92);
+};
+
+/* ── settings ── */
+$('#origin').textContent = location.origin;
+$('#clientId').value = store.get('clientId') || '';
+$('#groqKey').value = store.get('groqKey') || '';
+if (store.get('groqModel')) $('#groqModel').value = store.get('groqModel');
+if (store.get('groqKey')) $('#aiNote').textContent = 'Ready.';
+
+$('#btnSaveId').onclick = () => {
+  const v = $('#clientId').value.trim();
+  if (!v.endsWith('.apps.googleusercontent.com')){ log('That does not look like an OAuth client ID.','er'); return; }
+  store.set('clientId', v); log('Client ID saved.','ok');
+};
+$('#btnSaveGroq').onclick = () => {
+  const v = $('#groqKey').value.trim();
+  if (!v.startsWith('gsk_')){ log('Groq keys start with gsk_.','er'); return; }
+  store.set('groqKey', v); store.set('groqModel', $('#groqModel').value);
+  $('#aiNote').textContent = 'Ready.'; log('Groq key saved.','ok');
+};
+$('#groqModel').addEventListener('change', () => store.set('groqModel', $('#groqModel').value));
+
+/* ── youtube ── */
+$('#btnConnect').onclick = () => {
+  const id = store.get('clientId');
+  if (!id){ log('Add your OAuth client ID under Setup first.','er'); return; }
+  if (!window.google?.accounts?.oauth2){ log('Google sign-in has not loaded yet. Try again in a moment.','er'); return; }
+  google.accounts.oauth2.initTokenClient({
+    client_id: id,
+    scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+    callback: async resp => {
+      if (resp.error){ log('Sign-in failed: '+resp.error,'er'); return; }
+      S.token = resp.access_token;
+      $('#btnUploadAll').disabled = false;
+      $('#upNote').textContent = 'Connected. Token lasts about an hour.';
+      log('YouTube connected.','ok');
+      try {
+        const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:'Bearer '+S.token}});
+        const c = (await r.json()).items?.[0];
+        if (c) $('#acct').innerHTML = `<a href="./index.html" style="color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line)">Today</a><img src="${c.snippet.thumbnails.default.url}" alt=""><span>Publishing to <b>${esc(c.snippet.title)}</b></span>`;
+      } catch { log('Could not read channel info.','er'); }
+    }
+  }).requestAccessToken();
+};
+
+const fill = (s,t) => s.replace(/\{title\}/g, t.name)
+  .replace(/\{date\}/g, new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}));
+
+async function uploadTrack(t){
+  t.state = 'uploading'; paintTracks();
+  const m = t.meta;
+  const meta = {
+    snippet: {
+      title: (m?.title || fill($('#tTitle').value, t)).slice(0,100),
+      description: (m?.description || fill($('#tDesc').value, t)).slice(0,5000),
+      tags: m?.tags?.length ? m.tags : $('#tTags').value.split(',').map(s=>s.trim()).filter(Boolean),
+      categoryId: '10'
+    },
+    status: {
+      privacyStatus: $('#tPriv').value,
+      selfDeclaredMadeForKids: $('#tKids').checked,
+      containsSyntheticMedia: $('#tSynth').checked
+    }
+  };
+
+  const init = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
+    method:'POST',
+    headers:{ Authorization:'Bearer '+S.token, 'Content-Type':'application/json',
+      'X-Upload-Content-Type': t.blob.type || 'video/webm',
+      'X-Upload-Content-Length': String(t.blob.size) },
+    body: JSON.stringify(meta)
+  });
+  if (!init.ok){
+    const txt = await init.text();
+    throw new Error(init.status === 403 ? 'quota spent or upload not permitted' : txt.slice(0,160));
+  }
+  const url = init.headers.get('Location') || init.headers.get('location');
+  if (!url) throw new Error('YouTube did not return an upload URL');
+
+  const video = await new Promise((res,rej) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url, true);
+    x.setRequestHeader('Content-Type', t.blob.type || 'video/webm');
+    x.upload.onprogress = e => {
+      if (!e.lengthComputable) return;
+      const pct = e.loaded/e.total*100;
+      $('#upBar').style.width = pct+'%';
+      $('#upNote').textContent = `Uploading “${meta.snippet.title}” — ${pct.toFixed(0)}%`;
+    };
+    x.onload = () => x.status < 300 ? res(JSON.parse(x.responseText)) : rej(new Error('upload failed, status '+x.status));
+    x.onerror = () => rej(new Error('network dropped during upload'));
+    x.send(t.blob);
+  });
+
+  t.videoId = video.id; t.state = 'done'; bumpUploads();
+  log(`Published “${meta.snippet.title}” → youtu.be/${video.id}`,'ok');
+
+  if ($('#tThumb').checked && t.thumb){
+    try {
+      const r = await fetch(`https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=${video.id}&uploadType=media`, {
+        method:'POST', headers:{ Authorization:'Bearer '+S.token, 'Content-Type':'image/jpeg' }, body: t.thumb
+      });
+      if (r.ok) log('Thumbnail set.','ok');
+      else log('Thumbnail rejected — channel may not be phone-verified.','er');
+    } catch { log('Thumbnail upload failed.','er'); }
+  }
+  paintTracks();
+}
+
+$('#btnUploadAll').onclick = async () => {
+  if (S.busy) return;
+  const todo = S.tracks.filter(t => t.state === 'rendered' && t.blob);
+  if (!todo.length){ log('Nothing rendered yet.','er'); return; }
+  const room = MAX_UPLOADS - uploadsToday();
+  if (room <= 0){ log('Daily quota is spent. It resets at 12:30 PM IST.','er'); return; }
+  if (todo.length > room) log(`Quota allows ${room} more today — uploading the first ${room}.`);
+  S.busy = true; $('#btnUploadAll').disabled = true;
+  for (const t of todo.slice(0,room)){
+    try { await uploadTrack(t); }
+    catch(e){ t.state='failed'; t.err=e.message; log(`${t.name}: ${e.message}`,'er'); paintTracks(); }
+  }
+  S.busy = false; $('#btnUploadAll').disabled = false;
+  $('#upBar').style.width = '0%'; $('#upNote').textContent = 'Finished this batch.';
+};
+
+/* ── boot ── */
+function idleFrame(){
+  if (S.busy || previewStop) return;
+  const cv = $('#cv'), ctx = cv.getContext('2d');
+  const n = 1024, freq = new Uint8Array(n), wave = new Uint8Array(n);
+  const now = performance.now()/1000;
+  for (let i = 0; i < n; i++){
+    const f = i/n;
+    freq[i] = Math.max(0, 1 - f*2.2) * 70 * (0.55 + 0.45*Math.sin(now*0.5 + f*9));
+  }
+  const t = selTrack();
+  draw(ctx, cv.width, cv.height, freq, wave, t?.meta?.title || t?.name || 'Preview', (now*0.04) % 1);
+}
+setInterval(idleFrame, 120);
+idleFrame(); drawThumb(); paintTracks(); paintRidge();
+window.addEventListener('beforeunload', e => { if (S.busy){ e.preventDefault(); e.returnValue=''; } });
+</script>
+</body>
+</html>

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridge — today</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0E1220;--deep:#161C2E;--panel:#1B2236;--line:#2E3854;
+  --snow:#EDF0F7;--mist:#8792AE;
+  --dawn:#FF7A9C;--glacier:#8FD9C9;--lamp:#FFC257;--dusk:#7C6CFF;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter Tight',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --hi:'Noto Sans Devanagari',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--night);color:var(--snow);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+:focus-visible{outline:2px solid var(--dawn);outline-offset:2px;border-radius:3px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
+
+header{border-bottom:1px solid var(--line);background:linear-gradient(180deg,#121729,var(--night));padding:22px 24px 20px}
+.wrap{max-width:1180px;margin:0 auto}
+.brandrow{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:32px;letter-spacing:-.03em;margin:0;line-height:1}
+h1 span{color:var(--dawn)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--mist);letter-spacing:.14em;text-transform:uppercase;margin-top:8px;display:block}
+.chan{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--mist)}
+.chan img{width:34px;height:34px;border-radius:50%;border:1px solid var(--line)}
+.chan b{color:var(--snow);font-weight:600;display:block;font-size:14.5px}
+
+main{max-width:1180px;margin:0 auto;padding:24px 24px 90px}
+
+.rooms{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+@media(max-width:700px){.rooms{grid-template-columns:1fr}}
+.room{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:19px 20px;transition:border-color .16s,transform .16s}
+.room:hover{border-color:var(--dawn);transform:translateY(-1px)}
+.room h3{font-family:var(--display);font-size:18px;font-weight:600;margin:0 0 4px}
+.room p{margin:0;color:var(--mist);font-size:13px}
+.room em{font-style:normal;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dawn);display:block;margin-bottom:9px}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:11px;margin-bottom:22px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:15px 16px}
+.stat b{display:block;font-family:var(--display);font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.stat span{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--mist);display:block;margin-top:6px}
+.stat.up b{color:var(--glacier)}
+.stat.flat b{color:var(--lamp)}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+@media(max-width:940px){.cols{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:19px}
+.card+.card{margin-top:14px}
+h2{font-family:var(--display);font-size:17.5px;font-weight:600;margin:0 0 3px}
+.sub{color:var(--mist);font-size:13px;margin:0 0 15px}
+
+.finds{list-style:none;padding:0;margin:0}
+.finds li{position:relative;padding:0 0 14px 22px;font-size:14px;line-height:1.62}
+.finds li::before{content:'';position:absolute;left:0;top:9px;width:7px;height:7px;border-radius:50%;background:var(--dusk)}
+.finds.do li::before{background:var(--dawn)}
+.finds li:last-child{padding-bottom:0}
+
+.top{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.top:last-child{border-bottom:none}
+.top a{font-size:13.5px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.top a:hover{color:var(--dawn)}
+.top i{font-style:normal;font-family:var(--mono);font-size:12px;color:var(--glacier);white-space:nowrap}
+
+.clip{background:var(--deep);border:1px solid var(--line);border-radius:6px;padding:15px;margin-top:11px}
+.clip h3{font-family:var(--hi);font-size:16px;font-weight:600;margin:0 0 10px}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:11px}
+.strip div{aspect-ratio:9/16;border-radius:4px;overflow:hidden;background:var(--night);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:var(--mist)}
+.strip img{width:100%;height:100%;object-fit:cover;display:block}
+.beat{display:grid;grid-template-columns:22px 1fr;gap:9px;padding:3px 0}
+.beat i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--dawn);padding-top:4px}
+.beat p{margin:0;font-family:var(--hi);font-size:14px;line-height:1.5}
+.cap{font-family:var(--mono);font-size:11.5px;color:var(--mist);margin-top:9px;line-height:1.6}
+
+.btn{background:var(--dawn);color:#20101A;font-weight:600;padding:11px 18px;border-radius:5px;font-size:14px;display:block;text-align:center;text-decoration:none}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--snow);font-weight:500}
+.btn.ghost:hover{border-color:var(--snow);filter:none}
+
+.freshness{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;color:var(--mist);margin-bottom:18px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--glacier);flex:none}
+.dot.stale{background:var(--lamp)}
+.dot.cold{background:var(--dawn)}
+
+.setup{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:26px}
+.setup h2{font-size:20px;margin-bottom:7px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0 0}
+.steps li{counter-increment:s;position:relative;padding:0 0 16px 34px;font-size:14px;line-height:1.65;color:var(--mist)}
+.steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;border:1px solid var(--line);border-radius:50%;font-family:var(--mono);font-size:11px;display:grid;place-items:center;color:var(--dawn)}
+.steps b{color:var(--snow);font-weight:600}
+code{font-family:var(--mono);font-size:12.5px;background:var(--deep);padding:2px 7px;border-radius:3px;color:var(--glacier);word-break:break-all}
+.empty{color:var(--mist);font-size:13.5px;text-align:center;padding:26px 14px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap brandrow">
+    <div><h1>Ridge<span>.</span></h1><span class="tag" id="today">Today</span></div>
+    <div class="chan" id="chan"></div>
+  </div>
+</header>
+
+<main>
+  <div class="rooms">
+    <a class="room" href="./shorts.html"><em>Vertical</em><h3>Shorts studio</h3><p>Cast, script, film ten seconds, publish. Today's clips are already written.</p></a>
+    <a class="room" href="./music.html"><em>Long form</em><h3>Music video studio</h3><p>Drop Suno tracks, render the visualiser, upload with thumbnails.</p></a>
+  </div>
+  <div id="body"><div class="card"><div class="empty">Loading…</div></div></div>
+</main>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const n = x => Number(x || 0).toLocaleString('en-IN');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+$('#today').textContent = new Date().toLocaleDateString('en-IN',
+  { weekday:'long', day:'numeric', month:'long' });
+
+function onboarding(reason){
+  $('#body').innerHTML = `
+    <div class="setup">
+      <h2>No brief yet</h2>
+      <p class="sub">${esc(reason)} Once the nightly workflow runs, this page fills with your numbers, what they suggest, and tomorrow's clips already written and drawn.</p>
+      <ol class="steps">
+        <li>In your repo, open <b>Settings → Secrets and variables → Actions</b> and add <code>GROQ_API_KEY</code>. That alone is enough to start.</li>
+        <li>Add <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> and <code>GOOGLE_REFRESH_TOKEN</code> to switch on the stats and suggestions.</li>
+        <li>Open the <b>Actions</b> tab, pick <b>Nightly brief</b>, and press <b>Run workflow</b>. It takes about three minutes.</li>
+        <li>Come back here. After that it runs itself every morning at 8:00 IST.</li>
+      </ol>
+      <p class="sub" style="margin:20px 0 0">Full walkthrough in <b>SETUP.md</b> in the repo. The two studios above work right now without any of this.</p>
+    </div>`;
+}
+
+function statBlocks(b){
+  const c = b.channel, a = b.analysis;
+  const out = [];
+  if (c){
+    out.push(['Subscribers', n(c.subs), '']);
+    out.push(['Lifetime views', n(c.totalViews), '']);
+    out.push(['Videos', n(c.videoCount), '']);
+  }
+  if (a){
+    out.push(['Median views', n(a.median), a.median >= a.mean ? 'up' : 'flat']);
+    if (a.shortsCount) out.push(['Shorts average', n(a.shortsAvg), a.shortsAvg > a.longAvg ? 'up' : '']);
+    if (a.longCount) out.push(['Long-form average', n(a.longAvg), a.longAvg > a.shortsAvg ? 'up' : '']);
+    out.push(['Uploads, 14 days', n(a.uploadsLast14), a.uploadsLast14 >= 6 ? 'up' : 'flat']);
+  }
+  if (!out.length) return '';
+  return `<div class="stats">${out.map(([l,v,k]) =>
+    `<div class="stat ${k}"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+}
+
+function render(b){
+  const when = new Date(b.generatedAt);
+  const ageH = (Date.now() - when) / 36e5;
+  const cls = ageH < 30 ? '' : ageH < 72 ? 'stale' : 'cold';
+  const ago = ageH < 1 ? 'just now'
+    : ageH < 24 ? `${Math.round(ageH)} hours ago`
+    : `${Math.round(ageH/24)} days ago`;
+
+  if (b.channel) $('#chan').innerHTML =
+    (b.channel.thumb ? `<img src="${b.channel.thumb}" alt="">` : '') +
+    `<div><b>${esc(b.channel.title)}</b><span>${n(b.channel.subs)} subscribers</span></div>`;
+
+  const obs = (b.observations||[]).length
+    ? `<div class="card"><h2>What the numbers say</h2><p class="sub">Read from your last ${b.analysis ? b.analysis.top.length + (b.analysis.weakest?.length||0) : 'few'} uploads.</p>
+        <ul class="finds">${b.observations.map(o=>`<li>${esc(o)}</li>`).join('')}</ul></div>` : '';
+
+  const sug = (b.suggestions||[]).length
+    ? `<div class="card"><h2>Do next</h2><p class="sub">Specific, and sometimes it will tell you to stop something.</p>
+        <ul class="finds do">${b.suggestions.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>` : '';
+
+  const top = b.analysis?.top?.length
+    ? `<div class="card"><h2>Best performers</h2><p class="sub">Worth studying before you write anything new.</p>
+        ${b.analysis.top.map(t=>`<div class="top"><a href="https://youtu.be/${t.id}" target="_blank" rel="noopener">${esc(t.title)}</a><i>${n(t.views)} · ${t.engagement}%</i></div>`).join('')}</div>` : '';
+
+  const clips = (b.clips||[]).length
+    ? `<div class="card"><h2>Ready to film</h2>
+        <p class="sub">Written overnight, panels already drawn. Open the Shorts studio and they load with one tap.</p>
+        ${b.clips.map(c=>`
+          <div class="clip">
+            <h3>${esc(c.title||'Untitled')}</h3>
+            <div class="strip">${[0,1,2].map(i=>{
+              const p=(c.panels||[])[i];
+              return p ? `<div><img src="${esc(p)}" alt="Panel ${i+1}" loading="lazy"></div>`
+                       : `<div>panel ${i+1}</div>`;
+            }).join('')}</div>
+            ${(c.beats||[]).map((x,i)=>`<div class="beat"><i>${i+1}</i><p>${esc(x.line||'')}</p></div>`).join('')}
+            <div class="cap">${esc(c.caption||'')} ${(c.tags||[]).map(t=>'#'+esc(t)).join(' ')}</div>
+          </div>`).join('')}
+        <a class="btn" style="margin-top:15px" href="./shorts.html?brief=1">Open in the Shorts studio</a>
+      </div>` : '';
+
+  const health = b.panelHealth && b.panelHealth.made < b.panelHealth.total
+    ? `<div class="card"><h2>Heads up</h2><p class="sub" style="margin:0">Only ${b.panelHealth.made} of ${b.panelHealth.total} panels came back last night. The missing beats will reuse the previous panel when you film. Re-run the workflow if you want them redrawn.</p></div>` : '';
+
+  $('#body').innerHTML =
+    `<div class="freshness"><span class="dot ${cls}"></span>Brief built ${ago} · ${when.toLocaleString('en-IN')}</div>` +
+    statBlocks(b) +
+    `<div class="cols"><div>${clips}</div><div>${obs}${sug}${top}${health}
+      <div class="card"><h2>Run it again</h2><p class="sub" style="margin-bottom:13px">New numbers, new clips, fresh panels. About three minutes.</p>
+      <a class="btn ghost" id="rerun" href="#" target="_blank" rel="noopener">Open the Actions tab</a></div>
+    </div></div>`;
+
+  // point the rerun button at this repo's Actions tab
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/);
+  if (m){
+    const repo = location.pathname.split('/').filter(Boolean)[0] || (m[1] + '.github.io');
+    $('#rerun').href = `https://github.com/${m[1]}/${repo}/actions`;
+  } else $('#rerun').style.display = 'none';
+}
+
+fetch('./data/brief.json', { cache: 'no-store' })
+  .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+  .then(render)
+  .catch(() => onboarding('The nightly workflow has not produced one yet.'));
+</script>
+</body>
+</html>
