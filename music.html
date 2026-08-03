@@ -184,13 +184,12 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       <div id="list"></div>
     </div>
     <div>
-      <div class="card" id="restoreCard" style="display:none">
-        <div class="warn good">
-          <b>Unfinished work found.</b> <span id="restoreText"></span>
-        </div>
-        <div class="row">
-          <button class="btn sm" id="btnRestore">Restore it</button>
-          <button class="btn ghost sm" id="btnDiscard">Discard</button>
+      <div class="card" id="libCard" style="display:none">
+        <h2>Saved on this device</h2>
+        <p class="sub" id="libSub"></p>
+        <div id="libList"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost sm" id="btnDownloadPending">Download everything unpublished</button>
         </div>
       </div>
       <div class="card">
@@ -199,9 +198,13 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       </div>
       <div class="card">
         <h2>Safe storage</h2>
-        <p class="sub">Audio and finished videos are kept in this browser's database, so a crash or a closed tab doesn't lose them.</p>
+        <p class="sub">Rendered videos are written to this browser's own database the moment they finish — no YouTube connection needed. They come back automatically next time you open the app.</p>
         <p class="note" id="vaultNote">Checking…</p>
-        <button class="btn ghost sm" id="btnClearVault" style="margin-top:10px">Empty the vault</button>
+        <div class="warn" id="persistWarn" style="display:none;margin-top:12px">
+          <b>Storage is not pinned.</b> The browser may evict this data if the device runs low on space. Nothing you can do about it directly — but keep a copy of anything you cannot lose, using the download button above.
+        </div>
+        <p class="note" style="margin-top:12px">Pushing new code to GitHub does <b style="color:var(--snow)">not</b> touch this. The database belongs to the domain, not to the files. What does erase it: clearing browsing data for this site, using a private window, or moving the app to a different domain.</p>
+        <button class="btn ghost sm" id="btnClearVault" style="margin-top:12px">Empty the vault</button>
       </div>
     </div>
   </div>
@@ -359,7 +362,7 @@ Follow @mohucool for new music.
       </div>
       <div class="card">
         <h2>Publish</h2>
-        <button class="btn" id="btnConnect">Connect Google</button>
+        <button class="btn" id="btnConnect">Connect YouTube</button>
         <button class="btn" id="btnUploadAll" style="margin-top:9px" disabled>Publish all rendered</button>
         <div class="bar"><i id="upBar"></i></div>
         <p class="note" id="upNote">Not connected.</p>
@@ -367,9 +370,11 @@ Follow @mohucool for new music.
       <div class="card">
         <h2>Back up to Drive</h2>
         <p class="sub">Audio and finished videos into a <code>Ridge</code> folder. The app can only see files it created.</p>
-        <button class="btn ghost" id="btnDrive" disabled>Back up rendered tracks</button>
+        <p class="note" style="margin-bottom:11px">Drive signs in separately from YouTube. Google rejects any request that asks for both at once, so this is two consent screens rather than one.</p>
+        <button class="btn ghost" id="btnDriveConnect">Connect Drive</button>
+        <button class="btn ghost" id="btnDrive" style="margin-top:9px" disabled>Back up rendered tracks</button>
         <div class="bar"><i id="drvBar"></i></div>
-        <p class="note" id="drvNote">Connect Google first.</p>
+        <p class="note" id="drvNote">Not connected.</p>
       </div>
       <div class="card"><h2>Activity</h2><div class="log" id="log"><div>Ready.</div></div></div>
     </div>
@@ -430,7 +435,7 @@ const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.flo
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const bytes = n => n > 1e9 ? (n/1073741824).toFixed(1)+' GB' : (n/1048576).toFixed(0)+' MB';
 
-const S = { tracks:[], sel:null, forced:null, accent:null, token:null, busy:false, stopShots:false, slots:null };
+const S = { tracks:[], sel:null, forced:null, accent:null, token:null, driveToken:null, busy:false, stopShots:false, slots:null };
 const ACCENTS = ['#FF7A9C','#8FD9C9','#FFC257','#7C6CFF','#5AC8FA','#F2F5FC'];
 // The binding limit is whichever is lower: the API's 100-a-day upload
 // bucket, or YouTube's per-channel cap for this account. See core.js.
@@ -555,7 +560,7 @@ function paintTracks(){
     const a=document.createElement('a'); a.href=URL.createObjectURL(t.blob); a.download=t.name+'.webm'; a.click();
   });
   $('#nTracks').textContent=S.tracks.length||'';
-  paintMood(); paintRidge();
+  paintMood(); paintRidge(); paintLibrary();
 }
 
 function paintMood(){
@@ -1044,13 +1049,27 @@ paintProviders();
 async function refreshVault(){
   try{
     const u=await vault.usage(), keys=await vault.keys();
-    $('#vaultNote').textContent=u
-      ? `${keys.length} items · ${bytes(u.used)} used of about ${bytes(u.quota)} available.`
-      : `${keys.length} items stored.`;
+    let pinned=null;
+    try{ pinned = navigator.storage?.persisted ? await navigator.storage.persisted() : null; }catch{}
+    $('#vaultNote').textContent =
+      (u ? `${keys.length} items · ${bytes(u.used)} used of about ${bytes(u.quota)} available.`
+         : `${keys.length} items stored.`) +
+      (pinned===true ? ' Storage is pinned — the browser will not evict it.'
+       : pinned===false ? ' Storage is not pinned.' : '');
+    $('#persistWarn').style.display = pinned===false ? 'block' : 'none';
     $('#mVault').textContent=u?bytes(u.used):'—';
   }catch{ $('#vaultNote').textContent='Storage unavailable in this browser.'; }
 }
-$('#btnClearVault').onclick=async()=>{ await vault.clear(); log('Vault emptied.','ok'); refreshVault(); };
+$('#btnClearVault').onclick=async()=>{
+  const pending=S.tracks.filter(t=>t.blob&&t.state!=='done').length;
+  const msg=pending
+    ? `This deletes everything stored locally, including ${pending} rendered video${pending>1?'s':''} that has not been uploaded. Download them first if you want to keep them. Continue?`
+    : 'Delete all locally stored audio and video? Published videos stay on YouTube.';
+  if(!confirm(msg)) return;
+  await vault.clear();
+  S.tracks.forEach(t=>{ t.blob=null; });
+  log('Vault emptied.','ok'); paintTracks(); paintLibrary(); refreshVault();
+};
 
 /* ── crash-safe state ── */
 let saveTimer;
@@ -1061,7 +1080,7 @@ function saveState(){
       await vault.putState('session',{
         at:Date.now(),
         tracks:S.tracks.map(t=>({ id:t.id, name:t.name, dur:t.dur, state:t.state,
-          shots:t.shots, meta:t.meta, videoId:t.videoId, ytUrl:t.ytUrl,
+          shots:t.shots, meta:t.meta, videoId:t.videoId, ytUrl:t.ytUrl, publishAt:t.publishAt,
           mood:t.mood?{label:t.mood.label,visual:t.mood.visual,palette:t.mood.palette,bpm:t.mood.bpm,
                        energy:t.mood.energy,brightness:t.mood.brightness,dynamics:t.mood.dynamics,
                        pace:t.mood.pace,sceneMood:t.mood.sceneMood}:null }))
@@ -1070,63 +1089,120 @@ function saveState(){
   },800);
 }
 
-async function offerRestore(){
+async function autoRestore(){
   let s; try{ s=await vault.getState('session'); }catch{ return; }
   if(!s?.tracks?.length) return;
-  const when=new Date(s.at);
-  const unfinished=s.tracks.filter(t=>t.state!=='done').length;
-  $('#restoreText').textContent =
-    `${s.tracks.length} track${s.tracks.length>1?'s':''} from ${when.toLocaleString('en-IN')}` +
-    (unfinished?`, ${unfinished} not yet published.`:', all published.');
-  $('#restoreCard').style.display='block';
-  $('#btnRestore').onclick=async()=>{
-    $('#restoreCard').style.display='none';
-    let n=0;
-    for(const rec of s.tracks){
-      const audio=await vault.getBlob('audio:'+rec.id).catch(()=>null);
-      if(!audio) continue;
-      const t={ id:rec.id, file:audio, name:rec.name, dur:rec.dur, buf:null, mood:rec.mood,
-        shots:rec.shots||[], imgs:[], state:rec.state==='rendering'?'queued':rec.state,
-        blob:null, thumb:null, meta:rec.meta, videoId:rec.videoId, ytUrl:rec.ytUrl, err:null };
-      const vid=await vault.getBlob('video:'+rec.id).catch(()=>null);
-      if(vid){ t.blob=vid; if(t.state==='queued') t.state='rendered'; }
-      S.tracks.push(t); n++;
-    }
-    if(!S.sel) S.sel=S.tracks[0]?.id||null;
-    paintTracks();
-    for(const t of S.tracks) if(!t.buf) await decode(t);
-    paintTracks(); refreshVault();
-    log(`Restored ${n} tracks. Scene images need regenerating — the shot lists survived.`,'ok');
-  };
-  $('#btnDiscard').onclick=async()=>{ $('#restoreCard').style.display='none'; await vault.clear(); refreshVault(); };
+  let n=0;
+  for(const rec of s.tracks){
+    if(S.tracks.some(t=>t.id===rec.id)) continue;
+    const audio=await vault.getBlob('audio:'+rec.id).catch(()=>null);
+    const vid=await vault.getBlob('video:'+rec.id).catch(()=>null);
+    if(!audio&&!vid) continue;                    // nothing left to restore
+    if(rec.state==='done'&&!vid) continue;        // already published, blob pruned
+    const t={ id:rec.id, file:audio, name:rec.name, dur:rec.dur, buf:null, mood:rec.mood,
+      shots:rec.shots||[], imgs:[],
+      state: rec.state==='rendering' ? 'queued' : rec.state,
+      blob:vid||null, thumb:null, meta:rec.meta, videoId:rec.videoId,
+      ytUrl:rec.ytUrl, publishAt:rec.publishAt||null, err:null };
+    if(vid&&['queued','rendering'].includes(t.state)) t.state='rendered';
+    S.tracks.push(t); n++;
+  }
+  if(!n) return;
+  if(!S.sel) S.sel=S.tracks[0].id;
+  paintTracks(); paintLibrary();
+  for(const t of S.tracks) if(!t.buf&&t.file) await decode(t);
+  paintTracks(); refreshVault();
+  const pending=S.tracks.filter(t=>t.blob&&t.state!=='done').length;
+  log(`Restored ${n} track${n>1?'s':''} from this device` +
+      (pending?` — ${pending} rendered and waiting to upload.`:'.') +
+      ' Scene images need regenerating; everything else survived.','ok');
 }
 
+function paintLibrary(){
+  const withVideo=S.tracks.filter(t=>t.blob);
+  const pending=withVideo.filter(t=>t.state!=='done');
+  const card=$('#libCard');
+  if(!withVideo.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  const total=withVideo.reduce((a,t)=>a+t.blob.size,0);
+  $('#libSub').textContent =
+    `${withVideo.length} rendered video${withVideo.length>1?'s':''} held locally · ${bytes(total)}` +
+    (pending.length?` · ${pending.length} not yet on YouTube`:' · all published');
+  $('#libList').innerHTML = withVideo.map(t=>`
+    <div class="track" style="margin-top:8px">
+      <div class="num">${t.state==='done'?'✓':'•'}</div>
+      <div><div class="tname">${esc(t.meta?.title||t.name)}</div>
+        <div class="tmeta">${(t.blob.size/1048576).toFixed(1)} MB · ${esc(t.state)}${t.publishAt?' · '+esc(istLabel(t.publishAt)):''}</div></div>
+      <div class="rowbtns">
+        <button class="btn ghost sm" data-lib-dl="${t.id}">Download</button>
+        <button class="btn ghost sm" data-lib-rm="${t.id}">Delete</button>
+      </div>
+    </div>`).join('');
+  $('#libList').querySelectorAll('[data-lib-dl]').forEach(b=>b.onclick=()=>{
+    const t=S.tracks.find(x=>x.id===b.dataset.libDl); if(!t?.blob) return;
+    const a=document.createElement('a'); a.href=URL.createObjectURL(t.blob);
+    a.download=(t.meta?.title||t.name).replace(/[^\w\u0900-\u097F .-]/g,'').trim().slice(0,60)+'.webm'; a.click();
+  });
+  $('#libList').querySelectorAll('[data-lib-rm]').forEach(b=>b.onclick=async()=>{
+    const t=S.tracks.find(x=>x.id===b.dataset.libRm); if(!t) return;
+    if(t.state!=='done'&&!confirm(`Delete the rendered video for “${t.meta?.title||t.name}”? It has not been uploaded yet.`)) return;
+    await vault.delBlob('video:'+t.id).catch(()=>{});
+    t.blob=null; if(t.state==='rendered') t.state='queued';
+    paintTracks(); paintLibrary(); refreshVault(); saveState();
+  });
+}
+
+$('#btnDownloadPending').onclick=()=>{
+  const pending=S.tracks.filter(t=>t.blob&&t.state!=='done');
+  if(!pending.length){ log('Nothing unpublished to download.','er'); return; }
+  pending.forEach((t,i)=>setTimeout(()=>{
+    const a=document.createElement('a'); a.href=URL.createObjectURL(t.blob);
+    a.download=(t.meta?.title||t.name).replace(/[^\w\u0900-\u097F .-]/g,'').trim().slice(0,60)+'.webm'; a.click();
+  }, i*700));
+  log(`Downloading ${pending.length} unpublished video${pending.length>1?'s':''}.`,'ok');
+};
+
 /* ── Google ── */
-$('#btnConnect').onclick=()=>{
+// Google refuses to issue one token covering both YouTube and Drive —
+// the request comes back "scopes that cannot be requested together".
+// So they are two separate consents producing two separate tokens.
+function consent(scope, onToken){
   const id=store.get('clientId');
   if(!id){ log('Add your OAuth client ID under Setup first.','er'); return; }
   if(!window.google?.accounts?.oauth2){ log('Google sign-in has not loaded yet.','er'); return; }
   google.accounts.oauth2.initTokenClient({
-    client_id:id,
-    scope:`https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly ${DRIVE_SCOPE}`,
-    callback: async resp=>{
+    client_id:id, scope,
+    callback: resp=>{
       if(resp.error){ log('Sign-in failed: '+resp.error,'er'); return; }
-      S.token=resp.access_token;
-      $('#btnUploadAll').disabled=false; $('#btnDrive').disabled=false;
-      $('#upNote').textContent='Connected. Token lasts about an hour.';
-      $('#drvNote').textContent='Ready.';
-      log('Google connected.','ok');
-      try{
-        const r=await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:'Bearer '+S.token}});
-        const c=(await r.json()).items?.[0];
-        if(c) $('#acct').innerHTML=`<a href="./index.html">Today</a><a href="./shorts.html">Shorts</a><img src="${c.snippet.thumbnails.default.url}" alt=""><span>Publishing to <b>${esc(c.snippet.title)}</b></span>`;
-      }catch{}
-      learnSlots();
-      try{ const q=await driveQuota(S.token);
-        if(q) $('#mDrive').textContent=q.limit?bytes(q.limit-q.used):'unlimited'; }catch{}
+      onToken(resp.access_token);
     }
   }).requestAccessToken();
-};
+}
+
+$('#btnConnect').onclick=()=>consent(
+  'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
+  async token=>{
+    S.token=token;
+    $('#btnUploadAll').disabled=false; $('#btnDrive').disabled=false;
+    $('#upNote').textContent='Connected. Token lasts about an hour.';
+    $('#drvNote').textContent='Drive needs its own sign-in — Google will not combine the two.';
+    log('YouTube connected.','ok');
+    try{
+      const r=await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{headers:{Authorization:'Bearer '+S.token}});
+      const c=(await r.json()).items?.[0];
+      if(c) $('#acct').innerHTML=`<a href="./index.html">Today</a><a href="./shorts.html">Shorts</a><img src="${c.snippet.thumbnails.default.url}" alt=""><span>Publishing to <b>${esc(c.snippet.title)}</b></span>`;
+    }catch{}
+    learnSlots();
+  });
+
+$('#btnDriveConnect').onclick=()=>consent(DRIVE_SCOPE, async token=>{
+  S.driveToken=token;
+  $('#btnDrive').disabled=false;
+  $('#drvNote').textContent='Drive connected.';
+  log('Drive connected.','ok');
+  try{ const q=await driveQuota(S.driveToken);
+    if(q) $('#mDrive').textContent=q.limit?bytes(q.limit-q.used):'unlimited'; }catch{}
+});
 
 const fill=(s,t)=>s.replace(/\{title\}/g,t.name)
   .replace(/\{date\}/g,new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}));
@@ -1206,27 +1282,28 @@ $('#btnUploadAll').onclick=async()=>{
 };
 
 $('#btnDrive').onclick=async()=>{
-  if(!S.token){ log('Connect Google first.','er'); return; }
+  if(!S.driveToken){ log('Connect Drive first — it is a separate sign-in from YouTube.','er');
+    $('#drvNote').textContent='Press Connect Drive above.'; return; }
   const todo=S.tracks.filter(t=>t.blob||t.file);
   if(!todo.length){ log('Nothing to back up.','er'); return; }
   $('#btnDrive').disabled=true;
   try{
-    const folder=await driveFolder(S.token,'Ridge');
+    const folder=await driveFolder(S.driveToken,'Ridge');
     for(const t of todo){
       const safe=t.name.replace(/[^\w\u0900-\u097F .-]/g,'').trim().slice(0,60)||t.id;
       if(t.file){
         $('#drvNote').textContent=`Backing up ${safe} — audio…`;
-        await driveUpload(S.token,folder,safe+' — audio.'+(t.file.name.split('.').pop()||'mp3'),t.file,
+        await driveUpload(S.driveToken,folder,safe+' — audio.'+(t.file.name.split('.').pop()||'mp3'),t.file,
           p=>$('#drvBar').style.width=(p*100)+'%');
       }
       if(t.blob){
         $('#drvNote').textContent=`Backing up ${safe} — video…`;
-        await driveUpload(S.token,folder,safe+'.webm',t.blob,p=>$('#drvBar').style.width=(p*100)+'%');
+        await driveUpload(S.driveToken,folder,safe+'.webm',t.blob,p=>$('#drvBar').style.width=(p*100)+'%');
       }
       log(`Backed up “${safe}” to Drive.`,'ok');
     }
     $('#drvNote').textContent='Backup complete.';
-    const q=await driveQuota(S.token);
+    const q=await driveQuota(S.driveToken);
     if(q) $('#mDrive').textContent=q.limit?bytes(q.limit-q.used):'unlimited';
   }catch(e){ $('#drvNote').textContent=e.message; log('Drive: '+e.message,'er'); }
   $('#drvBar').style.width='0%'; $('#btnDrive').disabled=false;
@@ -1301,8 +1378,8 @@ function idleFrame(){
   draw(ctx,cv.width,cv.height,freq,wave,selTrack(),(now*0.04)%1);
 }
 setInterval(idleFrame,120);
-idleFrame(); drawThumb(); paintTracks(); paintRidge(); refreshVault(); offerRestore();
-vault.persist();
+idleFrame(); drawThumb(); paintTracks(); paintRidge(); refreshVault(); autoRestore();
+vault.persist().then(()=>refreshVault());
 window.addEventListener('beforeunload',e=>{ if(S.busy){e.preventDefault();e.returnValue=''} });
 </script>
 </body>

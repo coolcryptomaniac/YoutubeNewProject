@@ -45,8 +45,14 @@ You need a Google Cloud project so the apps can upload on your behalf.
 3. **APIs & Services → OAuth consent screen**
    - User type: **External** → Create
    - Fill in app name and your email, Save and continue
-   - **Scopes** → Add or remove scopes → paste
-     `https://www.googleapis.com/auth/youtube.upload` → Update → Save
+   - **Scopes** → Add or remove scopes → paste these three, one per line:
+     ```
+     https://www.googleapis.com/auth/youtube.upload
+     https://www.googleapis.com/auth/youtube.readonly
+     https://www.googleapis.com/auth/drive.file
+     ```
+     Update → Save. Declaring all three here is fine — they only clash when
+     *requested together*, which the app avoids. See below.
    - **Test users** → **Add users** → add your own Gmail address.
      *Skip this and sign-in will be blocked.* Save.
 4. **APIs & Services → Credentials → Create credentials → OAuth client ID**
@@ -229,10 +235,39 @@ the music studio.
 
 ## Nothing is lost if it crashes
 
-Audio and finished videos go into the browser's own database, not just memory. Close the
-tab, crash, lose power — reopen and the Tracks screen offers to restore everything. Shot
-lists, metadata and detected moods come back too. Scene images have to be regenerated,
-since storing twenty images per track would fill the vault quickly.
+**A rendered video is written to disk the instant it finishes — no YouTube connection
+required.** You can render six tracks with Google never connected, close the laptop, come
+back on Thursday, and they are all still sitting there ready to upload.
+
+Restoring is automatic. There is no prompt to catch and nothing to click; open the app and
+anything unpublished is already back in the list, marked *rendered*, with its title, tags
+and detected mood intact. The **Saved on this device** panel on the Tracks screen shows
+everything held locally, how much space it uses, and which items have not reached YouTube
+yet. Each has its own Download and Delete.
+
+Filmed Shorts clips work the same way and come back on their own too.
+
+Scene images are deliberately not kept — twenty images per track would fill the quota fast,
+and they regenerate in a couple of minutes. The shot list that produced them does survive.
+
+### Pushing new code does not erase anything
+
+This is worth being clear about, because it sounds like it should. The database belongs to
+the **domain**, not to the files. Committing a new `music.html`, rewriting `core.js`,
+re-running the workflow — none of it touches your stored videos. GitHub Pages replaces the
+code; the browser keeps the data.
+
+What *does* erase it:
+
+- clearing browsing data or site data for `yourname.github.io`
+- opening the app in a private or incognito window
+- moving the app to a different domain, including switching to a custom domain
+- the browser evicting it under storage pressure
+
+The app asks the browser to pin the storage against that last one, and tells you on the
+Tracks screen whether it was granted. If it says **not pinned**, the browser reserves the
+right to reclaim the space, so use **Download everything unpublished** for anything you
+would hate to re-render. It is one click and gives you real files on disk.
 
 An interrupted **upload** resumes properly rather than starting over: YouTube's session
 URL is kept, and on retry the app asks how many bytes arrived and sends only the rest.
@@ -347,3 +382,29 @@ Worth saying plainly: being able to upload a hundred a day is not a reason to. S
 helps because it separates *when you work* from *when things come out* — batch on Sunday,
 release across the week. That reads as a consistent channel. Uploading thirty in one
 afternoon reads as a dump, and performs like one.
+
+
+---
+
+## Why YouTube and Drive sign in separately
+
+If you try to authorise both at once, Google refuses:
+
+> This request contains scopes that cannot be requested together.
+> Error 400: invalid_request
+
+Google does not allow a single authorisation request to cover YouTube scopes and Drive
+scopes at the same time. It is not a setting you can change and not something the consent
+screen configuration fixes — declaring all three scopes in the Cloud Console is fine and
+necessary, but the *request* must ask for one group or the other.
+
+So the Publish tab has two buttons:
+
+- **Connect YouTube** — uploads, channel info, release-timing history.
+- **Connect Drive** — backup only, using `drive.file`.
+
+Two consent screens, two tokens. You only need Drive if you want the backup; everything
+else works without it. Each token lasts about an hour, and the app asks again when it
+expires.
+
+The nightly workflow is unaffected — it only ever asks for `youtube.readonly`.

@@ -317,6 +317,7 @@ canvas{display:block;width:100%;height:auto}
         </div>
         <p class="sub">The honest workflow: download the clip, then post it from your phone. Ten seconds of tapping, and the caption is already written for you.</p>
         <button class="btn ghost" id="btnDownloadAll">Download filmed clips</button>
+        <p class="note">Filmed clips are saved in this browser as soon as they finish, with or without a YouTube connection, and reload themselves next time you open the page. Pushing new code to GitHub does not touch them.</p>
         <button class="btn ghost" id="btnCopyCaps" style="margin-top:9px">Copy all captions</button>
       </div>
     </div>
@@ -359,8 +360,9 @@ canvas{display:block;width:100%;height:auto}
 
 </main>
 
-<script>
+<script type="module">
 'use strict';
+import { vault } from './core.js';
 
 const PRESETS = {
   dogcat: "Motu, a chubby golden-brown street dog with one floppy ear and a red collar; and Chotu, a small grumpy grey cat with white paws and green eyes. Both stay exactly this colour and shape in every panel.",
@@ -778,6 +780,12 @@ async function film(c){
 
   c.blob=new Blob(chunks,{type:mime.split(';')[0]});
   c.state='filmed';
+  try{
+    await vault.putBlob('clip:'+c.id,c.blob);
+    await vault.putState('shortsSession',{ at:Date.now(),
+      clips:S.clips.filter(x=>x.blob).map(x=>({ id:x.id,title:x.title,beats:x.beats,
+        caption:x.caption,tags:x.tags,state:x.state,videoId:x.videoId })) });
+  }catch(e){ log('Could not save the clip locally: '+e.message,'er'); }
   $('#takeBar').style.width='0%';
   $('#takeNote').textContent=`Filmed — ${(c.blob.size/1048576).toFixed(1)} MB.`;
   log(`Filmed “${c.title}”.`,'ok'); paintClips();
@@ -896,6 +904,7 @@ async function upload(c,when){
   });
   c.videoId=video.id; bumpPosted();
   c.state=scheduled?'scheduled':'done';
+  if(!scheduled) vault.delBlob('clip:'+c.id).catch(()=>{});
   log(scheduled?`Scheduled “${c.title}” for ${istLabel(at)}`
                :`Published “${c.title}” → youtube.com/shorts/${video.id}`,'ok');
   paintClips();
@@ -960,7 +969,27 @@ document.fonts.load("700 68px 'Noto Sans Devanagari'").then(()=>{
   x.fillText('यहाँ आपकी क्लिप', cv.width/2, cv.height/2);
   x.textAlign='left';
 });
-paintClips(); paintTake(); paintStrip();
+async function restoreClips(){
+  let s; try{ s=await vault.getState('shortsSession'); }catch{ return; }
+  if(!s?.clips?.length) return;
+  let n=0;
+  for(const rec of s.clips){
+    if(rec.state==='done') continue;
+    if(S.clips.some(c=>c.id===rec.id)) continue;
+    const blob=await vault.getBlob('clip:'+rec.id).catch(()=>null);
+    if(!blob) continue;
+    S.clips.push({ id:rec.id,title:rec.title,beats:rec.beats||[],caption:rec.caption||'',
+      tags:rec.tags||[],panelUrls:[],imgs:[],blob,videoId:rec.videoId||null,
+      state:'filmed',err:null });
+    n++;
+  }
+  if(!n) return;
+  if(!S.sel) S.sel=S.clips[0].id;
+  paintClips(); paintTake();
+  log(`Restored ${n} filmed clip${n>1?'s':''} from this device — still waiting to upload.`,'ok');
+}
+
+paintClips(); paintTake(); paintStrip(); restoreClips();
 if (new URLSearchParams(location.search).get('brief')){
   $$('#nav button').forEach(x => x.setAttribute('aria-selected', String(x.dataset.p === 'take')));
   $$('.panes > section').forEach(s => s.classList.toggle('on', s.id === 'p-take'));
