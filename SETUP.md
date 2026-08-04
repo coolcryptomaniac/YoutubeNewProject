@@ -408,3 +408,157 @@ else works without it. Each token lasts about an hour, and the app asks again wh
 expires.
 
 The nightly workflow is unaffected — it only ever asks for `youtube.readonly`.
+
+
+---
+
+## Drive not working? Enable the API
+
+The most likely cause, and it catches nearly everyone: **the Drive API is switched off in
+your Cloud project.** Turning on the YouTube Data API does not turn on Drive — they are
+separate switches.
+
+1. **console.cloud.google.com** → your project
+2. **APIs & Services → Library**
+3. Search **Google Drive API** → **Enable**
+4. Give it a minute, then press **Connect Drive** again
+
+The app now reads Google's error properly and will tell you this in the Drive panel rather
+than showing a raw 403.
+
+If it still fails: check `https://www.googleapis.com/auth/drive.file` is listed on your
+**OAuth consent screen → Scopes**. Declaring it there is required; it only clashes with the
+YouTube scopes when *requested* together, which the app already avoids.
+
+### Or skip Drive entirely — use a folder
+
+**Publish → Save to a folder.** Choose a folder once and every finished render is written
+straight into it. No sign-in, no API to enable, no consent screen, no 15 GB cap. It is
+limited by your disk, which answers the 10–100 GB question directly.
+
+Tick **Write every render automatically** and videos land in the folder the moment they
+finish, before any upload happens.
+
+The trick worth knowing: **point it at your Google Drive desktop folder.** You get Drive
+sync, on whichever account that machine is signed into, with none of the API plumbing. Same
+for OneDrive or Dropbox. This also sidesteps the dual-account problem — the folder belongs
+to whatever account the desktop app uses, which need not be your YouTube account.
+
+Chrome, Edge and Opera on desktop support this. Firefox and Safari do not, and the app
+disables the buttons and says so.
+
+---
+
+## Genres
+
+**Look → Genre** offers 35 genres across seven families — Indian, Electronic, Acoustic,
+Rock, Cinematic, Pop and Functional. Picking one sets four things at once: the visualiser,
+the colour palette, the style of the scene art, and how the thumbnail reads.
+
+Genre and mood work together rather than fighting. The genre decides the *look*; the
+detected mood decides the *motion*. A slow track tagged Techno will not get the frantic
+grid treatment — it switches to something calmer and tells you why in one line. A fast
+track tagged Ambient goes the other way.
+
+Leave the genre blank and everything follows the detected mood alone, as before.
+
+---
+
+## Suno prompts and lyrics
+
+The **Suno** tab writes the brief you paste into Suno: a style prompt for the *Style of
+Music* box, a title, and full lyrics with `[Verse]` / `[Chorus]` structure tags in Hindi,
+English, Kumaoni or Hinglish — or instrumental with no lyrics at all.
+
+It is told not to name artists or existing songs, because Suno rejects prompts that do.
+
+**Keep this one** saves a brief to this device so you can return to the ones that worked.
+
+This is the step the app cannot automate — Suno has no API and never has. What it can do is
+write the brief, which is most of the thinking.
+
+
+---
+
+## Bringing images in from ChatGPT, Gemini or Midjourney
+
+**Assist → Bring one in by hand.**
+
+Automating those tools is not possible from this app, and not advisable anywhere. A popup
+window is cross-origin: the app can open `chatgpt.com` but cannot read a single pixel out
+of it, inject a prompt, or press a button. That is the browser's security model, not a
+missing feature.
+
+Getting round it needs a browser extension or a local Playwright script — and OpenAI treats
+scripting the chat interface as grounds for suspension, alongside its API terms. Suno and
+Google say much the same. A scraper also breaks whenever they change a CSS class, which is
+roughly fortnightly.
+
+So the app makes the manual hop take about five seconds instead:
+
+1. **Write a detailed prompt** — a language model expands your idea into a full image
+   brief: subject, composition, lens, lighting, palette, texture, and negative space on one
+   side for the headline. It knows the track's genre, mood and thumbnail headline. This is
+   most of why ChatGPT's images look better than a bare one-line prompt — the prompt
+   writing, not the model.
+2. **Open ChatGPT** or **Open Gemini** — the prompt is copied to your clipboard and the tab
+   opens. Paste, press enter.
+3. **Bring it back** — copy the image there, then press **Ctrl + V** anywhere in Ridge. It
+   lands instantly. Dragging the downloaded file works too.
+
+Choose where it goes: thumbnail background, the first scene of the selected track, or
+appended as the next scene.
+
+The Suno tab has the same hop — **Open Suno** copies the style prompt and lyrics together
+and opens the create page. Drop the finished MP3 on the Tracks screen when it is done.
+
+None of this touches anyone's terms, because you are the one using the site. The app just
+removes the typing.
+
+
+---
+
+## Working from your phone
+
+The whole thing is built to run on an Android phone, not just to survive on one.
+
+Every control is at least 44 pixels tall on a touch screen, text inputs use 16px so the
+browser does not zoom when you focus them, and a **sticky action bar** sits at the bottom
+of each screen with that screen's main verb — Render, Generate, Publish — within thumb
+reach. It follows whichever tab you are on.
+
+Rendering works on mobile Chrome. A three-minute track still takes three minutes and the
+tab must stay in front, so plug in and leave it.
+
+---
+
+## One button for the whole thing
+
+**Tracks → Make the whole thing.** Drop a Suno track, pick a genre if you want one, press
+it once. It runs the lot in order:
+
+1. Write the title, description and tags
+2. Plan the shot list
+3. Draw the scenes
+4. Build the thumbnail
+5. Render the video
+
+Each step shows a tick when it is done. If something fails — the image service is busy, a
+key expired — it stops there, tells you which step and why, and the button changes to
+**Carry on**. Pressing it again resumes from the failed step rather than repeating the work
+already finished.
+
+Then it is just Publish.
+
+---
+
+## The dashboard
+
+Four cards across the top of **Today** take you straight into a job rather than into a
+screen: start a music video, film the Shorts that were written overnight, write a Suno
+brief, or schedule a release. Each one deep-links to the right tab, so tapping *Write a
+Suno brief* opens the Suno tab directly instead of dropping you on Tracks to go hunting.
+
+Below them sits everything the nightly job worked out: your numbers, what it reads into
+them, what to do next, which release windows perform, what festival is coming, and what is
+trending in India this morning.

@@ -148,6 +148,60 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
 .meter span{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mist);display:block;margin-top:3px}
 .meter i{display:block;height:3px;background:var(--line);border-radius:2px;margin-top:7px;overflow:hidden}
 .meter i em{display:block;height:100%;background:var(--dusk)}
+
+/* ── touch sizing ─────────────────────────────────────────
+   Everything below 44px is hard to hit accurately on a phone.
+   Applied by pointer type rather than width, so a small desktop
+   window keeps its compact controls. */
+@media (pointer: coarse){
+  .btn.sm{ padding:12px 16px; font-size:13.5px; min-height:44px; }
+  .btn{ min-height:48px; }
+  .vis button, .styles button, .presets button{ min-height:46px; font-size:12.5px; }
+  .chk{ padding:10px 0; align-items:center; min-height:48px; }
+  .chk input{ width:22px; height:22px; margin-top:0; }
+  select, input[type=text], input[type=password], input[type=number],
+  input[type=datetime-local]{ min-height:46px; font-size:16px; }  /* 16px stops iOS zooming on focus */
+  textarea{ font-size:16px; }
+  nav button{ padding:14px 16px; }
+  .sw{ width:38px; height:38px; }
+  .row{ gap:10px; }
+  .track{ padding:14px 13px; }
+  .rowbtns{ gap:8px; }
+}
+@media (max-width: 620px){
+  header{ padding:16px 16px 0; }
+  main{ padding:16px 16px 100px; }
+  h1{ font-size:26px; }
+  .card{ padding:15px; }
+  .rowbtns{ width:100%; justify-content:flex-start; margin-top:6px; }
+  .track{ grid-template-columns:28px minmax(0,1fr); }
+  .track .rowbtns{ grid-column:1 / -1; }
+  .vis{ grid-template-columns:repeat(3,1fr); }
+  .meters{ grid-template-columns:repeat(2,1fr); }
+  .row .btn.sm{ flex:1 1 auto; }
+}
+
+/* ── sticky primary action on phones ──────────────────────
+   The main verb for each screen, always reachable with a thumb. */
+.doit{ display:none; }
+@media (max-width: 860px){
+  .doit{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60;
+    gap:10px; padding:11px 14px calc(11px + env(safe-area-inset-bottom));
+    background:rgba(14,18,32,.94); backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+  }
+  .doit button{
+    flex:1; min-height:50px; border-radius:7px; font-weight:600; font-size:14.5px;
+    background:var(--dawn); color:#20101A;
+  }
+  .doit button.ghost{ background:transparent; border:1px solid var(--line); color:var(--snow); font-weight:500; flex:0 0 auto; padding:0 18px; }
+  .doit button:disabled{ opacity:.4; }
+}
+
+.beatline{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13.5px;color:var(--mist)}
+.tick{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:11px;flex:none;color:var(--mist)}
+.tick.on{border-color:var(--glacier);color:var(--glacier);background:rgba(143,217,201,.1)}
 </style>
 </head>
 <body>
@@ -167,6 +221,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
     <button aria-selected="false" data-p="scenes">Scenes</button>
     <button aria-selected="false" data-p="assist">Assist</button>
     <button aria-selected="false" data-p="publish">Publish</button>
+    <button aria-selected="false" data-p="suno">Suno</button>
     <button aria-selected="false" data-p="setup">Setup</button>
   </nav>
 </header>
@@ -176,12 +231,22 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
 <!-- ═══ TRACKS ═══ -->
 <section id="p-tracks" class="on">
   <div class="grid">
+    <div>
+      <div class="card" id="oneClick" style="display:none">
+        <h2>Make the whole thing</h2>
+        <p class="sub" id="ocSub"></p>
+        <button class="btn" id="btnOneClick">Do everything for the selected track</button>
+        <div class="bar"><i id="ocBar"></i></div>
+        <p class="note" id="ocNote">Writes the metadata, plans the shots, draws them, builds the thumbnail, then renders. It stops if anything fails, and picks up where it stopped.</p>
+        <div id="ocSteps" style="margin-top:12px"></div>
+      </div>
     <div class="card">
       <h2>Add your Suno tracks</h2>
       <p class="sub">Dropped audio is analysed on the spot — tempo, energy, brightness and dynamics — and each track picks its own look from that.</p>
       <div class="drop" id="drop"><h3>Drop audio files</h3><p>MP3, WAV, M4A or OGG — or click to browse</p></div>
       <input type="file" id="file" accept="audio/*" multiple hidden>
       <div id="list"></div>
+    </div>
     </div>
     <div>
       <div class="card" id="libCard" style="display:none">
@@ -229,6 +294,12 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       </div>
     </div>
     <div>
+      <div class="card">
+        <h2>Genre</h2>
+        <p class="sub">Sets the look, the scene style and the thumbnail. The detected mood still controls the motion.</p>
+        <div class="f"><select id="genrePick"></select></div>
+        <p class="note" id="genreNote">No genre chosen — the visualiser follows the mood alone.</p>
+      </div>
       <div class="card">
         <h2>Visualiser</h2>
         <p class="sub" id="visSub">Auto follows the mood of each track.</p>
@@ -309,6 +380,32 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       </div>
     </div>
     <div class="card">
+      <h2>Bring one in by hand</h2>
+      <p class="sub">For when you want ChatGPT, Gemini or Midjourney to make the image instead. The app writes the prompt, opens the tab, and takes the picture back — you paste, it lands.</p>
+      <div class="f"><label>What the image should show</label><input type="text" id="bridgeIdea" placeholder="leave blank to build it from the track's genre and mood"></div>
+      <div class="row">
+        <button class="btn sm" id="btnBridgeWrite">Write a detailed prompt</button>
+        <button class="btn ghost sm" id="btnBridgeCopy">Copy</button>
+      </div>
+      <textarea id="bridgePrompt" style="min-height:110px;margin-top:12px" placeholder="The prompt appears here…"></textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn ghost sm" id="btnOpenGPT">Open ChatGPT</button>
+        <button class="btn ghost sm" id="btnOpenGemini">Open Gemini</button>
+      </div>
+      <div class="drop" id="bridgeDrop" style="margin-top:13px;padding:24px 18px">
+        <h3>Paste or drop the image</h3>
+        <p>Copy it there, press <b>Ctrl&nbsp;+&nbsp;V</b> anywhere here — or drag the downloaded file in</p>
+      </div>
+      <div class="f" style="margin-top:12px"><label>Where it goes</label>
+        <select id="bridgeTarget">
+          <option value="thumb">Thumbnail background</option>
+          <option value="shot">First scene of the selected track</option>
+          <option value="append">Add as the next scene</option>
+        </select>
+      </div>
+      <p class="note" id="bridgeNote">Nothing brought in yet.</p>
+    </div>
+    <div class="card">
       <h2>Thumbnail</h2>
       <p class="sub">1280 × 720, built from the first shot and the headline.</p>
       <div class="stage"><canvas id="th" width="1280" height="720"></canvas></div>
@@ -368,6 +465,18 @@ Follow @mohucool for new music.
         <p class="note" id="upNote">Not connected.</p>
       </div>
       <div class="card">
+        <h2>Save to a folder</h2>
+        <p class="sub">Choose a folder once and every finished video is written straight into it. No sign-in, no API to switch on, and it is limited only by your disk rather than 15 GB.</p>
+        <p class="note" style="margin-bottom:11px">Point it at your Google Drive or OneDrive desktop folder and you get cloud sync without any of the API trouble.</p>
+        <div class="row">
+          <button class="btn ghost sm" id="btnFolder">Choose folder</button>
+          <button class="btn ghost sm" id="btnFolderSave">Save all rendered</button>
+          <button class="btn ghost sm" id="btnFolderForget">Forget</button>
+        </div>
+        <label class="chk" style="margin-top:12px"><input type="checkbox" id="autoFolder"><span>Write every render automatically<small>As soon as it finishes, before any upload.</small></span></label>
+        <p class="note" id="folderNote">No folder chosen.</p>
+      </div>
+      <div class="card">
         <h2>Back up to Drive</h2>
         <p class="sub">Audio and finished videos into a <code>Ridge</code> folder. The app can only see files it created.</p>
         <p class="note" style="margin-bottom:11px">Drive signs in separately from YouTube. Google rejects any request that asks for both at once, so this is two consent screens rather than one.</p>
@@ -377,6 +486,53 @@ Follow @mohucool for new music.
         <p class="note" id="drvNote">Not connected.</p>
       </div>
       <div class="card"><h2>Activity</h2><div class="log" id="log"><div>Ready.</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SUNO ═══ -->
+<section id="p-suno">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Make something to feed Suno</h2>
+        <p class="sub">Pick a genre, say what it is about, and get a style prompt plus lyrics you can paste straight in. This is the one step the app cannot do for you — Suno has no API — so it at least writes the brief.</p>
+        <div class="row" style="margin-bottom:13px">
+          <div style="flex:1;min-width:170px"><label>Genre</label><select id="sunoGenre"></select></div>
+          <div style="flex:1;min-width:150px"><label>Language</label>
+            <select id="sunoLang"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option><option>Instrumental — no lyrics</option></select>
+          </div>
+        </div>
+        <div class="f"><label>What it is about — optional</label><input type="text" id="sunoTheme" placeholder="leaving the hills for the city and missing the quiet"></div>
+        <div class="row">
+          <button class="btn sm" id="btnSuno">Write it</button>
+          <button class="btn ghost sm" id="btnSunoMore">Another take</button>
+        </div>
+        <p class="note" id="sunoNote">Needs a writing key — see Setup.</p>
+      </div>
+      <div class="card" id="sunoOut" style="display:none">
+        <h2>Style prompt</h2>
+        <p class="sub">Paste into Suno's <b>Style of Music</b> box.</p>
+        <textarea id="sunoStyle" style="min-height:64px"></textarea>
+        <button class="btn ghost sm" id="btnCopyStyle" style="margin-top:9px">Copy</button>
+        <h2 style="margin-top:22px">Title</h2>
+        <input type="text" id="sunoTitle">
+        <h2 style="margin-top:22px">Lyrics</h2>
+        <p class="sub">Structure tags included. Suno reads <code>[Verse]</code> and <code>[Chorus]</code>.</p>
+        <textarea id="sunoLyrics" style="min-height:280px"></textarea>
+        <div class="row" style="margin-top:9px">
+          <button class="btn ghost sm" id="btnCopyLyrics">Copy lyrics</button>
+          <button class="btn ghost sm" id="btnSaveSuno">Keep this one</button>
+          <button class="btn ghost sm" id="btnOpenSuno">Open Suno</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Kept prompts</h2>
+        <p class="sub">Saved on this device so you can come back to the ones that worked.</p>
+        <div id="sunoLib"><div class="empty">Nothing kept yet.</div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -421,21 +577,28 @@ Follow @mohucool for new music.
 </section>
 
 </main>
+<div class="doit" id="doit"></div>
 
 <script type="module">
 import { store, sleep, clamp, analyseAudio, MOOD_LIST, IMAGE_PROVIDERS, TEXT_PROVIDERS,
          think, makeImage, imagePace, vault, DRIVE_SCOPE, driveFolder, driveUpload,
          driveQuota, ytSession, ytProgress, ytPut,
          bestSlots, planReleases, nextSlot, istLabel, DEFAULT_SLOTS,
-         budget, ACCOUNT_TIERS, isUploadLimit, nextReset, API_UPLOAD_BUCKET } from './core.js';
+         budget, ACCOUNT_TIERS, isUploadLimit, nextReset, API_UPLOAD_BUCKET,
+         folder, folderSupported, explainGoogleError } from './core.js';
+import { GENRES, FAMILIES, findGenre, resolveTemplate } from './genres.js';
 
 const $ = s => document.querySelector(s);
+/** Attach a handler only if the element exists — a missing node should not
+    silently kill every listener registered after it. */
+const on = (sel, ev, fn) => { const el=$(sel); if(el) el.addEventListener(ev,fn);
+  else console.warn('Ridge: no element', sel); return !!el; };
 const $$ = s => [...document.querySelectorAll(s)];
 const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const bytes = n => n > 1e9 ? (n/1073741824).toFixed(1)+' GB' : (n/1048576).toFixed(0)+' MB';
 
-const S = { tracks:[], sel:null, forced:null, accent:null, token:null, driveToken:null, busy:false, stopShots:false, slots:null };
+const S = { tracks:[], sel:null, forced:null, accent:null, token:null, driveToken:null, busy:false, stopShots:false, slots:null, template:null, bridgeImage:null };
 const ACCENTS = ['#FF7A9C','#8FD9C9','#FFC257','#7C6CFF','#5AC8FA','#F2F5FC'];
 // The binding limit is whichever is lower: the API's 100-a-day upload
 // bucket, or YouTube's per-channel cap for this account. See core.js.
@@ -482,6 +645,7 @@ $('#nav').addEventListener('click',e=>{
   $$('.panes > section').forEach(s=>s.classList.toggle('on',s.id==='p-'+b.dataset.p));
   if(b.dataset.p==='assist') fillMeta();
   if(b.dataset.p==='scenes') paintShots();
+  paintDoIt();
 });
 
 /* ── audio in ── */
@@ -560,7 +724,7 @@ function paintTracks(){
     const a=document.createElement('a'); a.href=URL.createObjectURL(t.blob); a.download=t.name+'.webm'; a.click();
   });
   $('#nTracks').textContent=S.tracks.length||'';
-  paintMood(); paintRidge(); paintLibrary();
+  paintMood(); paintRidge(); paintLibrary(); paintOneClick(); paintDoIt();
 }
 
 function paintMood(){
@@ -788,7 +952,10 @@ $('#btnStopPrev').onclick=stopPreview;
 function paintShots(){
   const t=selTrack(), g=$('#shotGrid'); g.innerHTML='';
   if(!t) return;
-  t.shots.forEach((s,i)=>{
+  // an image can exist without a written shot behind it — anything brought
+  // in by hand lands in imgs directly, so show whichever list is longer
+  const rows=Math.max(t.shots.length,t.imgs.length);
+  Array.from({length:rows},(_,i)=>t.shots[i]||'brought in by hand').forEach((s,i)=>{
     const d=document.createElement('div'); d.className='shot';
     if(t.imgs[i]){
       const c=document.createElement('canvas'); c.width=192; c.height=108;
@@ -815,7 +982,8 @@ $('#btnShotlist').onclick=async()=>{
         'Never mention text, letters, logos, watermarks or people\\u2019s faces in close-up.' },
       { role:'user', content:
         `Track: "${t.name}"\nLength: ${mmss(t.dur)}\nMood: ${t.mood?.label} (${t.mood?.bpm||'no clear'} bpm)\n` +
-        `Visual direction: ${t.mood?.sceneMood}\n` +
+        `Visual direction: ${S.template?.scene || t.mood?.sceneMood}\n` +
+        (S.template?`Genre: ${S.template.genre}. Keep every shot consistent with that world.\n`:'') +
         ($('#threadPrompt').value.trim()?`The director wants: ${$('#threadPrompt').value.trim()}\n`:'') +
         `\nWrite exactly ${n} shots.` }
     ]);
@@ -897,6 +1065,7 @@ async function renderTrack(t){
   t.state='rendered';
   try{ await vault.putBlob('video:'+t.id,t.blob); }catch(e){ log('Could not save to the vault: '+e.message,'er'); }
   log(`Rendered “${t.meta?.title||t.name}” — ${(t.blob.size/1048576).toFixed(1)} MB.`,'ok');
+  if($('#autoFolder').checked&&folder.handle()){ await saveToFolder(t); paintFolder(); }
   paintTracks(); saveState(); refreshVault();
 }
 $('#btnRenderAll').onclick=async()=>{
@@ -968,7 +1137,8 @@ function wrapText(ctx,text,maxW){
 function drawThumb(){
   const t=selTrack(), cv=$('#th'), ctx=cv.getContext('2d'), W=1280,H=720;
   ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
-  if(t?.imgs?.length) coverDraw(ctx,t.imgs[0],W,H,1.02,0,1);
+  const bg = S.bridgeImage || t?.imgs?.[0];
+  if(bg) coverDraw(ctx,bg,W,H,1.02,0,1);
   if($('#thumbLayout').checked){
     const g=ctx.createLinearGradient(0,H,0,H*0.15);
     g.addColorStop(0,'rgba(10,13,22,.94)'); g.addColorStop(1,'rgba(10,13,22,0)');
@@ -1305,7 +1475,11 @@ $('#btnDrive').onclick=async()=>{
     $('#drvNote').textContent='Backup complete.';
     const q=await driveQuota(S.driveToken);
     if(q) $('#mDrive').textContent=q.limit?bytes(q.limit-q.used):'unlimited';
-  }catch(e){ $('#drvNote').textContent=e.message; log('Drive: '+e.message,'er'); }
+  }catch(e){
+    const m=/^Drive rejected the upload: |^Drive /.test(e.message)
+      ? explainGoogleError(403,e.message) : e.message;
+    $('#drvNote').textContent=m; log('Drive: '+m,'er');
+  }
   $('#drvBar').style.width='0%'; $('#btnDrive').disabled=false;
 };
 
@@ -1368,6 +1542,306 @@ async function learnSlots(){
   }catch(e){ log('Could not read upload history: '+e.message,'er'); }
 }
 
+
+/* ── genre templates ── */
+function fillGenreSelects(){
+  const opts = '<option value="">— none, follow the mood —</option>' +
+    FAMILIES.map(f=>`<optgroup label="${f}">` +
+      GENRES.filter(g=>g.family===f).map(g=>`<option value="${g.name}">${g.name}</option>`).join('') +
+      '</optgroup>').join('');
+  $('#genrePick').innerHTML=opts;
+  $('#sunoGenre').innerHTML=opts.replace('— none, follow the mood —','— pick a genre —');
+  const saved=store.get('genre');
+  if(saved){ $('#genrePick').value=saved; $('#sunoGenre').value=saved; }
+}
+function applyGenre(){
+  const name=$('#genrePick').value;
+  store.set('genre',name||null);
+  if(!name){ S.template=null; S.accent=null;
+    $('#genreNote').textContent='No genre chosen — the visualiser follows the mood alone.';
+    $$('.sw').forEach(x=>x.classList.remove('on')); return; }
+  const t=resolveTemplate(name, selTrack()?.mood);
+  S.template=t;
+  S.forced=t.visual; S.accent=t.palette[0];
+  $$('#visBtns button').forEach(x=>x.classList.toggle('on',x.dataset.v===t.visual));
+  $$('.sw').forEach(x=>x.classList.remove('on'));
+  $('#genreNote').textContent=t.why+' Scene art and thumbnails follow it too.';
+  $('#visSub').textContent=`Set by ${t.genre}. Override below if you want something else.`;
+}
+$('#genrePick').addEventListener('change',applyGenre);
+
+/* ── Suno prompts ── */
+function paintSunoLib(){
+  const lib=store.get('sunoLib')||[];
+  $('#sunoLib').innerHTML = lib.length ? lib.map((s,i)=>`
+    <div class="track" style="margin-top:8px">
+      <div class="num">${i+1}</div>
+      <div><div class="tname">${esc(s.title)}</div><div class="tmeta">${esc(s.genre)} · ${esc(s.lang)}</div></div>
+      <div class="rowbtns">
+        <button class="btn ghost sm" data-suno-load="${i}">Open</button>
+        <button class="btn ghost sm" data-suno-rm="${i}">Delete</button>
+      </div>
+    </div>`).join('') : '<div class="empty">Nothing kept yet.</div>';
+  $('#sunoLib').querySelectorAll('[data-suno-load]').forEach(b=>b.onclick=()=>{
+    const s=(store.get('sunoLib')||[])[b.dataset.sunoLoad]; if(!s) return;
+    $('#sunoStyle').value=s.style; $('#sunoTitle').value=s.title;
+    $('#sunoLyrics').value=s.lyrics; $('#sunoGenre').value=s.genre;
+    $('#sunoOut').style.display='block';
+  });
+  $('#sunoLib').querySelectorAll('[data-suno-rm]').forEach(b=>b.onclick=()=>{
+    const lib=store.get('sunoLib')||[]; lib.splice(Number(b.dataset.sunoRm),1);
+    store.set('sunoLib',lib); paintSunoLib();
+  });
+}
+async function writeSuno(){
+  const g=findGenre($('#sunoGenre').value);
+  if(!g){ $('#sunoNote').textContent='Pick a genre first.'; return; }
+  const lang=$('#sunoLang').value, instrumental=lang.startsWith('Instrumental');
+  $('#sunoNote').textContent='Writing…'; $('#btnSuno').disabled=true;
+  try{
+    const out=await think([
+      { role:'system', content:
+        'You write briefs for the Suno music generator. Reply with JSON only: {"style","title","lyrics"}. ' +
+        '"style" is one line under 200 characters describing instrumentation, tempo and production — no artist names, ' +
+        'no song titles, no copyrighted references. Suno rejects those. ' +
+        '"title" is short and evocative. ' +
+        (instrumental
+          ? '"lyrics" must be an empty string — this is instrumental.'
+          : '"lyrics" uses Suno structure tags on their own lines: [Intro] [Verse] [Pre-Chorus] [Chorus] [Verse] [Chorus] [Bridge] [Outro]. ' +
+            'Write real lyrics, not placeholders. Keep lines singable and concrete. Avoid cliché rhymes.') },
+      { role:'user', content:
+        `Genre: ${g.name}\nSuno style guidance for this genre: ${g.suno}\n` +
+        (instrumental?'Instrumental, no vocal.\n':`Language for the lyrics: ${lang}. Write them in that language's own script.\n`) +
+        ($('#sunoTheme').value.trim()?`Subject: ${$('#sunoTheme').value.trim()}\n`:'') +
+        'Write the brief.' }
+    ],{temperature:1.0});
+    $('#sunoStyle').value=String(out.style||g.suno);
+    $('#sunoTitle').value=String(out.title||'');
+    $('#sunoLyrics').value=String(out.lyrics||'');
+    $('#sunoOut').style.display='block';
+    $('#sunoNote').textContent='Done. Edit anything, then copy into Suno.';
+    log(`Suno brief written for ${g.name}.`,'ok');
+  }catch(e){ $('#sunoNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnSuno').disabled=false;
+}
+$('#btnSuno').onclick=writeSuno;
+$('#btnSunoMore').onclick=writeSuno;
+const copy=async(v,what)=>{ try{ await navigator.clipboard.writeText(v); log(what+' copied.','ok'); }
+  catch{ log('Clipboard blocked by the browser.','er'); } };
+$('#btnCopyStyle').onclick=()=>copy($('#sunoStyle').value,'Style prompt');
+$('#btnCopyLyrics').onclick=()=>copy($('#sunoLyrics').value,'Lyrics');
+$('#btnSaveSuno').onclick=()=>{
+  const lib=store.get('sunoLib')||[];
+  lib.unshift({ style:$('#sunoStyle').value, title:$('#sunoTitle').value||'Untitled',
+    lyrics:$('#sunoLyrics').value, genre:$('#sunoGenre').value, lang:$('#sunoLang').value, at:Date.now() });
+  store.set('sunoLib',lib.slice(0,60)); paintSunoLib(); log('Kept.','ok');
+};
+
+/* ── folder storage ── */
+async function paintFolder(){
+  if(!folderSupported()){
+    $('#folderNote').textContent='This browser has no folder access. Chrome, Edge or Opera on desktop support it; Firefox and Safari do not.';
+    ['#btnFolder','#btnFolderSave','#btnFolderForget','#autoFolder'].forEach(s=>$(s).disabled=true);
+    return;
+  }
+  const n=folder.name();
+  if(!n){ $('#folderNote').textContent='No folder chosen.'; return; }
+  const files=await folder.list('videos').catch(()=>[]);
+  $('#folderNote').textContent=`Writing into ${n}/videos — ${files.length} file${files.length===1?'':'s'} there` +
+    (files.length?` (${bytes(files.reduce((a,f)=>a+f.size,0))}).`:'.');
+}
+$('#btnFolder').onclick=async()=>{
+  try{ const n=await folder.choose(); log(`Folder set to ${n}.`,'ok'); paintFolder(); }
+  catch(e){ if(e.name!=='AbortError') log(e.message,'er'); }
+};
+$('#btnFolderForget').onclick=async()=>{ await folder.forget(); paintFolder(); log('Folder forgotten.','ok'); };
+$('#autoFolder').checked=!!store.get('autoFolder');
+$('#autoFolder').addEventListener('change',()=>store.set('autoFolder',$('#autoFolder').checked));
+
+async function saveToFolder(t){
+  if(!folder.handle()||!t.blob) return false;
+  const safe=(t.meta?.title||t.name).replace(/[^\w\u0900-\u097F .-]/g,'').trim().slice(0,60)||t.id;
+  try{ const at=await folder.write(safe+'.webm',t.blob,'videos');
+       log(`Saved to ${at}`,'ok'); return true; }
+  catch(e){ log('Folder write failed: '+e.message,'er'); return false; }
+}
+$('#btnFolderSave').onclick=async()=>{
+  if(!folder.handle()){ log('Choose a folder first.','er'); return; }
+  const todo=S.tracks.filter(t=>t.blob);
+  if(!todo.length){ log('Nothing rendered yet.','er'); return; }
+  for(const t of todo) await saveToFolder(t);
+  paintFolder();
+};
+
+
+/* ── the hand bridge ──────────────────────────────────────
+   ChatGPT, Gemini and Suno cannot be driven from this page. A popup is
+   cross-origin, so we could open one but never read a pixel out of it,
+   and scripting those interfaces breaks their terms and gets accounts
+   suspended. What is left is making the manual hop take two seconds:
+   the app writes the prompt, opens the tab, and catches the result on
+   a paste. */
+
+async function bridgeWrite(){
+  const t=selTrack();
+  $('#bridgeNote').textContent='Writing the prompt…';
+  $('#btnBridgeWrite').disabled=true;
+  try{
+    const out=await think([
+      { role:'system', content:
+        'You write prompts for image generators, for YouTube thumbnails and music-video stills. ' +
+        'Reply with JSON only: {"prompt"}. One paragraph, 60 to 110 words. ' +
+        'Be concrete about subject, composition, lens and framing, lighting direction and quality, ' +
+        'colour palette, texture and mood. Name a camera or film stock if it helps. ' +
+        'Leave clear negative space on one side where a headline will sit. ' +
+        'Do not put any text, letters, numbers, logos or watermarks in the image, and say so in the prompt. ' +
+        'Do not name real artists, brands or existing works.' },
+      { role:'user', content:
+        ($('#bridgeIdea').value.trim() ? `Idea: ${$('#bridgeIdea').value.trim()}\n` : '') +
+        (t ? `Track: "${t.name}". Mood: ${t.mood?.label||'unknown'}.\n` : '') +
+        (S.template ? `Genre: ${S.template.genre}. Look: ${S.template.scene}. Thumbnail style: ${S.template.thumb}.\n` : '') +
+        (t?.meta?.hook ? `The headline over it will read "${t.meta.hook}".\n` : '') +
+        'Write the prompt.' }
+    ],{temperature:0.95});
+    $('#bridgePrompt').value=String(out.prompt||'');
+    $('#bridgeNote').textContent='Copy it, open ChatGPT or Gemini, then paste the picture back here.';
+  }catch(e){ $('#bridgeNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnBridgeWrite').disabled=false;
+}
+on('#btnBridgeWrite','click',bridgeWrite);
+on('#btnBridgeCopy','click',()=>copy($('#bridgePrompt').value,'Prompt'));
+
+async function openWith(url,label){
+  const p=$('#bridgePrompt').value||$('#sunoStyle')?.value||'';
+  if(p){ try{ await navigator.clipboard.writeText(p); }catch{} }
+  window.open(url,'_blank','noopener');
+  $('#bridgeNote').textContent=`Prompt copied. Paste it into ${label}, then bring the image back with Ctrl+V.`;
+}
+on('#btnOpenGPT','click',()=>openWith('https://chatgpt.com/','ChatGPT'));
+on('#btnOpenGemini','click',()=>openWith('https://gemini.google.com/','Gemini'));
+on('#btnOpenSuno','click',async()=>{
+  const parts=[$('#sunoStyle').value,'',$('#sunoLyrics').value].filter(Boolean).join('\n');
+  try{ await navigator.clipboard.writeText(parts); }catch{}
+  window.open('https://suno.com/create','_blank','noopener');
+  $('#sunoNote').textContent='Style and lyrics copied. Paste them into Suno, then drop the finished MP3 on the Tracks screen.';
+});
+
+async function acceptImage(blob){
+  if(!blob||!blob.type.startsWith('image/')){ log('That is not an image.','er'); return; }
+  let bmp; try{ bmp=await createImageBitmap(blob); }
+  catch{ log('Could not read that image.','er'); return; }
+  const where=$('#bridgeTarget').value, t=selTrack();
+  if(where==='thumb'||!t){
+    S.bridgeImage=bmp; drawThumb();
+    $('#bridgeNote').textContent=`Brought in ${bmp.width}×${bmp.height} — now behind the thumbnail.`;
+  } else if(where==='shot'){
+    t.imgs[0]=bmp; paintShots(); paintTracks(); drawThumb();
+    $('#bridgeNote').textContent=`Brought in ${bmp.width}×${bmp.height} — set as the first scene.`;
+  } else {
+    t.imgs.push(bmp); paintShots(); paintTracks();
+    $('#bridgeNote').textContent=`Brought in ${bmp.width}×${bmp.height} — added as scene ${t.imgs.length}.`;
+  }
+  log(`Image brought in by hand (${bmp.width}×${bmp.height}).`,'ok');
+}
+
+// paste works anywhere on the page, not just over the drop zone
+document.addEventListener('paste', e=>{
+  const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+  if(!item) return;
+  e.preventDefault();
+  acceptImage(item.getAsFile());
+});
+const bd=$('#bridgeDrop');
+if(bd){
+bd.addEventListener('click',()=>{ const i=document.createElement('input');
+  i.type='file'; i.accept='image/*'; i.onchange=()=>acceptImage(i.files[0]); i.click(); });
+['dragenter','dragover'].forEach(ev=>bd.addEventListener(ev,e=>{e.preventDefault();bd.classList.add('hot')}));
+['dragleave','drop'].forEach(ev=>bd.addEventListener(ev,e=>{e.preventDefault();bd.classList.remove('hot')}));
+bd.addEventListener('drop',e=>{ const f=[...(e.dataTransfer?.files||[])].find(x=>x.type.startsWith('image/'));
+  if(f) acceptImage(f); else log('Drop an image file.','er'); });
+}
+
+
+/* ── one click, whole pipeline ────────────────────────────
+   Each stage is skipped when already done, so pressing again after a
+   failure resumes rather than redoing finished work. */
+const OC_STEPS=[
+  { key:'meta',  label:'Write title, description and tags',
+    done:t=>!!t.meta,          run:async t=>{ await writeFor(t); paintTracks(); } },
+  { key:'shots', label:'Plan the shot list',
+    done:t=>t.shots.length>0,  run:async ()=>{ await $('#btnShotlist').onclick(); } },
+  { key:'art',   label:'Draw the scenes',
+    done:t=>t.shots.length>0&&t.imgs.length>=t.shots.length,
+    run:async ()=>{ await $('#btnMakeShots').onclick(); } },
+  { key:'thumb', label:'Build the thumbnail',
+    done:t=>!!t.thumb,
+    run:async t=>{ drawThumb(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92)); paintTracks(); } },
+  { key:'render',label:'Render the video',
+    done:t=>!!t.blob,          run:async t=>{ await renderTrack(t); } }
+];
+
+function paintOneClick(){
+  const t=selTrack(), card=$('#oneClick');
+  if(!card) return;
+  if(!t){ card.style.display='none'; return; }
+  card.style.display='block';
+  $('#ocSub').textContent=`“${t.meta?.title||t.name}” — ${t.mood?.label||'analysing'}${S.template?' · '+S.template.genre:''}`;
+  $('#ocSteps').innerHTML=OC_STEPS.map(s=>{
+    const ok=s.done(t);
+    return `<div class="beatline"><span class="tick ${ok?'on':''}">${ok?'✓':'○'}</span>${s.label}</div>`;
+  }).join('');
+  const left=OC_STEPS.filter(s=>!s.done(t)).length;
+  const btn=$('#btnOneClick');
+  btn.textContent = left===0 ? 'All done — head to Publish'
+    : left===OC_STEPS.length ? 'Do everything for this track'
+    : `Carry on — ${left} step${left>1?'s':''} left`;
+  btn.disabled = left===0 || S.busy;
+}
+
+on('#btnOneClick','click',async()=>{
+  const t=selTrack(); if(!t||S.busy) return;
+  S.busy=true; $('#btnOneClick').disabled=true;
+  const todo=OC_STEPS.filter(s=>!s.done(t));
+  let n=0;
+  const stop=msg=>{ $('#ocNote').textContent=msg; S.busy=false; paintOneClick();
+                    $('#ocBar').style.width='0%'; log(msg,'er'); };
+  for(const s of todo){
+    $('#ocNote').textContent=`${s.label}…`;
+    $('#ocBar').style.width=(n/todo.length*100)+'%';
+    try{ await s.run(t); }
+    catch(e){ return stop(`Stopped at “${s.label}” — ${e.message}. Press again to carry on.`); }
+    if(!s.done(t)) return stop(`“${s.label}” did not finish. Press again to retry that step.`);
+    n++; paintOneClick();
+  }
+  S.busy=false; $('#ocBar').style.width='0%';
+  $('#ocNote').textContent='All done. Head to Publish.';
+  log(`“${t.meta?.title||t.name}” is ready to publish.`,'ok');
+  paintOneClick(); paintTracks();
+});
+
+/* ── sticky thumb-reach action bar (phones only) ── */
+const DOIT={
+  tracks:  [['Do everything','#btnOneClick']],
+  look:    [['Render all queued','#btnRenderAll'],['Preview','#btnPreview']],
+  scenes:  [['Generate images','#btnMakeShots'],['Shot list','#btnShotlist']],
+  assist:  [['Write for all','#btnWriteAll'],['Thumbnail','#btnThumb']],
+  publish: [['Publish all','#btnUploadAll'],['Connect','#btnConnect']],
+  suno:    [['Write it','#btnSuno']],
+  setup:   []
+};
+function paintDoIt(){
+  const bar=$('#doit'); if(!bar) return;
+  const tab=$('#nav button[aria-selected="true"]')?.dataset.p||'tracks';
+  const acts=DOIT[tab]||[];
+  bar.innerHTML=acts.map(([label,sel],i)=>{
+    const el=$(sel);
+    return `<button data-go="${sel}" class="${i?'ghost':''}" ${(!el||el.disabled)?'disabled':''}>${label}</button>`;
+  }).join('');
+  bar.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    const el=$(b.dataset.go); if(el&&!el.disabled) el.click();
+  });
+}
+
 /* ── boot ── */
 function idleFrame(){
   if(S.busy||previewStop) return;
@@ -1378,7 +1852,20 @@ function idleFrame(){
   draw(ctx,cv.width,cv.height,freq,wave,selTrack(),(now*0.04)%1);
 }
 setInterval(idleFrame,120);
+fillGenreSelects(); applyGenre(); paintSunoLib(); paintOneClick(); paintDoIt();
+setInterval(paintDoIt,1500);
+// #suno / #publish etc. from the dashboard should land on that tab
+(function openFromHash(){
+  const want=(location.hash||'').replace('#','');
+  if(!want) return;
+  const btn=$(`#nav button[data-p="${want}"]`);
+  if(!btn) return;
+  $$('#nav button').forEach(x=>x.setAttribute('aria-selected',String(x===btn)));
+  $$('.panes > section').forEach(s=>s.classList.toggle('on',s.id==='p-'+want));
+  paintDoIt();
+})();
 idleFrame(); drawThumb(); paintTracks(); paintRidge(); refreshVault(); autoRestore();
+folder.reconnect().then(n=>{ if(n) log(`Reconnected to folder ${n}.`,'ok'); paintFolder(); });
 vault.persist().then(()=>refreshVault());
 window.addEventListener('beforeunload',e=>{ if(S.busy){e.preventDefault();e.returnValue=''} });
 </script>

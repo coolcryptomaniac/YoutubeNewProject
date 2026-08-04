@@ -135,6 +135,56 @@ canvas{display:block;width:100%;height:auto}
 .steps li{counter-increment:s;position:relative;padding:0 0 14px 32px;font-size:13.5px;line-height:1.6;color:var(--mist)}
 .steps li::before{content:counter(s);position:absolute;left:0;top:0;width:21px;height:21px;border:1px solid var(--line);border-radius:50%;font-family:var(--mono);font-size:10.5px;display:grid;place-items:center;color:var(--dawn)}
 .steps b{color:var(--snow);font-weight:600}
+
+/* ── touch sizing ─────────────────────────────────────────
+   Everything below 44px is hard to hit accurately on a phone.
+   Applied by pointer type rather than width, so a small desktop
+   window keeps its compact controls. */
+@media (pointer: coarse){
+  .btn.sm{ padding:12px 16px; font-size:13.5px; min-height:44px; }
+  .btn{ min-height:48px; }
+  .vis button, .styles button, .presets button{ min-height:46px; font-size:12.5px; }
+  .chk{ padding:10px 0; align-items:center; min-height:48px; }
+  .chk input{ width:22px; height:22px; margin-top:0; }
+  select, input[type=text], input[type=password], input[type=number],
+  input[type=datetime-local]{ min-height:46px; font-size:16px; }  /* 16px stops iOS zooming on focus */
+  textarea{ font-size:16px; }
+  nav button{ padding:14px 16px; }
+  .sw{ width:38px; height:38px; }
+  .row{ gap:10px; }
+  .track{ padding:14px 13px; }
+  .rowbtns{ gap:8px; }
+}
+@media (max-width: 620px){
+  header{ padding:16px 16px 0; }
+  main{ padding:16px 16px 100px; }
+  h1{ font-size:26px; }
+  .card{ padding:15px; }
+  .rowbtns{ width:100%; justify-content:flex-start; margin-top:6px; }
+  .track{ grid-template-columns:28px minmax(0,1fr); }
+  .track .rowbtns{ grid-column:1 / -1; }
+  .vis{ grid-template-columns:repeat(3,1fr); }
+  .meters{ grid-template-columns:repeat(2,1fr); }
+  .row .btn.sm{ flex:1 1 auto; }
+}
+
+/* ── sticky primary action on phones ──────────────────────
+   The main verb for each screen, always reachable with a thumb. */
+.doit{ display:none; }
+@media (max-width: 860px){
+  .doit{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60;
+    gap:10px; padding:11px 14px calc(11px + env(safe-area-inset-bottom));
+    background:rgba(14,18,32,.94); backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+  }
+  .doit button{
+    flex:1; min-height:50px; border-radius:7px; font-weight:600; font-size:14.5px;
+    background:var(--dawn); color:#20101A;
+  }
+  .doit button.ghost{ background:transparent; border:1px solid var(--line); color:var(--snow); font-weight:500; flex:0 0 auto; padding:0 18px; }
+  .doit button:disabled{ opacity:.4; }
+}
 </style>
 </head>
 <body>

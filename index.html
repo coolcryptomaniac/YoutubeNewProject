@@ -99,6 +99,66 @@ h2{font-family:var(--display);font-size:17.5px;font-weight:600;margin:0 0 3px}
 .steps b{color:var(--snow);font-weight:600}
 code{font-family:var(--mono);font-size:12.5px;background:var(--deep);padding:2px 7px;border-radius:3px;color:var(--glacier);word-break:break-all}
 .empty{color:var(--mist);font-size:13.5px;text-align:center;padding:26px 14px}
+
+/* ── touch sizing ─────────────────────────────────────────
+   Everything below 44px is hard to hit accurately on a phone.
+   Applied by pointer type rather than width, so a small desktop
+   window keeps its compact controls. */
+@media (pointer: coarse){
+  .btn.sm{ padding:12px 16px; font-size:13.5px; min-height:44px; }
+  .btn{ min-height:48px; }
+  .vis button, .styles button, .presets button{ min-height:46px; font-size:12.5px; }
+  .chk{ padding:10px 0; align-items:center; min-height:48px; }
+  .chk input{ width:22px; height:22px; margin-top:0; }
+  select, input[type=text], input[type=password], input[type=number],
+  input[type=datetime-local]{ min-height:46px; font-size:16px; }  /* 16px stops iOS zooming on focus */
+  textarea{ font-size:16px; }
+  nav button{ padding:14px 16px; }
+  .sw{ width:38px; height:38px; }
+  .row{ gap:10px; }
+  .track{ padding:14px 13px; }
+  .rowbtns{ gap:8px; }
+}
+@media (max-width: 620px){
+  header{ padding:16px 16px 0; }
+  main{ padding:16px 16px 100px; }
+  h1{ font-size:26px; }
+  .card{ padding:15px; }
+  .rowbtns{ width:100%; justify-content:flex-start; margin-top:6px; }
+  .track{ grid-template-columns:28px minmax(0,1fr); }
+  .track .rowbtns{ grid-column:1 / -1; }
+  .vis{ grid-template-columns:repeat(3,1fr); }
+  .meters{ grid-template-columns:repeat(2,1fr); }
+  .row .btn.sm{ flex:1 1 auto; }
+}
+
+/* ── sticky primary action on phones ──────────────────────
+   The main verb for each screen, always reachable with a thumb. */
+.doit{ display:none; }
+@media (max-width: 860px){
+  .doit{
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:60;
+    gap:10px; padding:11px 14px calc(11px + env(safe-area-inset-bottom));
+    background:rgba(14,18,32,.94); backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);
+  }
+  .doit button{
+    flex:1; min-height:50px; border-radius:7px; font-weight:600; font-size:14.5px;
+    background:var(--dawn); color:#20101A;
+  }
+  .doit button.ghost{ background:transparent; border:1px solid var(--line); color:var(--snow); font-weight:500; flex:0 0 auto; padding:0 18px; }
+  .doit button:disabled{ opacity:.4; }
+}
+
+.quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin-bottom:22px}
+.qa{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);
+  border-radius:7px;padding:14px 15px;transition:border-color .16s,transform .16s;min-height:74px}
+.qa:hover{border-color:var(--dawn);transform:translateY(-1px)}
+.qa b{display:block;font-size:14px;font-weight:600;margin-bottom:3px}
+.qa span{display:block;color:var(--mist);font-size:12px;line-height:1.45}
+.qa em{font-style:normal;color:var(--dawn);font-family:var(--mono);font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px}
+@media (pointer:coarse){ .qa{min-height:86px;padding:16px} }
 </style>
 </head>
 <body>
@@ -115,6 +175,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--deep);padding:2px
     <a class="room" href="./shorts.html"><em>Vertical</em><h3>Shorts studio</h3><p>Cast, script, film ten seconds, publish. Today's clips are already written.</p></a>
     <a class="room" href="./music.html"><em>Long form</em><h3>Music video studio</h3><p>Drop Suno tracks, render the visualiser, upload with thumbnails.</p></a>
   </div>
+  <div class="quick" id="quick"></div>
   <div id="body"><div class="card"><div class="empty">Loading…</div></div></div>
 </main>
 
@@ -161,7 +222,22 @@ function statBlocks(b){
     `<div class="stat ${k}"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
 }
 
+function quickActions(b){
+  const clips=(b?.clips||[]).length;
+  const acts=[
+    ['Start here','music.html','New music video','Drop a Suno track and press one button'],
+    ['Vertical', clips?'shorts.html?brief=1':'shorts.html',
+      clips?`Film today's ${clips} clip${clips>1?'s':''}`:'Make a Short',
+      clips?'Already written, panels already drawn':'Write a sketch and film it'],
+    ['Words','music.html#suno','Write a Suno brief','Style prompt and lyrics, ready to paste'],
+    ['Publish','music.html#publish','Schedule a release','Space uploads across your best slots']
+  ];
+  $('#quick').innerHTML=acts.map(([tag,href,title,sub])=>
+    `<a class="qa" href="./${href}"><em>${esc(tag)}</em><b>${esc(title)}</b><span>${esc(sub)}</span></a>`).join('');
+}
+
 function render(b){
+  quickActions(b);
   const when = new Date(b.generatedAt);
   const ageH = (Date.now() - when) / 36e5;
   const cls = ageH < 30 ? '' : ageH < 72 ? 'stale' : 'cold';

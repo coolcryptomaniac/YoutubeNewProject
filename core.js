@@ -599,3 +599,98 @@ export const budget = {
 /** YouTube's own signal that the channel is done for the day. */
 export const isUploadLimit = err =>
   /uploadLimitExceeded|exceeded the number of videos/i.test(String(err?.message || err));
+
+/* ───────────────── local folder storage ─────────────────
+   The File System Access API lets the app write straight into a folder
+   you choose, once, with permission that survives reloads. No OAuth, no
+   API to enable, no 15 GB cap — it is bounded by your disk.
+
+   Point it at your Google Drive or OneDrive desktop folder and you get
+   cloud sync for free, without any of the API plumbing. */
+
+const FS_OK = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+export const folderSupported = () => FS_OK;
+
+let _dir = null;
+
+export const folder = {
+  supported: FS_OK,
+  handle: () => _dir,
+  name: () => _dir?.name || null,
+
+  async choose(){
+    if (!FS_OK) throw new Error('This browser has no folder access — use Chrome, Edge or Opera on desktop.');
+    _dir = await window.showDirectoryPicker({ id:'ridge-out', mode:'readwrite', startIn:'videos' });
+    await idbPutHandle(_dir);
+    return _dir.name;
+  },
+
+  /** Reconnect to last session's folder. Chrome may still ask once per visit. */
+  async reconnect({ prompt = false } = {}){
+    if (!FS_OK) return null;
+    const saved = await idbGetHandle();
+    if (!saved) return null;
+    let perm = await saved.queryPermission({ mode:'readwrite' });
+    if (perm === 'prompt' && prompt) perm = await saved.requestPermission({ mode:'readwrite' });
+    if (perm !== 'granted') return null;
+    _dir = saved;
+    return saved.name;
+  },
+
+  async forget(){ _dir = null; await idbDelHandle(); },
+
+  /** Write a blob into <folder>/<sub>/<name>, creating the subfolder. */
+  async write(name, blob, sub = null){
+    if (!_dir) throw new Error('No folder chosen yet');
+    let target = _dir;
+    if (sub) target = await _dir.getDirectoryHandle(sub, { create:true });
+    const fh = await target.getFileHandle(name, { create:true });
+    const w = await fh.createWritable();
+    await w.write(blob);
+    await w.close();
+    return `${_dir.name}/${sub ? sub + '/' : ''}${name}`;
+  },
+
+  async list(sub = null){
+    if (!_dir) return [];
+    let target = _dir;
+    try { if (sub) target = await _dir.getDirectoryHandle(sub); } catch { return []; }
+    const out = [];
+    for await (const [name, h] of target.entries())
+      if (h.kind === 'file'){ const f = await h.getFile(); out.push({ name, size:f.size, at:f.lastModified }); }
+    return out.sort((a, b) => b.at - a.at);
+  }
+};
+
+/* Directory handles are structured-cloneable, so IndexedDB can hold them
+   across sessions — localStorage cannot, it only takes strings. */
+const HDB = 'ridge-fs';
+function hdb(){
+  return new Promise((res, rej) => {
+    const q = indexedDB.open(HDB, 1);
+    q.onupgradeneeded = () => q.result.createObjectStore('h');
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+const idbPutHandle = async h => { const d = await hdb();
+  return new Promise(r => { const t = d.transaction('h','readwrite'); t.objectStore('h').put(h,'dir'); t.oncomplete = r; }); };
+const idbGetHandle = async () => { const d = await hdb();
+  return new Promise(r => { const t = d.transaction('h','readonly'); const g = t.objectStore('h').get('dir'); g.onsuccess = () => r(g.result); g.onerror = () => r(null); }); };
+const idbDelHandle = async () => { const d = await hdb();
+  return new Promise(r => { const t = d.transaction('h','readwrite'); t.objectStore('h').delete('dir'); t.oncomplete = r; }); };
+
+/** Turn a raw Google API failure into something a person can act on. */
+export function explainGoogleError(status, body){
+  const text = String(body || '');
+  if (/has not been used in project|is disabled/i.test(text)){
+    const m = text.match(/project\s+(\d+)/i);
+    return `The Drive API is switched off in your Cloud project${m ? ' ' + m[1] : ''}. ` +
+           `Open console.cloud.google.com → APIs & Services → Library → search "Google Drive API" → Enable. ` +
+           `It can take a minute to take effect. Enabling the YouTube API does not enable Drive.`;
+  }
+  if (status === 403 && /insufficient|scope/i.test(text))
+    return 'That token does not carry the Drive scope. Press Connect Drive — it is a separate sign-in from YouTube.';
+  if (status === 401) return 'The Drive sign-in expired. Press Connect Drive again.';
+  if (status === 404) return 'Drive could not find that folder. Press Connect Drive again to recreate it.';
+  return `Drive returned ${status}. ${text.slice(0, 180)}`;
+}
