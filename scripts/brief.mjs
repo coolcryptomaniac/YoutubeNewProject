@@ -15,7 +15,10 @@ const {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REFRESH_TOKEN,
   GROQ_MODEL = 'openai/gpt-oss-120b',
-  GROQ_BASE = 'https://api.groq.com/openai/v1'
+  GROQ_BASE = 'https://api.groq.com/openai/v1',
+  NVIDIA_API_KEY,
+  NVIDIA_MODEL = 'meta/llama-3.3-70b-instruct',
+  PEXELS_API_KEY
 } = process.env;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -199,6 +202,38 @@ async function trending(token){
 }
 
 
+
+/* ─────────────── Pexels lookahead ───────────────
+   Real footage at full resolution, unlike every free AI image
+   service. The workflow only records what is available and its
+   URLs — the actual files are cached in the browser, because a
+   repo cannot carry gigabytes and Pages caps a site at 1 GB. */
+async function stock(queries){
+  if (!PEXELS_API_KEY || !queries?.length) return null;
+  const out = { photos: [], videos: [] };
+  for (const q of queries.slice(0, 4)){
+    try {
+      const ph = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=8&orientation=landscape`,
+        { headers:{ Authorization: PEXELS_API_KEY } }).then(r => r.json());
+      for (const p of (ph.photos || []))
+        out.photos.push({ id:'px-'+p.id, kind:'photo', q, url:p.src.large2x, thumb:p.src.medium,
+                          w:p.width, h:p.height, credit:p.photographer });
+
+      const vd = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(q)}&per_page=5&orientation=landscape`,
+        { headers:{ Authorization: PEXELS_API_KEY } }).then(r => r.json());
+      for (const v of (vd.videos || [])){
+        const files = (v.video_files || []).filter(f => f.link && f.width).sort((a,b) => b.width - a.width);
+        const pick = files.find(f => f.width <= 1920) || files[0];
+        if (pick) out.videos.push({ id:'pxv-'+v.id, kind:'video', q, url:pick.link, thumb:v.image,
+                                    w:pick.width, h:pick.height, dur:v.duration, credit:v.user?.name });
+      }
+      await sleep(400);
+    } catch (e){ warn('Pexels', q + ':', e.message); }
+  }
+  say('stock: found', out.photos.length, 'photos and', out.videos.length, 'clips');
+  return out;
+}
+
 /* ─────────────── when to release ─────────────── */
 // India peaks 18:00-21:00 IST. Publish 2-3h earlier so indexing lands first.
 const DEFAULT_SLOTS = {
@@ -247,6 +282,17 @@ function bestSlots(videos, shorts){
 }
 
 /* ─────────────── groq ─────────────── */
+async function nvidia(messages, temperature = 0.9){
+  const r = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + NVIDIA_API_KEY },
+    body: JSON.stringify({ model: NVIDIA_MODEL, messages, temperature, max_tokens: 4096 })
+  });
+  if (!r.ok) throw new Error('NVIDIA ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  const txt = (await r.json()).choices[0].message.content;
+  return JSON.parse(txt.replace(/^[\s\S]*?```json\s*|\s*```[\s\S]*$/g, '').trim());
+}
+
 async function groq(messages, temperature = 0.9){
   if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY is not set');
   for (let attempt = 0; attempt < 3; attempt++){
@@ -259,6 +305,15 @@ async function groq(messages, temperature = 0.9){
     if (r.status === 429 && attempt < 2){ warn('Groq rate limit, backing off'); await sleep(20000); continue; }
     throw new Error('Groq ' + r.status + ': ' + (await r.text()).slice(0, 200));
   }
+}
+
+/** Try NVIDIA first when a key is present, fall back to Groq. */
+async function ask(messages, temperature = 0.9){
+  if (NVIDIA_API_KEY){
+    try { return await nvidia(messages, temperature); }
+    catch (e){ warn('NVIDIA failed, falling back to Groq:', e.message.slice(0, 120)); }
+  }
+  return groq(messages, temperature);
 }
 
 async function think(cfg, stats, an, cal, trend, timing){
@@ -291,7 +346,7 @@ Trending music in India right now: ${trend.music.join(' | ')}
 Trending overall: ${trend.general.join(' | ')}
 Tags recurring across those: ${trend.tags.join(', ')}` : '';
 
-  return groq([
+  return ask([
     { role: 'system', content:
       'You advise an independent Indian music and comedy creator, and you write their vertical Hindi comedy sketches. ' +
       'Reply with JSON only, exactly these keys: observations, suggestions, clips.\n' +
@@ -391,6 +446,12 @@ async function main(){
   }
   say(`panels: ${made}/${total}`);
 
+  const stockQueries = [
+    ...(cal.upcoming[0] ? [cal.upcoming[0].name + ' india celebration'] : []),
+    'himalaya mountains mist', 'indian village life', 'night city lights bokeh'
+  ];
+  const assets = await stock(stockQueries);
+
   const brief = {
     generatedAt: new Date().toISOString(),
     config: { handle: cfg.handle, castSheet: cfg.castSheet, artStyle: cfg.artStyle, seed: cfg.seed },
@@ -402,6 +463,7 @@ async function main(){
     calendar: cal,
     timing,
     trending: trend,
+    stock: assets,
     observations: think_.observations || [],
     suggestions: think_.suggestions || [],
     clips,
