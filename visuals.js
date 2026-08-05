@@ -14,8 +14,8 @@ const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 
 /* one persistent layer per visualiser per size */
 const _scratch = new Map();
-export function scratch(key, W, H){
-  const id = `${key}:${W}x${H}`;
+export function scratch(key, W, H, ns = ''){
+  const id = `${ns}|${key}:${W}x${H}`;
   let c = _scratch.get(id);
   if (!c){
     c = document.createElement('canvas');
@@ -24,9 +24,15 @@ export function scratch(key, W, H){
   }
   return c;
 }
-export function resetVisuals(){ _scratch.clear(); _state.clear(); }
+/** Drop persistent layers. With a namespace, only that job's layers go. */
+export function resetVisuals(ns = null){
+  if (ns === null){ _scratch.clear(); _state.clear(); return; }
+  for (const k of [..._scratch.keys()]) if (k.startsWith(ns + '|')) _scratch.delete(k);
+  for (const k of [..._state.keys()])   if (k.startsWith(ns + '|')) _state.delete(k);
+}
 const _state = new Map();
 const memo = (key, make) => { if (!_state.has(key)) _state.set(key, make()); return _state.get(key); };
+const nk = (ns, key) => `${ns}|${key}`;
 
 const shade = (hex,k) => {
   const n = parseInt(hex.slice(1),16);
@@ -44,8 +50,8 @@ const mix = (a,b,t) => {
    The spectrum carves a landscape, and every past frame stays
    as a receding ridge. You end up flying over the shape of the
    whole song. */
-export function terrain(ctx, W, H, f, band, A, B, prog){
-  const st = memo('terrain', () => ({ rows: [] }));
+export function terrain(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const st = memo(nk(ns,'terrain'), () => ({ rows: [] }));
   const N = 96;
   const row = new Float32Array(N);
   for (let i = 0; i < N; i++){
@@ -95,8 +101,8 @@ export function terrain(ctx, W, H, f, band, A, B, prog){
 /* ── MURMURATION ───────────────────────────────────────────
    Boids. Bass pulls them together, treble scatters them, so
    the flock knots on the downbeat and frays in the hats. */
-export function murmuration(ctx, W, H, f, band, A, B, prog){
-  const st = memo('murmur', () => ({
+export function murmuration(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const st = memo(nk(ns,'murmur'), () => ({
     b: Array.from({length:190}, () => ({
       x: Math.random(), y: Math.random(),
       vx: (Math.random()-.5)*.004, vy: (Math.random()-.5)*.004
@@ -139,10 +145,10 @@ export function murmuration(ctx, W, H, f, band, A, B, prog){
 /* ── LOOM ──────────────────────────────────────────────────
    The song weaves a cloth. Low frequencies lay the warp, highs
    throw the weft, and it is finished exactly when the track is. */
-export function loom(ctx, W, H, f, band, A, B, prog){
-  const lay = scratch('loom', W, H);
+export function loom(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const lay = scratch('loom', W, H, ns);
   const lx = lay.getContext('2d');
-  const st = memo('loom', () => ({ last: -1 }));
+  const st = memo(nk(ns,'loom'), () => ({ last: -1 }));
 
   const col = Math.floor(prog * 150);
   if (col !== st.last){
@@ -184,10 +190,10 @@ export function loom(ctx, W, H, f, band, A, B, prog){
    Twelve-fold symmetry drawn outward from the centre as the
    song plays. The last frame is a complete rangoli, and no two
    songs draw the same one. */
-export function rangoli(ctx, W, H, f, band, A, B, prog){
-  const lay = scratch('rangoli', W, H);
+export function rangoli(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const lay = scratch('rangoli', W, H, ns);
   const lx = lay.getContext('2d');
-  const st = memo('rangoli', () => ({ t: 0 }));
+  const st = memo(nk(ns,'rangoli'), () => ({ t: 0 }));
   st.t += 1;
 
   const cx = W/2, cy = H/2, R = Math.min(W,H) * 0.46;
@@ -237,10 +243,10 @@ export function rangoli(ctx, W, H, f, band, A, B, prog){
 /* ── INK ───────────────────────────────────────────────────
    Pigment dropped into water. Bass hits release new blooms
    that keep spreading and never fully clear. */
-export function ink(ctx, W, H, f, band, A, B, prog){
-  const lay = scratch('ink', W, H);
+export function ink(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const lay = scratch('ink', W, H, ns);
   const lx = lay.getContext('2d');
-  const st = memo('ink', () => ({
+  const st = memo(nk(ns,'ink'), () => ({
     // seed a few so the frame is never empty while waiting for a transient
     drops: Array.from({length:3}, () => ({
       x:0.25+Math.random()*0.5, y:0.25+Math.random()*0.5,
@@ -292,10 +298,201 @@ export function ink(ctx, W, H, f, band, A, B, prog){
   ctx.drawImage(lay, 0, 0);
 }
 
+
+/* ── SHONEN ────────────────────────────────────────────────
+   The visual grammar of a battle-anime opening: radial speed
+   lines, impact frames on the downbeat, chromatic split, and a
+   halftone screen. Style only — no character from any series
+   appears here, and none should be prompted for either. */
+export function shonen(ctx, W, H, f, band, A, B, prog, ns = ''){
+  const st = memo(nk(ns,'shonen'), () => ({ t:0, flash:0, armed:true, peak:0.4, angle:0, lastHit:-999 }));
+  st.t += 1;
+  st.peak = Math.max(band.low, st.peak * 0.994);
+  const hit = Math.max(0.32, st.peak * 0.86);
+
+  /* Impact frames are the genre's signature, but a full-frame invert firing
+     on every downbeat of a 150 bpm track strobes at about 2.5 Hz — inside
+     the 3–30 Hz band that triggers photosensitive seizures. So: only the
+     strongest transients fire, never more than once every 1.2 seconds, and
+     the frame brightens rather than inverting to white. */
+  const MIN_GAP = 36;                       // frames — about 1.2s at 30fps
+  if (band.low > hit && st.armed && (st.t - st.lastHit) > MIN_GAP){
+    st.flash = 1; st.armed = false; st.lastHit = st.t; st.angle = Math.random() * TAU;
+  }
+  // The analyser smooths heavily, so sustained bass may never dip far.
+  // Re-arm close under the threshold, and always re-arm once the minimum
+  // gap has passed — otherwise a steady four-on-the-floor fires once and
+  // then never again.
+  if (band.low < hit * 0.92 || (st.t - st.lastHit) > MIN_GAP * 1.6) st.armed = true;
+  st.flash *= 0.80;
+  if (st.flash < 0.02) st.flash = 0;
+
+  const cx = W/2, cy = H*0.48;
+  // a lift toward the accent, never a white-out
+  const lift = st.flash * 0.42;
+  ctx.fillStyle = lift > 0.02 ? mix('#0A0D16', A, lift) : '#0A0D16';
+  ctx.fillRect(0,0,W,H);
+
+  // radial speed lines, denser and longer as the track pushes
+  const lines = 90 + Math.round(band.mid * 130);
+  const inner = Math.min(W,H) * (0.16 + band.low * 0.14);
+  ctx.lineCap = 'round';
+  for (let i = 0; i < lines; i++){
+    const a = st.angle + (i / lines) * TAU + Math.sin(i * 12.9898) * 0.02;
+    const jitter = ((Math.sin(i * 78.233 + st.t * 0.02) + 1) / 2);
+    const len = Math.max(W,H) * (0.20 + jitter * 0.55 + band.high * 0.30);
+    const wgt = (W/900) * (0.35 + jitter * 1.9);
+    ctx.strokeStyle = i % 7 === 0 ? A : i % 5 === 0 ? B : '#EDF0F7';
+    ctx.globalAlpha = 0.05 + jitter * 0.34 + band.mid * 0.25 + st.flash * 0.28;
+    ctx.lineWidth = wgt;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a)*inner, cy + Math.sin(a)*inner);
+    ctx.lineTo(cx + Math.cos(a)*(inner+len), cy + Math.sin(a)*(inner+len));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // the burst at the centre
+  const core = inner * (0.62 + band.low * 0.5) * (1 + st.flash * 0.7);
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, core);
+  g.addColorStop(0, '#EDF0F7');
+  g.addColorStop(0.35, mix(A, B, (Math.sin(st.t*0.03)+1)/2));
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, core, 0, TAU); ctx.fill();
+
+  // chromatic split on impact — cheap, and unmistakably the genre
+  if (st.flash > 0.1){
+    const off = st.flash * W * 0.011;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = st.flash * 0.34;
+    ctx.fillStyle = '#FF3B6B'; ctx.fillRect(-off, 0, W, H);
+    ctx.fillStyle = '#3BE0FF'; ctx.fillRect(off, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+
+  // halftone screen across the lower third
+  const dot = Math.max(4, W/150);
+  ctx.fillStyle = 'rgba(237,240,247,.09)';
+  for (let y = H*0.62; y < H; y += dot*2){
+    const fade = (y - H*0.62) / (H*0.38);
+    for (let x = 0; x < W; x += dot*2){
+      const r = dot * 0.42 * fade * (0.5 + band.high);
+      if (r < 0.4) continue;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    }
+  }
+
+  // vignette to sell the frame
+  const vg = ctx.createRadialGradient(cx, cy, Math.min(W,H)*0.28, cx, cy, Math.max(W,H)*0.72);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)');
+  ctx.fillStyle = vg; ctx.fillRect(0,0,W,H);
+}
+
 export const EXTRA_VISUALS = {
   terrain:     { label:'Terrain',     fn: terrain,     note:'the song carved as a landscape you fly over' },
   murmuration: { label:'Murmuration', fn: murmuration, note:'a flock that knots on the bass and frays on the hats' },
   loom:        { label:'Loom',        fn: loom,        note:'weaves a cloth, finished exactly when the track ends' },
   rangoli:     { label:'Rangoli',     fn: rangoli,     note:'twelve-fold pattern drawn outward, complete at the last bar' },
-  ink:         { label:'Ink',         fn: ink,         note:'pigment blooming in water on every transient' }
+  ink:         { label:'Ink',         fn: ink,         note:'pigment blooming in water on every transient' },
+  shonen:      { label:'Shonen',      fn: shonen,      note:'battle-anime opening — speed lines, impact frames, chromatic split' }
+};
+
+/* ═══════════════════════════════════════════════════════════
+   FLASH GUARD
+
+   WCAG 2.3.1 and the Ofcom/Harding guidance both put the danger
+   zone at more than three flashes a second, where a "flash" is a
+   relative-luminance swing of 10% or more against a dark field.
+   Roughly 1 in 4,000 people has photosensitive epilepsy, and it
+   most often presents in childhood.
+
+   Rather than trusting fifteen visualisers to each behave, this
+   sits at the end of the draw pipeline and physically cannot let
+   a frame through that swings too far or too often. A visualiser
+   written badly — or one added later — is contained by it.
+
+   It works by keeping the previous frame and blending it back in
+   when the new one jumps too hard, which reads as a soft pulse
+   rather than a strobe.
+   ═══════════════════════════════════════════════════════════ */
+
+const MAX_STEP    = 0.055;  // largest luminance jump allowed in one frame
+const FLASH_DELTA = 0.045;  // a swing this big counts as a flash
+const MAX_PER_SEC = 2;      // hard ceiling, below the guidance's 3
+
+const _guard = new Map();
+
+/** Mean relative luminance of the canvas, sampled cheaply. */
+function meanLuma(ctx, W, H, probe){
+  const p = probe.getContext('2d', { willReadFrequently: true });
+  p.drawImage(ctx.canvas, 0, 0, probe.width, probe.height);
+  const d = p.getImageData(0, 0, probe.width, probe.height).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4)
+    sum += (0.2126 * d[i] + 0.7152 * d[i+1] + 0.0722 * d[i+2]) / 255;
+  return sum / (d.length / 4);
+}
+
+/**
+ * Call immediately after a visualiser has drawn. Returns what it did,
+ * which the test harness reads to prove the limits hold.
+ */
+export function flashGuard(ctx, W, H, ns = ''){
+  let g = _guard.get(ns);
+  if (!g){
+    g = { prev: document.createElement('canvas'),
+          probe: document.createElement('canvas'),
+          luma: null, times: [], damped: 0, frames: 0 };
+    g.probe.width = 32; g.probe.height = 18;
+    _guard.set(ns, g);
+  }
+  if (g.prev.width !== W || g.prev.height !== H){ g.prev.width = W; g.prev.height = H; g.luma = null; }
+
+  const now = performance.now();
+  const luma = meanLuma(ctx, W, H, g.probe);
+  g.frames++;
+
+  if (g.luma !== null){
+    const delta = Math.abs(luma - g.luma);
+
+    // how many flashes in the last second
+    g.times = g.times.filter(t => now - t < 1000);
+    const overRate = g.times.length >= MAX_PER_SEC;
+
+    // a jump that is too large, or any jump at all once the rate is spent
+    const limit = overRate ? FLASH_DELTA * 0.5 : MAX_STEP;
+    if (delta > limit){
+      // blend the previous frame back until the change sits inside the limit
+      const keep = Math.min(0.92, 1 - limit / delta);
+      ctx.save();
+      ctx.globalAlpha = keep;
+      ctx.drawImage(g.prev, 0, 0, W, H);
+      ctx.restore();
+      g.damped++;
+      const after = g.luma + Math.sign(luma - g.luma) * limit;
+      if (Math.abs(after - g.luma) >= FLASH_DELTA) g.times.push(now);
+      g.luma = after;
+    } else {
+      if (delta >= FLASH_DELTA) g.times.push(now);
+      g.luma = luma;
+    }
+  } else {
+    g.luma = luma;
+  }
+
+  const px = g.prev.getContext('2d');
+  px.clearRect(0, 0, W, H);
+  px.drawImage(ctx.canvas, 0, 0, W, H);
+
+  return { luma: g.luma, damped: g.damped, frames: g.frames, recent: g.times.length };
+}
+
+export function resetGuard(ns = null){
+  if (ns === null) _guard.clear(); else _guard.delete(ns);
+}
+export const guardStats = ns => {
+  const g = _guard.get(ns);
+  return g ? { damped: g.damped, frames: g.frames } : null;
 };

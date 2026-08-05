@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridge Lab — experimental</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --night:#0E1220;--deep:#161C2E;--panel:#1B2236;--line:#2E3854;
+  --snow:#EDF0F7;--mist:#8792AE;
+  --dawn:#FF7A9C;--glacier:#8FD9C9;--lamp:#FFC257;--dusk:#7C6CFF;--sky:#5AC8FA;
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Inter Tight',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--night);color:var(--snow);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--lamp);outline-offset:2px;border-radius:3px}
+
+/* the lab wears amber, so you always know which room you are in */
+header{border-bottom:1px solid var(--line);padding:20px 24px 18px;
+  background:linear-gradient(180deg,#1d1a12,var(--night))}
+.wrap{max-width:1100px;margin:0 auto}
+.brandrow{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:29px;letter-spacing:-.03em;margin:0}
+h1 span{color:var(--lamp)}
+.tag{font-family:var(--mono);font-size:11px;color:var(--lamp);letter-spacing:.14em;text-transform:uppercase;margin-top:7px;display:block}
+.back{display:flex;gap:14px;font-size:13px}
+.back a{color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line);padding-bottom:1px}
+.back a:hover{color:var(--snow)}
+
+main{max-width:1100px;margin:0 auto;padding:22px 24px 90px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:19px;margin-bottom:14px}
+h2{font-family:var(--display);font-size:17.5px;font-weight:600;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sub{color:var(--mist);font-size:13.5px;margin:0 0 15px;line-height:1.6}
+code{font-family:var(--mono);font-size:12px;background:var(--deep);padding:2px 6px;border-radius:3px;color:var(--glacier);word-break:break-all}
+
+.state{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+  padding:4px 9px;border-radius:20px;border:1px solid var(--line);white-space:nowrap}
+.state.works{color:var(--glacier);border-color:rgba(143,217,201,.45);background:rgba(143,217,201,.08)}
+.state.rough{color:var(--lamp);border-color:rgba(255,194,87,.45);background:rgba(255,194,87,.08)}
+.state.dead{color:var(--dawn);border-color:rgba(255,122,156,.45);background:rgba(255,122,156,.08)}
+
+.banner{background:rgba(255,194,87,.08);border:1px solid rgba(255,194,87,.35);border-radius:7px;
+  padding:16px 18px;margin-bottom:22px;font-size:13.5px;line-height:1.65}
+.banner b{color:var(--lamp)}
+
+label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--mist);margin:0 0 6px}
+.f{margin-bottom:14px}
+input[type=text],input[type=password],select,textarea{width:100%;background:var(--deep);border:1px solid var(--line);border-radius:4px;padding:9px 11px;font-size:13.5px}
+textarea{min-height:80px;resize:vertical;line-height:1.55}
+.btn{background:var(--lamp);color:#241a06;font-weight:600;padding:11px 18px;border-radius:5px;font-size:14px;display:inline-block}
+.btn:hover:not(:disabled){filter:brightness(1.08)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--snow);font-weight:500}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.note{font-family:var(--mono);font-size:11.5px;color:var(--mist);margin-top:9px;line-height:1.65}
+.out{font-family:var(--mono);font-size:11.5px;background:var(--night);border:1px solid var(--line);
+  border-radius:4px;padding:11px;margin-top:11px;max-height:220px;overflow:auto;white-space:pre-wrap;display:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+@media (pointer: coarse){
+  .btn{min-height:48px}
+  select,input[type=text],input[type=password],textarea{min-height:46px;font-size:16px}
+}
+@media (max-width:620px){ header{padding:16px 16px 14px} main{padding:16px 16px 80px} h1{font-size:25px} .card{padding:15px} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap brandrow">
+    <div><h1>Ridge Lab<span>.</span></h1><span class="tag">Experimental · unproven</span></div>
+    <div class="back">
+      <a href="./index.html">Today</a><a href="./music.html">Music</a><a href="./shorts.html">Shorts</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="banner">
+    <b>Nothing here is trusted.</b> These are workarounds, half-answers and things that
+    might stop working next week. Anything that proves itself moves out of the Lab and into
+    the Music or Shorts studio, where only things that work reliably are allowed to live.
+    If something here breaks, that is the expected outcome, not a bug worth chasing.
+  </div>
+
+  <div class="card">
+    <h2>Free song generation <span class="state dead">no route</span></h2>
+    <p class="sub">
+      Checked repeatedly. No free service generates full songs with vocals at Suno's quality
+      and allows a browser to call it. The open models — MusicGen, Stable Audio, ACE-Step —
+      are instrumental-first and noticeably weaker, and their hosted endpoints block browser
+      requests outright. They would run inside the nightly workflow, but generated audio
+      committed to a repo hits the same 1 GB Pages ceiling as the image library, and the
+      result would be worse than what Suno already gives you free.
+    </p>
+    <p class="sub" style="margin-bottom:0">
+      If that changes, this card is where it will appear. Until then the Suno tab in the
+      Music studio writes the brief and opens the tab, which is the part that takes thinking.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Server-side providers <span class="state works">works, but not here</span></h2>
+    <p class="sub">
+      NVIDIA and Hugging Face refuse browser requests outright. OpenAI is subtler and worse:
+      it answers a request carrying obvious junk, then drops the same request once the key
+      looks real — an edge filter aimed at stopping people embedding keys in web pages. The
+      practical result is the same, you cannot rely on it from a browser. All three work in
+      the nightly workflow, which runs in Node where CORS does not apply.
+    </p>
+    <p class="sub">Add these as repository secrets and the nightly brief will use them:</p>
+    <div class="out" style="display:block">NVIDIA_API_KEY   nvapi-...      prefers NVIDIA, falls back to Groq
+NVIDIA_MODEL     (variable)     default meta/llama-3.3-70b-instruct
+PEXELS_API_KEY   ...            stock footage lookahead</div>
+    <p class="note">Probed live from a browser: NVIDIA blocked · OpenAI blocked · Hugging Face blocked · Pexels reachable · Groq reachable · Gemini reachable · OpenRouter reachable.</p>
+  </div>
+
+  <div class="card">
+    <h2>Provider probe <span class="state works">useful</span></h2>
+    <p class="sub">Rather than trusting any of the above, check for yourself right now. This fires a real request from this page and reports whether the response came back at all — a status code means CORS allowed it, a network failure means it did not.</p>
+    <button class="btn" id="btnProbe">Test every provider</button>
+    <div class="out" id="probeOut"></div>
+    <p class="note">No real keys are sent — each request carries a correctly-shaped but all-zero one, so a 401 is the success case. The shape matters: OpenAI's edge drops browser requests carrying a plausible credential, so probing with obvious junk reports it as working when it is not.</p>
+  </div>
+
+  <div class="card">
+    <h2>Pollinations video <span class="state rough">unreliable</span></h2>
+    <p class="sub">Some free image endpoints have started exposing short video generation. It is slow, frequently fails, and the output is a few seconds at low resolution — nowhere near usable as a music video, but occasionally interesting as a background element.</p>
+    <div class="f"><label>Prompt</label><input type="text" id="vidPrompt" value="slow drifting clouds over himalayan peaks at dawn"></div>
+    <div class="row"><button class="btn ghost" id="btnVid">Try it</button></div>
+    <div class="out" id="vidOut"></div>
+    <div id="vidHolder" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>What moved out of the Lab</h2>
+    <p class="sub" style="margin-bottom:11px">Things that started here and earned their place in the main studios:</p>
+    <div class="grid2">
+      <div><b>Gemini images</b><p class="sub" style="margin:4px 0 0">500 a day free, ~1s apart. Now the recommended image provider.</p></div>
+      <div><b>Pexels footage</b><p class="sub" style="margin:4px 0 0">The only free route to 4K. Now in the Scenes tab.</p></div>
+      <div><b>Paste-back bridge</b><p class="sub" style="margin:4px 0 0">Ctrl+V an image from ChatGPT. Now in Assist.</p></div>
+      <div><b>Parallel rendering</b><p class="sub" style="margin:4px 0 0">Measured 2.25× faster on three tracks. Now in Look.</p></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+'use strict';
+const $ = s => document.querySelector(s);
+
+/* The key must be shaped like a real one. OpenAI's edge drops browser
+   requests carrying a plausible credential — send it obvious junk and you
+   get a friendly 401 that makes the provider look usable when it is not.
+   This probe caught itself lying once already. */
+const PROBES = [
+  ['Groq',        'https://api.groq.com/openai/v1/chat/completions', 'POST', 'gsk_0000000000000000000000000000'],
+  ['OpenRouter',  'https://openrouter.ai/api/v1/chat/completions',   'POST', 'sk-or-v1-0000000000000000000000'],
+  ['Gemini',      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=AIzaSy0000000000000000000000000', 'POST', null],
+  ['Pexels',      'https://api.pexels.com/v1/search?query=test&per_page=1', 'GET', '00000000000000000000000000000000'],
+  ['Pollinations','https://image.pollinations.ai/prompt/test?width=64&height=64', 'GET', null],
+  ['OpenAI',      'https://api.openai.com/v1/chat/completions',      'POST', 'sk-proj-000000000000000000000000'],
+  ['NVIDIA',      'https://integrate.api.nvidia.com/v1/chat/completions', 'POST', 'nvapi-00000000000000000000000'],
+  ['HuggingFace', 'https://api-inference.huggingface.co/models/facebook/musicgen-small', 'POST', 'hf_00000000000000000000000000'],
+  ['Cerebras',    'https://api.cerebras.ai/v1/chat/completions',     'POST', 'csk-0000000000000000000000000']
+];
+
+$('#btnProbe').onclick = async () => {
+  const out = $('#probeOut');
+  out.style.display = 'block';
+  out.textContent = 'Probing…\n';
+  $('#btnProbe').disabled = true;
+  for (const [name, url, method, key] of PROBES){
+    let line;
+    try {
+      const o = { method, headers:{} };
+      if (key) o.headers.Authorization = name === 'Pexels' ? key : 'Bearer ' + key;
+      if (method === 'POST'){
+        o.headers['Content-Type'] = 'application/json';
+        o.body = JSON.stringify({ model:'gpt-4o-mini', messages:[{role:'user',content:'hello'}],
+                                  contents:[{parts:[{text:'hello'}]}], inputs:'hello' });
+      }
+      const r = await fetch(url, o);
+      line = `  reachable   ${name.padEnd(13)} HTTP ${r.status}`;
+    } catch {
+      line = `  BLOCKED     ${name.padEnd(13)} no browser can call this`;
+    }
+    out.textContent += line + '\n';
+  }
+  out.textContent += '\nBlocked ones still work inside the nightly workflow, where CORS does not apply.' +
+                     '\nProbed with realistically-shaped keys — an obviously fake one can sail past\n' +
+                     'an edge filter and make a blocked provider look reachable.';
+  $('#btnProbe').disabled = false;
+};
+
+$('#btnVid').onclick = async () => {
+  const out = $('#vidOut'), hold = $('#vidHolder');
+  out.style.display = 'block';
+  out.textContent = 'Asking… this often fails or times out, which is the point of the Lab.';
+  hold.innerHTML = '';
+  $('#btnVid').disabled = true;
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent($('#vidPrompt').value)}?model=video&width=768&height=432&nologo=true`;
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 90000);
+    const r = await fetch(url, { signal: ctl.signal });
+    clearTimeout(timer);
+    const type = r.headers.get('content-type') || '';
+    out.textContent = `HTTP ${r.status} · ${type}`;
+    if (!r.ok) { out.textContent += '\nRejected. Expected — this endpoint is not documented or stable.'; return; }
+    const blob = await r.blob();
+    out.textContent += `\n${(blob.size/1048576).toFixed(2)} MB`;
+    if (type.startsWith('video/')){
+      const v = document.createElement('video');
+      v.src = URL.createObjectURL(blob); v.controls = true; v.loop = true;
+      v.style.cssText = 'width:100%;max-width:520px;border-radius:6px;border:1px solid var(--line)';
+      hold.append(v);
+      out.textContent += '\nGot a video. Download it and drop it in as a backdrop if it is any good.';
+    } else if (type.startsWith('image/')){
+      const i = document.createElement('img');
+      i.src = URL.createObjectURL(blob);
+      i.style.cssText = 'width:100%;max-width:520px;border-radius:6px;border:1px solid var(--line)';
+      hold.append(i);
+      out.textContent += '\nA still image came back, not video. The endpoint ignored the request.';
+    }
+  } catch(e){
+    out.textContent = `Failed: ${e.name === 'AbortError' ? 'timed out after 90 seconds' : e.message}`;
+  }
+  $('#btnVid').disabled = false;
+};
+</script>
+</body>
+</html>

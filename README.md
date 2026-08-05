@@ -16,6 +16,7 @@ while you sleep.
 | **`core.js`** | shared engine — mood analysis, providers, vault, Drive, folder, Pexels |
 | **`genres.js`** | 35 genre templates |
 | **`visuals.js`** | the five accumulating visualisers |
+| **`lab.html`** | **Lab** — experimental, unproven, quarantined from the real work |
 
 ## How autonomous is it, really
 

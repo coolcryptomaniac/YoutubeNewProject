@@ -230,7 +230,8 @@ function quickActions(b){
       clips?`Film today's ${clips} clip${clips>1?'s':''}`:'Make a Short',
       clips?'Already written, panels already drawn':'Write a sketch and film it'],
     ['Words','music.html#suno','Write a Suno brief','Style prompt and lyrics, ready to paste'],
-    ['Publish','music.html#publish','Schedule a release','Space uploads across your best slots']
+    ['Publish','music.html#publish','Schedule a release','Space uploads across your best slots'],
+    ['Lab','lab.html','Experimental','Unproven workarounds, kept away from the real work']
   ];
   $('#quick').innerHTML=acts.map(([tag,href,title,sub])=>
     `<a class="qa" href="./${href}"><em>${esc(tag)}</em><b>${esc(title)}</b><span>${esc(sub)}</span></a>`).join('');

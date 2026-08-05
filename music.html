@@ -210,7 +210,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
 <header>
   <div class="brandrow">
     <div><h1>Ridge<span>.</span></h1><span class="tag">Music video studio</span></div>
-    <div class="acct" id="acct"><a href="./index.html">Today</a><a href="./shorts.html">Shorts</a><span>Not connected</span></div>
+    <div class="acct" id="acct"><a href="./index.html">Today</a><a href="./shorts.html">Shorts</a><a href="./lab.html" style="color:var(--lamp)">Lab</a><span>Not connected</span></div>
   </div>
   <div class="ridge">
     <div class="ridgehead"><span>Today's slots</span><span id="quotaLabel">—</span></div>
@@ -236,10 +236,28 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       <div class="card" id="oneClick" style="display:none">
         <h2>Make the whole thing</h2>
         <p class="sub" id="ocSub"></p>
+        <div class="f"><label>How to make it</label>
+          <select id="ocRoute">
+            <option value="auto" selected>Decide for me</option>
+            <option value="reel">Stock footage cut to the beat — fastest</option>
+            <option value="art">Generated scene art — most distinctive</option>
+            <option value="pure">Visualiser only — no images at all</option>
+          </select>
+        </div>
         <button class="btn" id="btnOneClick">Do everything for the selected track</button>
         <div class="bar"><i id="ocBar"></i></div>
         <p class="note" id="ocNote">Writes the metadata, plans the shots, draws them, builds the thumbnail, then renders. It stops if anything fails, and picks up where it stopped.</p>
         <div id="ocSteps" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h2>Publish something you already have</h2>
+        <p class="sub">A video made elsewhere, downloaded, or shot on your phone. It skips rendering entirely and joins the same queue — titles, tags, thumbnails and scheduling all still apply.</p>
+        <div class="drop" id="videoDrop" style="padding:26px 18px">
+          <h3>Drop a video file</h3>
+          <p>MP4, MOV, WebM or MKV — or tap to pick from your phone</p>
+        </div>
+        <input type="file" id="videoFile" accept="video/*" multiple hidden>
+        <p class="note" id="videoNote">YouTube accepts almost any format, so nothing is converted here.</p>
       </div>
     <div class="card">
       <h2>Add your Suno tracks</h2>
@@ -266,6 +284,15 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
         <h2>Safe storage</h2>
         <p class="sub">Rendered videos are written to this browser's own database the moment they finish — no YouTube connection needed. They come back automatically next time you open the app.</p>
         <p class="note" id="vaultNote">Checking…</p>
+        <div class="bar" style="margin-top:10px"><i id="vaultBar"></i></div>
+        <div class="f" style="margin-top:13px"><label>How much of this device to use</label>
+          <select id="budgetGB">
+            <option value="5">5 GB</option><option value="10">10 GB</option>
+            <option value="20" selected>20 GB</option><option value="30">30 GB</option>
+            <option value="50">50 GB</option>
+          </select>
+        </div>
+        <label class="chk"><input type="checkbox" id="autoReclaim" checked><span>Clear old published videos when it fills<small>Only ever removes videos already on YouTube. Unpublished work is never touched.</small></span></label>
         <div class="warn" id="persistWarn" style="display:none;margin-top:12px">
           <b>Storage is not pinned.</b> The browser may evict this data if the device runs low on space. Nothing you can do about it directly — but keep a copy of anything you cannot lose, using the download button above.
         </div>
@@ -292,6 +319,15 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
         </div>
         <div class="bar"><i id="renderBar"></i></div>
         <p class="note" id="renderNote">Nothing rendering.</p>
+        <div id="jobList"></div>
+        <div class="f" style="margin-top:14px"><label>Render at once</label>
+          <select id="lanes">
+            <option value="1">One at a time — safest</option>
+            <option value="2">Two together</option>
+            <option value="3">Three together</option>
+          </select>
+        </div>
+        <p class="note" id="laneNote"></p>
       </div>
     </div>
     <div>
@@ -309,6 +345,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
         <div class="f"><label>Resolution</label>
           <select id="res"><option value="1280x720">1280 × 720 · 720p</option><option value="1920x1080" selected>1920 × 1080 · 1080p</option></select>
         </div>
+        <label class="chk"><input type="checkbox" id="safeMode" checked><span>Flash safety<small>Caps how far and how often the picture can brighten, to the accessibility standard. Leave this on — roughly one person in 4,000 has photosensitive epilepsy, most often children.</small></span></label>
         <label class="chk"><input type="checkbox" id="autoVis" checked><span>Let each track choose its own visualiser<small>Turn off to force one look on everything.</small></span></label>
         <label class="chk"><input type="checkbox" id="showTitle" checked><span>Show track title</span></label>
         <label class="chk"><input type="checkbox" id="showChannel" checked><span>Show channel handle</span></label>
@@ -341,6 +378,21 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       </div>
     </div>
     <div>
+      <div class="card">
+        <h2>Footage reel</h2>
+        <p class="sub">Writes search terms from the track's mood, genre and theme, pulls real clips, and cuts them on the bar line. This is the fast route — no image generation at all.</p>
+        <div class="f"><label>What it should be about — optional</label><input type="text" id="reelTheme" placeholder="leaving the hills for the city"></div>
+        <div class="row" style="margin-bottom:12px">
+          <div style="flex:1;min-width:140px"><label>Clips</label><input type="number" id="reelCount" min="3" max="14" value="8"></div>
+          <div style="flex:1;min-width:140px"><label>Cut every</label>
+            <select id="reelBars"><option value="1">1 bar — frantic</option><option value="2" selected>2 bars</option><option value="4">4 bars — slow</option></select>
+          </div>
+        </div>
+        <button class="btn" id="btnReel">Build the reel</button>
+        <div class="bar"><i id="reelBar"></i></div>
+        <p class="note" id="reelNote">Needs a Pexels key and a decoded track.</p>
+        <div class="shots" id="reelGrid"></div>
+      </div>
       <div class="card">
         <h2>Stock footage and photographs</h2>
         <p class="sub">Pexels returns real 4K clips and 5000px photographs — the only route here to genuinely sharp material, since every free AI image service caps at 1024px. Free key from <b>pexels.com/api</b>.</p>
@@ -432,7 +484,23 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
         <button class="btn ghost sm" id="btnThumbAll">Build for all</button>
         <button class="btn ghost sm" id="btnThumbSave">Save</button>
       </div>
-      <label class="chk" style="margin-top:13px"><input type="checkbox" id="thumbLayout" checked><span>Dark scrim behind the headline</span></label>
+      <div class="f" style="margin-top:14px"><label>Layout</label>
+        <select id="thumbStyle">
+          <option value="bottomBar">Bottom bar — accent rule, big headline</option>
+          <option value="splitDiagonal">Split diagonal — colour block, hard edge</option>
+          <option value="centreStack">Centre stack — headline over a vignette</option>
+          <option value="leftPanel">Left panel — text on solid, art on the right</option>
+          <option value="sticker">Sticker — outlined caps, no scrim</option>
+          <option value="gradientWash">Gradient wash — duotone over the art</option>
+        </select>
+      </div>
+      <div class="f"><label>Headline colour</label>
+        <select id="thumbInk">
+          <option value="white">White</option><option value="accent">Accent</option>
+          <option value="gradient">Accent gradient</option><option value="dark">Near black</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="thumbLayout" checked><span>Dark scrim behind the headline</span></label>
       <p class="note">Custom thumbnails need a phone-verified channel.</p>
     </div>
   </div>
@@ -605,9 +673,11 @@ import { store, sleep, clamp, analyseAudio, MOOD_LIST, IMAGE_PROVIDERS, TEXT_PRO
          bestSlots, planReleases, nextSlot, istLabel, DEFAULT_SLOTS,
          budget, ACCOUNT_TIERS, isUploadLimit, nextReset, API_UPLOAD_BUCKET,
          folder, folderSupported, explainGoogleError,
-         pexelsPhotos, pexelsVideos, library, cacheAsset } from './core.js';
+         pexelsPhotos, pexelsVideos, library, cacheAsset,
+         budgetGB, storageReport, reclaim,
+         loadClip, cutPlan, cutAt } from './core.js';
 import { GENRES, FAMILIES, findGenre, resolveTemplate } from './genres.js';
-import { EXTRA_VISUALS, resetVisuals } from './visuals.js';
+import { EXTRA_VISUALS, resetVisuals, flashGuard, resetGuard, guardStats } from './visuals.js';
 
 const $ = s => document.querySelector(s);
 /** Attach a handler only if the element exists — a missing node should not
@@ -619,7 +689,7 @@ const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.flo
 const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const bytes = n => n > 1e9 ? (n/1073741824).toFixed(1)+' GB' : (n/1048576).toFixed(0)+' MB';
 
-const S = { tracks:[], sel:null, forced:null, accent:null, token:null, driveToken:null, busy:false, stopShots:false, slots:null, template:null, bridgeImage:null };
+const S = { tracks:[], sel:null, forced:null, accent:null, token:null, driveToken:null, busy:false, stopShots:false, slots:null, template:null, bridgeImage:null, jobs:[], slotCanvases:[] };
 const ACCENTS = ['#FF7A9C','#8FD9C9','#FFC257','#7C6CFF','#5AC8FA','#F2F5FC'];
 // The binding limit is whichever is lower: the API's 100-a-day upload
 // bucket, or YouTube's per-channel cap for this account. See core.js.
@@ -684,7 +754,7 @@ async function addFiles(fl){
   for(const f of audio){
     const t={ id:crypto.randomUUID(), file:f, name:f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),
       dur:0, buf:null, mood:null, shots:[], imgs:[], state:'queued', blob:null, thumb:null,
-      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null };
+      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null, clips:[], clipMeta:[], plan:[] };
     S.tracks.push(t); if(!S.sel) S.sel=t.id;
     try { await vault.putBlob('audio:'+t.id, f); } catch {}
   }
@@ -694,6 +764,7 @@ async function addFiles(fl){
 }
 
 async function decode(t){
+  if(!t.file) return;                    // imported videos carry no audio to decode
   try {
     t.buf = await ac().decodeAudioData(await t.file.arrayBuffer());
     t.dur = t.buf.duration;
@@ -717,7 +788,7 @@ function paintTracks(){
       <div class="num">${String(i+1).padStart(2,'0')}</div>
       <div>
         <div class="tname">${esc(t.meta?.title||t.name)}</div>
-        <div class="tmeta">${t.dur?mmss(t.dur):'—'} · ${(t.file.size/1048576).toFixed(1)} MB${t.err?' · '+esc(t.err):''}</div>
+        <div class="tmeta">${t.dur?mmss(t.dur):'—'} · ${(((t.file||t.blob)?.size||0)/1048576).toFixed(1)} MB${t.imported?' · imported':''}${t.err?' · '+esc(t.err):''}</div>
       </div>
       <div class="rowbtns">
         ${t.mood?`<span class="mood">${esc(t.mood.label)}</span>`:''}
@@ -772,7 +843,7 @@ $('#visBtns').innerHTML=VIS.map(([k,l])=>`<button data-v="${k}" class="${k==='au
 $('#visBtns').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   S.forced = b.dataset.v==='auto' ? null : b.dataset.v;
-  resetVisuals();                       // accumulating layers must start clean
+  resetVisuals(); resetGuard();          // accumulating layers must start clean
   $('#autoVis').checked = !S.forced;
   $$('#visBtns button').forEach(x=>x.classList.toggle('on',x===b));
   const x=EXTRA_VISUALS[b.dataset.v];
@@ -794,6 +865,27 @@ function coverDraw(ctx,img,W,H,zoom,drift,alpha){
   const r=Math.max(W/img.width,H/img.height)*zoom, w=img.width*r, h=img.height*r;
   ctx.globalAlpha=alpha; ctx.drawImage(img,(W-w)/2+drift*W*0.03,(H-h)/2,w,h); ctx.globalAlpha=1;
 }
+function drawReel(ctx,t,W,H,prog){
+  if(!t?.clips?.length||!t.plan?.length) return false;
+  const cur=cutAt(t.plan,prog*t.dur);
+  if(!cur) return false;
+  const v=t.clips[cur.clip];
+  if(!v||v.readyState<2) return false;
+  if(v.paused) v.play().catch(()=>{});
+  // a slow push-in over each cut, so a short looping clip still feels alive
+  const zoom=1.03+cur.local*0.07;
+  const r=Math.max(W/v.videoWidth,H/v.videoHeight)*zoom;
+  const w=v.videoWidth*r, hh=v.videoHeight*r;
+  ctx.drawImage(v,(W-w)/2,(H-hh)/2,w,hh);
+  // a quick flash on the cut reads as an edit rather than a glitch
+  if(cur.local<0.06){
+    ctx.globalAlpha=(0.06-cur.local)/0.06*0.5;
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+  }
+  ctx.fillStyle='rgba(10,13,22,.34)'; ctx.fillRect(0,0,W,H);
+  return true;
+}
+
 function drawShots(ctx,imgs,W,H,prog){
   const n=imgs.length; if(!n) return false;
   const seg=1/n, i=clamp(Math.floor(prog/seg),0,n-1), local=clamp((prog-i*seg)/seg,0,1);
@@ -804,10 +896,10 @@ function drawShots(ctx,imgs,W,H,prog){
 }
 
 let particles=null;
-function draw(ctx,W,H,freq,wave,t,prog){
+function draw(ctx,W,H,freq,wave,t,prog,ns=''){
   const A=accentOf(t), B=accent2Of(t), style=visOf(t);
   ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
-  const art=drawShots(ctx,t?.imgs||[],W,H,prog||0);
+  const art=drawReel(ctx,t,W,H,clamp(prog||0,0,1)) || drawShots(ctx,t?.imgs||[],W,H,prog||0);
   const N=freq.length;
   const energy=freq.reduce((a,b)=>a+b,0)/(N*255);
   const band=(a,b)=>{let s=0,c=0;for(let i=Math.floor(N*a);i<Math.floor(N*b);i++){s+=freq[i];c++}return c?s/c/255:0};
@@ -923,7 +1015,7 @@ function draw(ctx,W,H,freq,wave,t,prog){
   else if(EXTRA_VISUALS[style]){
     // these paint the whole frame themselves, including any scene art beneath
     if(art){ ctx.save(); ctx.globalAlpha=0.55; }
-    EXTRA_VISUALS[style].fn(ctx,W,H,freq,{low,mid,high},A,B,clamp(prog||0,0,1));
+    EXTRA_VISUALS[style].fn(ctx,W,H,freq,{low,mid,high},A,B,clamp(prog||0,0,1),ns);
     if(art){ ctx.restore(); }
   }
   else { // grid
@@ -948,6 +1040,9 @@ function draw(ctx,W,H,freq,wave,t,prog){
     ctx.globalAlpha=1;
   }
 
+  // Nothing draws after this without passing the flash guard.
+  if($('#safeMode')?.checked!==false) flashGuard(ctx,W,H,ns||'main');
+
   const pad=W*0.045;
   if($('#showTitle').checked&&t){
     ctx.fillStyle='#EDF0F7'; ctx.font=`600 ${Math.round(W/26)}px 'Bricolage Grotesque', sans-serif`;
@@ -963,14 +1058,14 @@ function draw(ctx,W,H,freq,wave,t,prog){
 let previewStop=null;
 $('#btnPreview').onclick=async()=>{
   const t=selTrack(); if(!t?.buf){ log('Select a decoded track first.','er'); return; }
-  stopPreview(); resetVisuals(); await ac().resume();
+  stopPreview(); resetVisuals('main'); resetGuard('main'); await ac().resume();
   const src=ac().createBufferSource(); src.buffer=t.buf;
   const an=ac().createAnalyser(); an.fftSize=2048; an.smoothingTimeConstant=0.78;
   src.connect(an); an.connect(ac().destination);
   const freq=new Uint8Array(an.frequencyBinCount), wave=new Uint8Array(an.fftSize);
   const cv=$('#cv'), ctx=cv.getContext('2d'), t0=performance.now(); let raf;
   const loop=()=>{ an.getByteFrequencyData(freq); an.getByteTimeDomainData(wave);
-    draw(ctx,cv.width,cv.height,freq,wave,t,(performance.now()-t0)/1000/t.dur);
+    draw(ctx,cv.width,cv.height,freq,wave,t,(performance.now()-t0)/1000/t.dur,'main');
     raf=requestAnimationFrame(loop); };
   src.start(); loop();
   previewStop=()=>{cancelAnimationFrame(raf);try{src.stop()}catch{};previewStop=null;};
@@ -1060,55 +1155,124 @@ $('#btnMakeShots').onclick=async()=>{
 const pickMime=()=>['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
   .find(m=>MediaRecorder.isTypeSupported(m))||'';
 
-async function renderTrack(t){
+async function renderTrack(t, opts = {}){
   if(!t.buf) return;
-  stopPreview(); await ac().resume();
+  const own = opts.canvas || $('#cv');
+  const ns  = opts.ns || 'main';
+  const solo = !opts.canvas;
+  if(solo){ stopPreview(); }
+  await ac().resume();
+  resetVisuals(ns); resetGuard(ns);
+  for(const v of (t.clips||[])){ try{ v.currentTime=0; await v.play(); }catch{} }
   t.state='rendering'; paintTracks();
-  resetVisuals();
-  const cv=$('#cv'), ctx=cv.getContext('2d');
+  await checkBudget();
+
+  const ctx=own.getContext('2d');
   const src=ac().createBufferSource(); src.buffer=t.buf;
   const an=ac().createAnalyser(); an.fftSize=2048; an.smoothingTimeConstant=0.78;
   const dest=ac().createMediaStreamDestination();
-  src.connect(an); an.connect(dest);
+  src.connect(an); an.connect(dest);          // never to speakers — parallel jobs would overlap
+
   const mime=pickMime();
-  if(!mime){ t.state='failed'; t.err='recorder unsupported'; log('Use Chrome or Edge — this browser cannot record WebM.','er'); paintTracks(); return; }
-  const mixed=new MediaStream([...cv.captureStream(30).getVideoTracks(),...dest.stream.getAudioTracks()]);
-  const rec=new MediaRecorder(mixed,{mimeType:mime,videoBitsPerSecond:cv.width>=1920?9e6:5e6,audioBitsPerSecond:192e3});
+  if(!mime){ t.state='failed'; t.err='recorder unsupported';
+    log('Use Chrome or Edge — this browser cannot record WebM.','er'); paintTracks(); return; }
+  const mixed=new MediaStream([...own.captureStream(30).getVideoTracks(),...dest.stream.getAudioTracks()]);
+  const rec=new MediaRecorder(mixed,{mimeType:mime,
+    videoBitsPerSecond:own.width>=1920?9e6:5e6, audioBitsPerSecond:192e3});
   const chunks=[]; rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+
   const freq=new Uint8Array(an.frequencyBinCount), wave=new Uint8Array(an.fftSize);
-  const t0=performance.now(); let raf;
-  const loop=()=>{
-    an.getByteFrequencyData(freq); an.getByteTimeDomainData(wave);
-    const el=(performance.now()-t0)/1000;
-    draw(ctx,cv.width,cv.height,freq,wave,t,el/t.dur);
-    $('#renderBar').style.width=clamp(el/t.dur*100,0,100)+'%';
-    $('#recTime').textContent=mmss(el);
-    $('#renderNote').textContent=`Rendering “${t.meta?.title||t.name}” as ${visOf(t)} — ${mmss(el)} of ${mmss(t.dur)}`;
-    raf=requestAnimationFrame(loop);
-  };
-  $('#rec').classList.add('on');
-  rec.start(1000); src.start(); loop(); paintRidge();
+  const t0=performance.now();
+  const job={ t, ctx, an, freq, wave, t0, ns, canvas:own, solo, pct:0 };
+  S.jobs.push(job);
+  if(solo) $('#rec').classList.add('on');
+  rec.start(1000); src.start(); pumpJobs(); paintRidge();
+
   await new Promise(res=>{
     src.onended=()=>setTimeout(()=>{try{rec.stop()}catch{}},350);
-    rec.onstop=()=>{cancelAnimationFrame(raf);res()};
+    rec.onstop=res;
   });
-  $('#rec').classList.remove('on');
+  S.jobs=S.jobs.filter(j=>j!==job);
+  if(solo) $('#rec').classList.remove('on');
+
   t.blob=new Blob(chunks,{type:mime.split(';')[0]});
   t.state='rendered';
-  try{ await vault.putBlob('video:'+t.id,t.blob); }catch(e){ log('Could not save to the vault: '+e.message,'er'); }
+  try{ await vault.putBlob('video:'+t.id,t.blob); }
+  catch(e){ log('Could not save to the vault: '+e.message,'er'); }
   log(`Rendered “${t.meta?.title||t.name}” — ${(t.blob.size/1048576).toFixed(1)} MB.`,'ok');
   if($('#autoFolder').checked&&folder.handle()){ await saveToFolder(t); paintFolder(); }
-  paintTracks(); saveState(); refreshVault();
+  paintTracks(); saveState(); refreshVault(); paintOneClick();
 }
+
+/* One animation loop drives every job. Separate loops would each fight
+   for frames and none would hold 30fps. */
+let pumping=false;
+function pumpJobs(){
+  if(pumping) return;
+  pumping=true;
+  const step=()=>{
+    if(!S.jobs.length){ pumping=false; return; }
+    for(const j of S.jobs){
+      j.an.getByteFrequencyData(j.freq); j.an.getByteTimeDomainData(j.wave);
+      const el=(performance.now()-j.t0)/1000;
+      j.pct=clamp(el/j.t.dur,0,1);
+      draw(j.ctx,j.canvas.width,j.canvas.height,j.freq,j.wave,j.t,j.pct,j.ns);
+      if(j.solo) $('#recTime').textContent=mmss(el);
+    }
+    paintJobs();
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function paintJobs(){
+  const host=$('#jobList'); if(!host) return;
+  if(!S.jobs.length){ host.innerHTML=''; $('#renderBar').style.width='0%'; return; }
+  host.innerHTML=S.jobs.map(j=>`
+    <div style="margin-top:9px">
+      <div class="tmeta" style="display:flex;justify-content:space-between;gap:10px">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(j.t.meta?.title||j.t.name)}</span>
+        <span>${Math.round(j.pct*100)}%</span>
+      </div>
+      <div class="bar"><i style="width:${j.pct*100}%"></i></div>
+    </div>`).join('');
+  const avg=S.jobs.reduce((a,j)=>a+j.pct,0)/S.jobs.length;
+  $('#renderBar').style.width=(avg*100)+'%';
+  $('#renderNote').textContent=S.jobs.length>1
+    ? `${S.jobs.length} rendering together — finishing in about ${mmss(Math.max(...S.jobs.map(j=>j.t.dur*(1-j.pct))))}`
+    : `Rendering “${S.jobs[0].t.meta?.title||S.jobs[0].t.name}” as ${visOf(S.jobs[0].t)}`;
+}
+
+/** Offscreen canvas per parallel slot — captureStream works without the DOM. */
+function slotCanvas(i){
+  const [w,hh]=$('#res').value.split('x').map(Number);
+  const c=S.slotCanvases[i] || (S.slotCanvases[i]=document.createElement('canvas'));
+  c.width=w; c.height=hh;
+  return c;
+}
+
 $('#btnRenderAll').onclick=async()=>{
   if(S.busy) return;
   const todo=S.tracks.filter(t=>t.state==='queued'&&t.buf);
   if(!todo.length){ log('Nothing queued.','er'); return; }
+  const lanes=clamp(Number(store.get('lanes'))||1,1,3);
   S.busy=true; $('#btnRenderAll').disabled=true;
-  log(`Rendering ${todo.length} tracks — about ${mmss(todo.reduce((a,t)=>a+t.dur,0))} in real time.`);
-  for(const t of todo) await renderTrack(t);
+  const total=todo.reduce((a,t)=>a+t.dur,0);
+  log(lanes>1
+    ? `Rendering ${todo.length} tracks ${lanes} at a time — about ${mmss(total/lanes)} instead of ${mmss(total)}.`
+    : `Rendering ${todo.length} tracks — about ${mmss(total)} in real time.`);
+
+  const queue=[...todo];
+  await Promise.all(Array.from({length:Math.min(lanes,queue.length)},async(_,lane)=>{
+    while(queue.length){
+      const t=queue.shift();
+      await renderTrack(t, lanes>1 ? { canvas:slotCanvas(lane), ns:'lane'+lane } : {});
+    }
+  }));
+
   S.busy=false; $('#btnRenderAll').disabled=false;
   $('#renderNote').textContent='All queued tracks rendered.'; $('#renderBar').style.width='0%';
+  paintOneClick();
 };
 
 /* ── assist ── */
@@ -1166,31 +1330,108 @@ function wrapText(ctx,text,maxW){
     if(ctx.measureText(t).width>maxW&&line){lines.push(line);line=w} else line=t; }
   if(line)lines.push(line); return lines;
 }
+function thumbInk(ctx,W,H,y,size,lines){
+  const mode=$('#thumbInk').value, A=accentOf(selTrack()), B=accent2Of(selTrack());
+  if(mode==='accent') return A;
+  if(mode==='dark') return '#0A0D16';
+  if(mode==='gradient'){
+    const g=ctx.createLinearGradient(0,y-size,0,y+lines*size);
+    g.addColorStop(0,A); g.addColorStop(1,B); return g;
+  }
+  return '#EDF0F7';
+}
+
 function drawThumb(){
   const t=selTrack(), cv=$('#th'), ctx=cv.getContext('2d'), W=1280,H=720;
+  const A=accentOf(t), B=accent2Of(t);
+  const style=$('#thumbStyle')?.value||'bottomBar';
   ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
-  const bg = S.bridgeImage || t?.imgs?.[0];
-  if(bg) coverDraw(ctx,bg,W,H,1.02,0,1);
-  if($('#thumbLayout').checked){
-    const g=ctx.createLinearGradient(0,H,0,H*0.15);
-    g.addColorStop(0,'rgba(10,13,22,.94)'); g.addColorStop(1,'rgba(10,13,22,0)');
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  const bg=S.bridgeImage||t?.imgs?.[0];
+  const drawArt=(x,y,w,hh)=>{
+    if(!bg) return;
+    ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,hh); ctx.clip();
+    const r=Math.max(w/bg.width,hh/bg.height)*1.02;
+    ctx.drawImage(bg,x+(w-bg.width*r)/2,y+(hh-bg.height*r)/2,bg.width*r,bg.height*r);
+    ctx.restore();
+  };
+
+  // ── the frame ──
+  if(style==='leftPanel'){
+    drawArt(W*0.42,0,W*0.58,H);
+    const g=ctx.createLinearGradient(0,0,W*0.52,0);
+    g.addColorStop(0,'#0A0D16'); g.addColorStop(0.82,'#0A0D16'); g.addColorStop(1,'rgba(10,13,22,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W*0.52,H);
+    ctx.fillStyle=A; ctx.fillRect(W*0.42-6,0,6,H);
+  } else if(style==='splitDiagonal'){
+    drawArt(0,0,W,H);
+    ctx.save(); ctx.beginPath();
+    ctx.moveTo(0,H); ctx.lineTo(0,H*0.24); ctx.lineTo(W*0.62,H); ctx.closePath();
+    const g=ctx.createLinearGradient(0,H*0.24,W*0.62,H);
+    g.addColorStop(0,A); g.addColorStop(1,B);
+    ctx.globalAlpha=0.93; ctx.fillStyle=g; ctx.fill(); ctx.restore(); ctx.globalAlpha=1;
+  } else if(style==='gradientWash'){
+    drawArt(0,0,W,H);
+    ctx.globalCompositeOperation='multiply';
+    const g=ctx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,A); g.addColorStop(1,B);
+    ctx.globalAlpha=0.72; ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1;
+    const v=ctx.createRadialGradient(W/2,H/2,H*0.2,W/2,H/2,W*0.72);
+    v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(10,13,22,.8)');
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  } else if(style==='centreStack'){
+    drawArt(0,0,W,H);
+    const v=ctx.createRadialGradient(W/2,H/2,H*0.14,W/2,H/2,W*0.66);
+    v.addColorStop(0,'rgba(10,13,22,.15)'); v.addColorStop(1,'rgba(10,13,22,.92)');
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  } else {
+    drawArt(0,0,W,H);
+    if(style!=='sticker'&&$('#thumbLayout').checked){
+      const g=ctx.createLinearGradient(0,H,0,H*0.12);
+      g.addColorStop(0,'rgba(10,13,22,.95)'); g.addColorStop(1,'rgba(10,13,22,0)');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    }
   }
+
+  // ── the headline ──
   const hook=(t?.meta?.hook||t?.name||'Untitled').toUpperCase();
-  ctx.font=`800 108px 'Bricolage Grotesque', sans-serif`;
-  let lines=wrapText(ctx,hook,W*0.82);
-  const size=lines.length>2?78:108;
+  const centred=style==='centreStack';
+  const boxW = style==='leftPanel' ? W*0.36 : centred ? W*0.80 : W*0.82;
+  let size=style==='leftPanel'?86:108;
   ctx.font=`800 ${size}px 'Bricolage Grotesque', sans-serif`;
-  lines=wrapText(ctx,hook,W*0.82).slice(0,3);
-  const lh=size*1.05;
-  let y=H-118-(lines.length-1)*lh;
-  ctx.fillStyle=accentOf(t); ctx.fillRect(64,y-size*0.82,8,lines.length*lh-lh*0.12);
-  ctx.fillStyle='#EDF0F7';
-  for(const ln of lines){ ctx.fillText(ln,92,y); y+=lh; }
+  let lines=wrapText(ctx,hook,boxW);
+  if(lines.length>2){ size=Math.round(size*0.72); ctx.font=`800 ${size}px 'Bricolage Grotesque', sans-serif`;
+    lines=wrapText(ctx,hook,boxW).slice(0,3); }
+  const lh=size*1.06;
+
+  let x = style==='leftPanel' ? 70 : centred ? W/2 : 92;
+  let y = centred ? H/2-(lines.length-1)*lh/2+size*0.34
+        : style==='leftPanel' ? H/2-(lines.length-1)*lh/2+size*0.3
+        : H-124-(lines.length-1)*lh;
+
+  ctx.textAlign=centred?'center':'left';
+  if(style==='bottomBar'){ ctx.fillStyle=A; ctx.fillRect(64,y-size*0.82,8,lines.length*lh-lh*0.12); }
+
+  const ink=thumbInk(ctx,W,H,y,size,lines.length);
+  for(const ln of lines){
+    if(style==='sticker'){
+      ctx.lineJoin='round'; ctx.lineWidth=size*0.20;
+      ctx.strokeStyle='#0A0D16'; ctx.strokeText(ln,x,y);
+      ctx.lineWidth=size*0.09; ctx.strokeStyle=A; ctx.strokeText(ln,x,y);
+    }
+    ctx.fillStyle=ink; ctx.fillText(ln,x,y);
+    y+=lh;
+  }
+
   ctx.font=`600 30px 'JetBrains Mono', monospace`;
-  ctx.fillStyle='rgba(237,240,247,.72)'; ctx.fillText($('#handle').value,92,H-62);
+  ctx.fillStyle= style==='splitDiagonal'||style==='leftPanel' ? 'rgba(237,240,247,.85)' : 'rgba(237,240,247,.72)';
+  ctx.fillText($('#handle').value, x, centred ? y+16 : H-62);
+  ctx.textAlign='left';
 }
 $('#thumbLayout').addEventListener('change',drawThumb);
+on('#thumbStyle','change',drawThumb);
+on('#thumbInk','change',drawThumb);
 $('#handle').addEventListener('input',drawThumb);
 $('#btnThumb').onclick=async()=>{ const t=selTrack(); if(!t) return;
   drawThumb(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92));
@@ -1256,16 +1497,16 @@ paintProviders();
 
 async function refreshVault(){
   try{
-    const u=await vault.usage(), keys=await vault.keys();
-    let pinned=null;
-    try{ pinned = navigator.storage?.persisted ? await navigator.storage.persisted() : null; }catch{}
+    const r=await storageReport(), keys=await vault.keys();
     $('#vaultNote').textContent =
-      (u ? `${keys.length} items · ${bytes(u.used)} used of about ${bytes(u.quota)} available.`
-         : `${keys.length} items stored.`) +
-      (pinned===true ? ' Storage is pinned — the browser will not evict it.'
-       : pinned===false ? ' Storage is not pinned.' : '');
-    $('#persistWarn').style.display = pinned===false ? 'block' : 'none';
-    $('#mVault').textContent=u?bytes(u.used):'—';
+      `${keys.length} items · ${bytes(r.used)} of your ${budgetGB()} GB budget` +
+      (r.grant ? ` · this browser would allow up to ${bytes(r.grant)}` : '') + '. ' +
+      (r.pinned===true ? 'Pinned — the browser will not evict it.'
+       : r.pinned===false ? 'Not pinned.' : '');
+    $('#vaultBar').style.width=(r.pct*100)+'%';
+    $('#vaultBar').style.background = r.pct>0.9 ? 'var(--dawn)' : r.pct>0.7 ? 'var(--lamp)' : 'var(--glacier)';
+    $('#persistWarn').style.display = r.pinned===false ? 'block' : 'none';
+    $('#mVault').textContent=bytes(r.used);
   }catch{ $('#vaultNote').textContent='Storage unavailable in this browser.'; }
 }
 $('#btnClearVault').onclick=async()=>{
@@ -1288,7 +1529,7 @@ function saveState(){
       await vault.putState('session',{
         at:Date.now(),
         tracks:S.tracks.map(t=>({ id:t.id, name:t.name, dur:t.dur, state:t.state,
-          shots:t.shots, meta:t.meta, videoId:t.videoId, ytUrl:t.ytUrl, publishAt:t.publishAt,
+          shots:t.shots, meta:t.meta, videoId:t.videoId, ytUrl:t.ytUrl, publishAt:t.publishAt, publishedAt:t.publishedAt||null, imported:t.imported||false,
           mood:t.mood?{label:t.mood.label,visual:t.mood.visual,palette:t.mood.palette,bpm:t.mood.bpm,
                        energy:t.mood.energy,brightness:t.mood.brightness,dynamics:t.mood.dynamics,
                        pace:t.mood.pace,sceneMood:t.mood.sceneMood}:null }))
@@ -1308,10 +1549,11 @@ async function autoRestore(){
     if(!audio&&!vid) continue;                    // nothing left to restore
     if(rec.state==='done'&&!vid) continue;        // already published, blob pruned
     const t={ id:rec.id, file:audio, name:rec.name, dur:rec.dur, buf:null, mood:rec.mood,
-      shots:rec.shots||[], imgs:[],
+      imported: rec.imported || (!audio && !!vid),   // no audio but a video means it came in finished
+      shots:rec.shots||[], imgs:[], clips:[], clipMeta:[], plan:[],
       state: rec.state==='rendering' ? 'queued' : rec.state,
       blob:vid||null, thumb:null, meta:rec.meta, videoId:rec.videoId,
-      ytUrl:rec.ytUrl, publishAt:rec.publishAt||null, err:null };
+      ytUrl:rec.ytUrl, publishAt:rec.publishAt||null, publishedAt:rec.publishedAt||null, err:null };
     if(vid&&['queued','rendering'].includes(t.state)) t.state='rendered';
     S.tracks.push(t); n++;
   }
@@ -1444,7 +1686,7 @@ async function uploadTrack(t, when){
     $('#upBar').style.width=(p*100)+'%';
     $('#upNote').textContent=`Uploading “${meta.snippet.title}” — ${(p*100).toFixed(0)}%`;
   });
-  t.videoId=video.id; t.ytUrl=null; bumpUploads();
+  t.videoId=video.id; t.ytUrl=null; t.publishedAt=Date.now(); bumpUploads();
   t.state = scheduled ? 'scheduled' : 'done';
   t.publishAt = scheduled ? at.toISOString() : null;
   log(scheduled
@@ -1800,15 +2042,45 @@ bd.addEventListener('drop',e=>{ const f=[...(e.dataTransfer?.files||[])].find(x=
 }
 
 
+
+/** Wait for a button to come back from disabled — the async work is done. */
+function waitIdle(sel,timeout=600000){
+  return new Promise(res=>{
+    const t0=Date.now();
+    const tick=()=>{
+      const el=$(sel);
+      if(!el||(!el.disabled&&Date.now()-t0>800)||Date.now()-t0>timeout) return res();
+      setTimeout(tick,400);
+    };
+    setTimeout(tick,600);
+  });
+}
+
 /* ── one click, whole pipeline ────────────────────────────
    Each stage is skipped when already done, so pressing again after a
    failure resumes rather than redoing finished work. */
+/** Which visual route suits this track when you have not chosen one. */
+function pickRoute(t){
+  const r=$('#ocRoute')?.value||'auto';
+  if(r!=='auto') return r;
+  const provider = store.get('imageProvider') || 'pollinations';   // default, not absent
+  const canMakeImages = provider === 'pollinations' || !!store.get('geminiKey');
+  if(!store.get('pexelsKey')) return canMakeImages ? 'art' : 'pure';
+  // fast, tempo-driven music suits cut footage; slow or beatless suits stills
+  return (t.mood?.bpm && t.mood.bpm >= 95 && t.mood.energy > 0.45) ? 'reel' : 'art';
+}
+
 const OC_STEPS=[
   { key:'meta',  label:'Write title, description and tags',
     done:t=>!!t.meta,          run:async t=>{ await writeFor(t); paintTracks(); } },
+  { key:'reel',  label:'Find footage and cut it to the beat',
+    skip:t=>pickRoute(t)!=='reel',
+    done:t=>t.clips?.length>0,  run:async ()=>{ await $('#btnReel').click(); await waitIdle('#btnReel'); } },
   { key:'shots', label:'Plan the shot list',
+    skip:t=>pickRoute(t)!=='art',
     done:t=>t.shots.length>0,  run:async ()=>{ await $('#btnShotlist').onclick(); } },
   { key:'art',   label:'Draw the scenes',
+    skip:t=>pickRoute(t)!=='art',
     done:t=>t.shots.length>0&&t.imgs.length>=t.shots.length,
     run:async ()=>{ await $('#btnMakeShots').onclick(); } },
   { key:'thumb', label:'Build the thumbnail',
@@ -1823,12 +2095,23 @@ function paintOneClick(){
   if(!card) return;
   if(!t){ card.style.display='none'; return; }
   card.style.display='block';
-  $('#ocSub').textContent=`“${t.meta?.title||t.name}” — ${t.mood?.label||'analysing'}${S.template?' · '+S.template.genre:''}`;
-  $('#ocSteps').innerHTML=OC_STEPS.map(s=>{
+  if(t.imported){
+    $('#ocSub').textContent=`“${t.meta?.title||t.name}” — imported, already a finished video`;
+    const need=[!t.meta&&'metadata',!t.thumb&&'a thumbnail'].filter(Boolean);
+    $('#ocSteps').innerHTML=[['Write title, description and tags',!!t.meta],['Build the thumbnail',!!t.thumb]]
+      .map(([l,ok])=>`<div class="beatline"><span class="tick ${ok?'on':''}">${ok?'✓':'○'}</span>${l}</div>`).join('');
+    $('#btnOneClick').textContent=need.length?`Finish it — needs ${need.join(' and ')}`:'Ready to publish';
+    $('#btnOneClick').disabled=!need.length||S.busy;
+    return;
+  }
+  const routeName={reel:'stock footage cut to the beat',art:'generated scene art',pure:'visualiser only'}[pickRoute(t)];
+  $('#ocSub').textContent=`“${t.meta?.title||t.name}” — ${t.mood?.label||'analysing'}${S.template?' · '+S.template.genre:''} · ${routeName}`;
+  const live=OC_STEPS.filter(s=>!s.skip||!s.skip(t));
+  $('#ocSteps').innerHTML=live.map(s=>{
     const ok=s.done(t);
     return `<div class="beatline"><span class="tick ${ok?'on':''}">${ok?'✓':'○'}</span>${s.label}</div>`;
   }).join('');
-  const left=OC_STEPS.filter(s=>!s.done(t)).length;
+  const left=live.filter(s=>!s.done(t)).length;
   const btn=$('#btnOneClick');
   btn.textContent = left===0 ? 'All done — head to Publish'
     : left===OC_STEPS.length ? 'Do everything for this track'
@@ -1839,7 +2122,8 @@ function paintOneClick(){
 on('#btnOneClick','click',async()=>{
   const t=selTrack(); if(!t||S.busy) return;
   S.busy=true; $('#btnOneClick').disabled=true;
-  const todo=OC_STEPS.filter(s=>!s.done(t));
+  const todo=(t.imported?OC_STEPS.filter(s=>['meta','thumb'].includes(s.key))
+                        :OC_STEPS.filter(s=>!s.skip||!s.skip(t))).filter(s=>!s.done(t));
   let n=0;
   const stop=msg=>{ $('#ocNote').textContent=msg; S.busy=false; paintOneClick();
                     $('#ocBar').style.width='0%'; log(msg,'er'); };
@@ -1856,6 +2140,8 @@ on('#btnOneClick','click',async()=>{
   log(`“${t.meta?.title||t.name}” is ready to publish.`,'ok');
   paintOneClick(); paintTracks();
 });
+
+on('#ocRoute','change',paintOneClick);
 
 /* ── sticky thumb-reach action bar (phones only) ── */
 const DOIT={
@@ -1928,6 +2214,143 @@ on('#btnLibClear','click',async()=>{
   for(const a of await library.index()) await library.remove(a.id);
   paintLibStats(); refreshVault(); log('Asset library cleared.','ok');
 });
+
+
+/* ── how many at once ── */
+$('#lanes').value=String(clamp(Number(store.get('lanes'))||1,1,3));
+function paintLanes(){
+  const n=Number($('#lanes').value);
+  const phone=matchMedia('(pointer: coarse)').matches;
+  $('#laneNote').textContent = n===1
+    ? 'Each track renders in real time — a three-minute song takes three minutes.'
+    : `Three-minute songs finish ${n}× faster overall. Each still plays through in real time, they just overlap.` +
+      (phone ? ' On a phone this is ambitious — if frames start dropping the video stutters, so drop back to one.' : '');
+}
+$('#lanes').addEventListener('change',()=>{ store.set('lanes',$('#lanes').value); paintLanes(); });
+paintLanes();
+
+
+/* ── storage budget ── */
+$('#budgetGB').value=String(budgetGB());
+$('#budgetGB').addEventListener('change',()=>{ store.set('storageBudgetGB',$('#budgetGB').value); refreshVault(); });
+$('#autoReclaim').checked=store.get('autoReclaim')!==false;
+$('#autoReclaim').addEventListener('change',()=>store.set('autoReclaim',$('#autoReclaim').checked));
+
+async function checkBudget(){
+  const r=await storageReport();
+  if(!r.over || !$('#autoReclaim').checked) return r;
+  const need=r.used - r.cap;
+  const { freed, gone } = await reclaim(need, S.tracks);
+  if(freed) log(`Storage was over ${budgetGB()} GB — cleared ${gone.length} published video${gone.length>1?'s':''} (${bytes(freed)}): ${gone.slice(0,3).join(', ')}${gone.length>3?'…':''}`,'ok');
+  else log(`Over the ${budgetGB()} GB budget, but nothing safe to clear — everything held is still unpublished.`,'er');
+  paintTracks(); paintLibrary();
+  return storageReport();
+}
+
+
+/* ── a video that needs no rendering ── */
+const vDrop=$('#videoDrop');
+on('#videoDrop','click',()=>$('#videoFile').click());
+on('#videoFile','change',e=>addVideos(e.target.files));
+if(vDrop){
+  ['dragenter','dragover'].forEach(ev=>vDrop.addEventListener(ev,e=>{e.preventDefault();vDrop.classList.add('hot')}));
+  ['dragleave','drop'].forEach(ev=>vDrop.addEventListener(ev,e=>{e.preventDefault();vDrop.classList.remove('hot')}));
+  vDrop.addEventListener('drop',e=>addVideos(e.dataTransfer.files));
+}
+
+async function addVideos(fl){
+  const vids=[...fl].filter(f=>f.type.startsWith('video/')||/\.(mp4|mov|webm|mkv|m4v|avi)$/i.test(f.name));
+  if(!vids.length){ log('Those are not video files.','er'); return; }
+  for(const f of vids){
+    const t={ id:crypto.randomUUID(), file:null, imported:true,
+      name:f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),
+      dur:0, buf:null, mood:null, shots:[], imgs:[],
+      state:'rendered', blob:f, thumb:null, meta:null,
+      videoId:null, ytUrl:null, publishAt:null, publishedAt:null, err:null };
+    t.dur=await new Promise(res=>{
+      const v=document.createElement('video'); v.preload='metadata';
+      v.onloadedmetadata=()=>res(v.duration||0);
+      v.onerror=()=>res(0);
+      v.src=URL.createObjectURL(f);
+      setTimeout(()=>res(0),8000);
+    });
+    S.tracks.push(t);
+    if(!S.sel) S.sel=t.id;
+    try{ await vault.putBlob('video:'+t.id,f); }
+    catch(e){ log('Could not store it locally: '+e.message,'er'); }
+  }
+  paintTracks(); saveState(); refreshVault(); paintLibrary();
+  $('#videoNote').textContent=`${vids.length} ready. Add metadata in Assist if you want, then Publish.`;
+  log(`Imported ${vids.length} video${vids.length>1?'s':''} — no rendering needed.`,'ok');
+}
+
+
+/* ── footage reel ── */
+on('#btnReel','click',async()=>{
+  const t=selTrack();
+  if(!t?.buf){ log('Select a decoded audio track first.','er'); return; }
+  const n=clamp(Number($('#reelCount').value)||8,3,14);
+  $('#btnReel').disabled=true;
+  try{
+    $('#reelNote').textContent='Writing search terms…';
+    const out=await think([
+      { role:'system', content:
+        'You choose stock footage for a music video. Reply with JSON only: {"thread","queries"}. ' +
+        '"thread" is one sentence naming the visual through-line. ' +
+        '"queries" is an array of short stock-footage search phrases, two to four words each — ' +
+        'the kind of thing that actually returns results on a stock site, so concrete nouns and ' +
+        'settings rather than abstractions. No brand names, no people by name. ' +
+        'Order them so the reel builds: establishing shots first, closer and more intense later.' },
+      { role:'user', content:
+        `Track: "${t.name}", ${mmss(t.dur)}, ${t.mood?.label||'unknown mood'}` +
+        (t.mood?.bpm?`, ${t.mood.bpm} bpm`:'') + '\n' +
+        (S.template?`Genre: ${S.template.genre}. Look: ${S.template.scene}\n`:'') +
+        ($('#reelTheme').value.trim()?`About: ${$('#reelTheme').value.trim()}\n`:'') +
+        `Give me exactly ${n} search phrases.` }
+    ]);
+    const queries=(out.queries||[]).slice(0,n).map(String);
+    if(out.thread&&!$('#reelTheme').value.trim()) $('#reelTheme').value=out.thread;
+    if(!queries.length) throw new Error('no search terms came back');
+
+    t.clips=[]; t.clipMeta=[];
+    for(let i=0;i<queries.length;i++){
+      $('#reelNote').textContent=`Finding “${queries[i]}” — ${i+1} of ${queries.length}`;
+      $('#reelBar').style.width=(i/queries.length*100)+'%';
+      try{
+        const hits=await pexelsVideos(queries[i],{count:3});
+        // shortest usable clip keeps downloads small and cuts feel tighter
+        const pick=hits.filter(v=>v.dur&&v.dur<=30).sort((a,b)=>a.dur-b.dur)[0]||hits[0];
+        if(!pick) continue;
+        const r=await fetch(pick.url);
+        if(!r.ok) continue;
+        const blob=await r.blob();
+        t.clips.push(await loadClip(blob));
+        t.clipMeta.push({ ...pick, query:queries[i] });
+        paintReel(t);
+      }catch(e){ log(`“${queries[i]}”: ${e.message}`,'er'); }
+    }
+    $('#reelBar').style.width='0%';
+    if(!t.clips.length){ $('#reelNote').textContent='No clips came back. Try a plainer theme.'; }
+    else {
+      t.plan=cutPlan(t.dur,t.mood?.bpm,t.clips.length,{barsPerCut:Number($('#reelBars').value)});
+      const per=t.plan.length>1?(t.plan[1].at-t.plan[0].at):0;
+      $('#reelNote').textContent=
+        `${t.clips.length} clips, cutting every ${per.toFixed(1)}s` +
+        (t.mood?.bpm?` — on the bar at ${t.mood.bpm} bpm.`:' — no clear tempo, so evenly spaced.') +
+        ' Render from the Look tab.';
+      log(`Reel ready: ${t.clips.length} clips, ${t.plan.length} cuts.`,'ok');
+    }
+    paintTracks();
+  }catch(e){ $('#reelNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnReel').disabled=false;
+});
+
+function paintReel(t){
+  const g=$('#reelGrid'); if(!g) return;
+  g.innerHTML=(t.clipMeta||[]).map((c,i)=>
+    `<div class="shot" title="${esc(c.query)} — ${esc(c.credit||'Pexels')}">
+       <img src="${esc(c.thumb)}" loading="lazy" alt=""><b>${i+1}</b></div>`).join('');
+}
 
 /* ── boot ── */
 function idleFrame(){

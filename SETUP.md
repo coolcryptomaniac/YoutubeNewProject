@@ -638,3 +638,233 @@ Suno.
 
 So Suno stays a manual step. The Suno tab writes the brief, copies it, and opens the tab —
 which is the part that actually takes thinking.
+
+
+---
+
+## Rendering several at once
+
+**Look → Render at once.** One, two or three.
+
+Each track still plays through in real time — that cannot change, because the browser
+records the canvas as it happens. What changes is that they overlap. Three six-second
+tracks took 20 seconds one at a time and 8.9 seconds three at a time in testing, so a
+little over twice as fast in practice rather than a clean 3×.
+
+Parallel jobs render on their own offscreen canvases and never touch the speakers, so
+nothing overlaps audibly. The accumulating visualisers — Terrain, Rangoli, Loom, Ink —
+keep separate layers per lane, so two tracks rendering together do not bleed into each
+other's picture.
+
+On a phone, three at once is ambitious. If frames start dropping the recording stutters,
+so drop back to one. On the Mac, three is comfortable.
+
+---
+
+## Storage on your phone
+
+**Tracks → Safe storage → How much of this device to use.** Up to 50 GB.
+
+Chrome grants a persisted origin roughly 60% of free disk, so with 100 GB free there is
+room for tens of gigabytes. The bar shows how much of your budget is gone and turns amber
+then red as it fills.
+
+**Clear old published videos when it fills** is on by default. It only ever removes videos
+that are already on YouTube, oldest first. Anything unpublished is never touched — that is
+the work you would have to redo.
+
+### The folder feature does not exist on Android
+
+Worth knowing before you go looking for it. Chrome for Android, Firefox for Android and
+the stock browser do not expose `showDirectoryPicker` at all — Android has no system file
+picker that maps to it. So **Save to a folder is a desktop feature**. On your Mac it works;
+on your phone the buttons are disabled and say so.
+
+On the phone your options are the local vault, which is where everything goes anyway, and
+Drive backup. Or render on the phone and download the files when you next have the Mac.
+
+---
+
+## The Lab
+
+A fourth page, `lab.html`, wearing amber so you always know which room you are in.
+
+Everything unproven lives there: workarounds, half-answers, and things that may stop
+working next week. The Music and Shorts studios stay for things that work reliably. When
+something in the Lab proves itself it moves out — Gemini images, Pexels footage, the
+paste-back bridge and parallel rendering all started there.
+
+It also carries a **provider probe** that fires real requests from your browser and reports
+which services will actually answer. Run it whenever something stops working — it tells you
+in ten seconds whether the problem is your key or the provider's door.
+
+That probe caught itself lying, which is worth knowing about. It originally sent an
+obviously-fake key and reported OpenAI as reachable. Send a key *shaped* like a real one
+and OpenAI drops the request — an edge filter aimed at stopping people embedding keys in
+web pages. It now probes with correctly-shaped all-zero keys, and reports OpenAI as blocked,
+which is the truth.
+
+
+---
+
+## Publishing a video you already have
+
+**Tracks → Publish something you already have.** Drop in an MP4, MOV, WebM or MKV — made
+elsewhere, downloaded, or shot on your phone.
+
+It skips rendering entirely and joins the same queue as everything else, so it still gets
+AI-written titles and tags, a thumbnail, release scheduling and the local vault. The
+one-click card notices it is already a finished video and only offers the two steps that
+still apply.
+
+Nothing is converted. YouTube accepts almost any format.
+
+---
+
+## Footage reels — the fast route
+
+**Scenes → Footage reel.** No image generation at all.
+
+A language model writes stock-footage *search terms* from the track's mood, tempo, genre
+and whatever theme you type, ordered so the reel builds — establishing shots first, closer
+and more intense later. Pexels returns real clips, they download, and the renderer cuts
+between them **on the bar line**.
+
+That last part is what makes it feel edited rather than assembled. With a detected tempo it
+cuts every one, two or four bars, your choice; a 120 bpm track at two bars is a cut every
+four seconds. Without a clear tempo it falls back to even spacing. Each cut carries a slow
+push-in and a one-frame flash, so a short looping clip still reads as a deliberate edit.
+
+Eight clips is usually plenty for a three-minute song — they cycle.
+
+---
+
+## Anime
+
+**Shonen** is the fifteenth visualiser: radial speed lines, an impact burst, chromatic
+split and a halftone screen. Four genres come with it — Anime Opening, Shonen Battle,
+Anime Lofi and City Pop — each carrying its own palette, scene direction and Suno prompt.
+
+Two things worth saying plainly.
+
+**It is a style, not a series.** Cel shading, speed lines and impact frames are visual
+grammar anyone can use. Named characters from Naruto or any other show are somebody's
+copyright, and putting them on a monetised channel invites a claim. The scene prompts are
+written to describe the look without naming a franchise, and you should keep them that way.
+
+**The impact frames are deliberately rate-limited.** The first version inverted the whole
+frame to white on every downbeat, which on a 150 bpm track meant flashing at roughly 2.5
+times a second — inside the 3 Hz band that triggers photosensitive seizures. It now fires
+at most once every 1.2 seconds and brightens toward the accent colour instead of going
+white. Measured at about 0.5 Hz with no white frames at all. If you edit that visualiser,
+leave the rate limit alone.
+
+---
+
+## Thumbnail layouts
+
+Six, under **Assist → Thumbnail**:
+
+**Bottom bar** — accent rule, big headline over a scrim. **Split diagonal** — a hard
+gradient wedge across the lower corner. **Centre stack** — headline over a vignette.
+**Left panel** — text on solid, art on the right. **Sticker** — outlined caps, no scrim,
+reads on anything. **Gradient wash** — duotone multiply over the art.
+
+Headline colour can be white, the accent, an accent gradient, or near-black for light
+backgrounds.
+
+
+---
+
+## Flash safety
+
+Every visualiser now passes through a guard before anything reaches the screen or the
+recording.
+
+The standard here is real. WCAG 2.3.1 and the Ofcom guidance both put the danger line at
+**more than three flashes a second**, where a flash means a relative-luminance swing of 10%
+or more. About one person in 4,000 has photosensitive epilepsy and it most commonly first
+appears in childhood, which is exactly the audience a music channel reaches without
+choosing to.
+
+Rather than trusting fifteen visualisers to each behave, the limit is enforced centrally, at
+the last step of every frame. It measures the luminance of what was just drawn, compares it
+to the previous frame, and if the jump is too large or too frequent it blends the previous
+frame back in until the change sits inside the limit. The result reads as a soft pulse
+instead of a strobe. A visualiser written carelessly — or one added later — is contained by
+it automatically.
+
+### What the measurements say
+
+Every visualiser was driven with a deliberately hostile signal: full-scale bass alternating
+every other frame at 30fps, which is a 15 Hz drive — about the worst thing you can feed a
+visualiser.
+
+| | flashes/sec | largest jump | |
+|---|---|---|---|
+| Terrain, Murmuration, Loom, Rangoli, Ink | 0 | 0.002 – 0.019 | inherently safe |
+| Shonen, guard **off** | **2.67** | **0.404** | four times the flash threshold |
+| Shonen, guard **on** | **0** | 0.058 | contained |
+
+And in the live app on a real track, all fifteen: zero flashes a second except Shonen at
+0.52, well inside the limit.
+
+The toggle is in **Look → Flash safety**, on by default. There is no good reason to turn it
+off, and the app says so.
+
+---
+
+## Anime, and what cannot be built
+
+You have asked twice for Akatsuki and Naruto Shippuden, so here is the straight answer.
+
+A black cloak with red clouds is not a genre. It is a specific costume design owned by
+Shueisha and Studio Pierrot, and an image generator producing it is producing their
+character design. On a monetised channel with real subscribers, that invites a Content ID
+match or a manual claim, and the claim lands on the video — the strike is against you, not
+against the tool that made the picture. That is the practical argument, and it is the one
+that matters for your channel.
+
+What is not owned by anyone is the atmosphere people actually mean. So there are now four
+genres carrying it:
+
+**Dark Ninja** — rain-soaked stone village at night, a hooded silhouette on a rooftop,
+lantern glow through downpour, indigo and blood red, no visible face.
+**Rain Village** — perpetual rain, grey towers, paper talismans, standing water reflecting
+neon, desaturated blue melancholy.
+**Sword Duel** — two silhouettes across a courtyard at dawn, petals held in a still frame,
+the moment before movement.
+**Mecha** — industrial hangar, vast machine silhouette, warning lights, steam, cold steel
+and hazard orange.
+
+All the mood, none of the claim. The same reasoning removed studio names from every prompt
+in the app — a scene that used to say "Pixar-style" now says "animated feature style",
+which describes the same look without naming somebody's company.
+
+---
+
+## One button, three routes
+
+**Tracks → Make the whole thing → How to make it.**
+
+**Decide for me** picks from what the track and your keys allow: fast, tempo-driven music
+with a Pexels key gets cut footage; slow or beatless music gets generated scene art; with no
+image source at all it falls back to the visualiser alone. The card tells you which route it
+chose before you commit.
+
+**Stock footage cut to the beat** is the quickest — no image generation, real clips, cuts on
+the bar line.
+**Generated scene art** is the most distinctive but the slowest.
+**Visualiser only** skips imagery entirely and finishes in the time the song takes to play.
+
+Steps that do not apply to the chosen route are hidden rather than skipped silently, so the
+tick list always matches what is actually going to happen.
+
+---
+
+## 51 genres
+
+Eight families now: Indian, Electronic, Acoustic, Rock, Cinematic, Pop, Anime and
+Functional — including Drill, UK Garage, Bhangra Fusion, Carnatic, Trap Soul, Post-Punk,
+Devotional Chant and a Kids &amp; Family preset written to keep everything bright, simple and
+free of anything frightening.

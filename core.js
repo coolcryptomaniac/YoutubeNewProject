@@ -804,3 +804,96 @@ export async function cacheAsset(asset, tags){
   await library.put(asset, blob, tags);
   return { cached:true, size:blob.size };
 }
+
+/* ───────────────── storage budget ─────────────────
+   Chrome grants roughly 60% of free disk to a persisted origin, so a
+   phone with 100 GB free can hold tens of gigabytes. That is plenty,
+   but "plenty" silently becomes "full", so the app keeps its own
+   ceiling and clears the oldest already-published videos first. */
+
+export const budgetGB = () => Number(store.get('storageBudgetGB')) || 20;
+
+export async function storageReport(){
+  const est = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
+  const pinned = navigator.storage?.persisted ? await navigator.storage.persisted() : null;
+  const cap = budgetGB() * 1073741824;
+  return {
+    used: est?.usage || 0,
+    grant: est?.quota || 0,           // what the browser is willing to give
+    cap,                              // what we choose to use
+    pinned,
+    pct: cap ? Math.min(1, (est?.usage || 0) / cap) : 0,
+    over: (est?.usage || 0) > cap
+  };
+}
+
+/**
+ * Free space by removing published videos, oldest first. Never touches
+ * anything unpublished — that is the work you would have to redo.
+ */
+export async function reclaim(need, tracks){
+  const safe = (tracks || [])
+    .filter(t => t.blob && t.state === 'done')
+    .sort((a,b) => (a.publishedAt || 0) - (b.publishedAt || 0));
+  let freed = 0;
+  const gone = [];
+  for (const t of safe){
+    if (freed >= need) break;
+    freed += t.blob.size;
+    await vault.delBlob('video:' + t.id).catch(()=>{});
+    t.blob = null;
+    gone.push(t.meta?.title || t.name);
+  }
+  return { freed, gone };
+}
+
+/* ───────────────── footage reels ─────────────────
+   Stock clips cut to the beat. The LLM writes search terms rather than
+   image prompts, Pexels returns real footage, and the renderer draws
+   whichever clip is current straight onto the canvas. */
+
+/** Load a clip blob into a <video> ready to be drawn. */
+export function loadClip(blob){
+  return new Promise((res, rej) => {
+    const v = document.createElement('video');
+    v.muted = true; v.loop = true; v.playsInline = true;
+    v.preload = 'auto';
+    v.src = URL.createObjectURL(blob);
+    v.onloadeddata = () => res(v);
+    v.onerror = () => rej(new Error('clip would not decode'));
+    setTimeout(() => rej(new Error('clip timed out')), 30000);
+  });
+}
+
+/**
+ * Cut points across a track. With a tempo it cuts on bar lines, which is
+ * what makes a montage feel deliberate rather than arbitrary; without one
+ * it falls back to even spacing.
+ */
+export function cutPlan(duration, bpm, clips, { barsPerCut = 2 } = {}){
+  if (!clips) return [];
+  const cuts = [];
+  if (bpm && bpm > 40){
+    const bar = (60 / bpm) * 4;
+    let step = bar * barsPerCut;
+    // keep cuts between 1.2s and 6s however odd the tempo
+    while (step < 1.2) step *= 2;
+    while (step > 6)   step /= 2;
+    for (let t = 0; t < duration; t += step) cuts.push(t);
+  } else {
+    // clips repeat rather than sitting on screen for half a minute
+    const step = Math.min(5, Math.max(2.5, duration / Math.max(clips, 1)));
+    for (let t = 0; t < duration; t += step) cuts.push(t);
+  }
+  return cuts.map((at, i) => ({ at, clip: i % clips }));
+}
+
+/** Which clip should be on screen, and how far into this cut we are. */
+export function cutAt(plan, t){
+  if (!plan.length) return null;
+  let i = 0;
+  while (i + 1 < plan.length && plan[i + 1].at <= t) i++;
+  const start = plan[i].at;
+  const end = i + 1 < plan.length ? plan[i + 1].at : start + 4;
+  return { clip: plan[i].clip, local: (t - start) / Math.max(0.001, end - start), index: i };
+}
