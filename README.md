@@ -13,7 +13,9 @@ while you sleep.
 | **`music.html`** | **Music video studio** — Suno tracks into audio-reactive videos |
 | **`.github/workflows/brief.yml`** | the nightly job that fills the Today screen |
 | **`config.json`** | your cast, tone and how many clips a day |
-| **`core.js`** | shared engine — mood analysis, providers, vault, Drive |
+| **`core.js`** | shared engine — mood analysis, providers, vault, Drive, folder, Pexels |
+| **`genres.js`** | 35 genre templates |
+| **`visuals.js`** | the five accumulating visualisers |
 
 ## How autonomous is it, really
 

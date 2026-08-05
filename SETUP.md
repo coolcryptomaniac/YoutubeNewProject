@@ -562,3 +562,79 @@ Suno brief* opens the Suno tab directly instead of dropping you on Tracks to go 
 Below them sits everything the nightly job worked out: your numbers, what it reads into
 them, what to do next, which release windows perform, what festival is coming, and what is
 trending in India this morning.
+
+
+---
+
+## The uncommon visualisers
+
+Five new ones, and four of them *accumulate* — the frame at 2:40 contains everything the
+song has done up to that point, so the video ends on a finished image rather than a random
+instant.
+
+| | |
+|---|---|
+| **Terrain** | the spectrum carves a landscape and every past frame stays as a receding ridge — you end up flying over the shape of the whole song |
+| **Rangoli** | twelve-fold symmetry drawn outward from the centre, complete at the last bar, and no two songs draw the same one |
+| **Loom** | low frequencies lay the warp, highs throw the weft; the cloth is finished exactly when the track is |
+| **Ink** | pigment blooming in water, a new bloom on every transient, never fully clearing |
+| **Murmuration** | a flock that knots together on the bass and frays apart in the hats |
+
+Fourteen visualisers in total now.
+
+---
+
+## Your NVIDIA key
+
+It works — but only in the nightly workflow, not in the browser. I tested
+`integrate.api.nvidia.com` from a live page and every endpoint fails with a CORS error.
+That is a browser restriction; Node has no same-origin policy, so the workflow can call it
+freely.
+
+Add `NVIDIA_API_KEY` as a repository secret (your `nvapi-...` key). The nightly job will
+prefer NVIDIA and fall back to Groq automatically if it errors. Set a repository *variable*
+`NVIDIA_MODEL` to change the model from the default `meta/llama-3.3-70b-instruct`.
+
+The same is true of OpenAI and Hugging Face. Both are blocked in the browser and both would
+work in the workflow — so if you want ChatGPT writing your briefs, that is the route.
+
+---
+
+## Stock footage — the only sharp material available
+
+**Scenes → Stock footage and photographs.** A free key from **pexels.com/api**, pasted
+under Setup.
+
+This matters more than it sounds. Every free AI image service caps at about 1024 pixels on
+the long edge — I tested this directly. Pexels returns real 4K video clips and 5000px
+photographs. For anything where sharpness shows, it is the only free route.
+
+Tap any result to keep it. It downloads once and stays on this device, tagged with the
+genre and mood that were active, so it is there next time without another download. Photos
+also drop straight into the current track's scenes.
+
+The nightly workflow also looks ahead — if a festival is close it searches for matching
+footage and records what it found in the brief.
+
+### About the 2 GB library
+
+It cannot ship in the repo. GitHub Pages caps a site at 1 GB, and a repo that size becomes
+painful to clone and push. What the app does instead is build the library *on your machine*,
+where the only limit is your disk. Search, tap what is good, and it accumulates. Point the
+folder feature at a synced folder and it backs itself up as it grows.
+
+---
+
+## On replacing Suno
+
+I looked, and I am not going to pretend otherwise: there is no free, browser-callable
+service that generates full songs with vocals at Suno's quality.
+
+The open models that exist — MusicGen, Stable Audio, ACE-Step — are instrumental-first,
+noticeably weaker, and their hosted endpoints block browser requests anyway. They would run
+in the nightly workflow, but committing generated audio to a repo hits the same size wall
+as the image library, and the output would be a downgrade on what you already get free from
+Suno.
+
+So Suno stays a manual step. The Suno tab writes the brief, copies it, and opens the tab —
+which is the part that actually takes thinking.

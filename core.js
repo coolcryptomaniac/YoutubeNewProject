@@ -257,7 +257,13 @@ async function tx(name, mode, fn){
     const t = d.transaction(name, mode);
     const s = t.objectStore(name);
     const out = fn(s);
-    t.oncomplete = () => res(out?.result ?? out);
+    t.oncomplete = () => {
+      // An IDBRequest for a missing key has result === undefined, so
+      // `out?.result ?? out` would fall through and hand back the request
+      // object itself — truthy, and mistaken for real data downstream.
+      const isReq = out && typeof out === 'object' && 'result' in out;
+      res(isReq ? out.result : out);
+    };
     t.onerror = () => rej(t.error);
   });
 }
@@ -693,4 +699,108 @@ export function explainGoogleError(status, body){
   if (status === 401) return 'The Drive sign-in expired. Press Connect Drive again.';
   if (status === 404) return 'Drive could not find that folder. Press Connect Drive again to recreate it.';
   return `Drive returned ${status}. ${text.slice(0, 180)}`;
+}
+
+/* ───────────────── Pexels: real footage and photographs ─────────────────
+   Verified reachable from a browser origin. Free key from pexels.com/api.
+   Unlike every free AI image service, this returns full-resolution assets —
+   4K video clips and 5000px photographs — so it is the only route to
+   genuinely sharp material in this app. */
+
+export const PEXELS_SIZES = { photo:'large2x', video:'hd' };
+
+async function pexels(path){
+  const key = store.get('pexelsKey');
+  if (!key) throw new Error('No Pexels key saved — get a free one at pexels.com/api');
+  const r = await fetch('https://api.pexels.com/' + path, { headers:{ Authorization: key } });
+  if (r.status === 401) throw new Error('Pexels rejected the key');
+  if (r.status === 429) throw new Error('Pexels hourly limit reached — it resets on the hour');
+  if (!r.ok) throw new Error('Pexels ' + r.status);
+  return r.json();
+}
+
+export async function pexelsPhotos(query, { count = 15, orientation = 'landscape', page = 1 } = {}){
+  const j = await pexels(`v1/search?query=${encodeURIComponent(query)}&per_page=${Math.min(count,80)}` +
+                         `&orientation=${orientation}&page=${page}`);
+  return (j.photos || []).map(p => ({
+    id:'px-'+p.id, kind:'photo',
+    url: p.src.large2x || p.src.large,
+    thumb: p.src.medium,
+    w: p.width, h: p.height,
+    credit: p.photographer, creditUrl: p.url
+  }));
+}
+
+export async function pexelsVideos(query, { count = 10, orientation = 'landscape', page = 1 } = {}){
+  const j = await pexels(`videos/search?query=${encodeURIComponent(query)}&per_page=${Math.min(count,80)}` +
+                         `&orientation=${orientation}&page=${page}`);
+  return (j.videos || []).map(v => {
+    // prefer the largest file that is not absurd to download
+    const files = (v.video_files || [])
+      .filter(f => f.link && f.width)
+      .sort((a,b) => b.width - a.width);
+    const pick = files.find(f => f.width <= 1920) || files[files.length-1];
+    return pick && {
+      id:'pxv-'+v.id, kind:'video',
+      url: pick.link, thumb: v.image,
+      w: pick.width, h: pick.height, dur: v.duration,
+      credit: v.user?.name, creditUrl: v.url
+    };
+  }).filter(Boolean);
+}
+
+/* ───────────────── asset library ─────────────────
+   A local, growing store of clips and stills tagged by genre and mood.
+   Nothing ships in the repo — a repo cannot carry gigabytes, and GitHub
+   Pages caps a site at 1 GB. This fills up on your machine instead,
+   bounded only by disk. */
+
+export const library = {
+  async put(asset, blob, tags){
+    const rec = { id:asset.id, kind:asset.kind, w:asset.w, h:asset.h, dur:asset.dur || null,
+                  credit:asset.credit || null, creditUrl:asset.creditUrl || null,
+                  tags, size:blob.size, at:Date.now() };
+    await vault.putBlob('asset:'+asset.id, blob);
+    const idx = (await vault.getState('libIndex')) || [];
+    const i = idx.findIndex(x => x.id === rec.id);
+    if (i >= 0) idx[i] = rec; else idx.push(rec);
+    await vault.putState('libIndex', idx);
+    return rec;
+  },
+  async index(){ return (await vault.getState('libIndex')) || []; },
+  async get(id){ return vault.getBlob('asset:'+id); },
+  async remove(id){
+    await vault.delBlob('asset:'+id).catch(()=>{});
+    const idx = (await vault.getState('libIndex')) || [];
+    await vault.putState('libIndex', idx.filter(x => x.id !== id));
+  },
+  async stats(){
+    const idx = await this.index();
+    return {
+      count: idx.length,
+      photos: idx.filter(a => a.kind === 'photo').length,
+      videos: idx.filter(a => a.kind === 'video').length,
+      bytes: idx.reduce((a, x) => a + (x.size || 0), 0)
+    };
+  },
+  /** Everything matching a genre or mood, newest first. */
+  async find({ genre = null, mood = null, kind = null } = {}){
+    const idx = await this.index();
+    return idx.filter(a =>
+      (!kind  || a.kind === kind) &&
+      (!genre || a.tags?.genre === genre) &&
+      (!mood  || a.tags?.mood === mood)
+    ).sort((a, b) => b.at - a.at);
+  },
+  async has(id){ return (await this.index()).some(x => x.id === id); }
+};
+
+/** Download an asset and file it. Skips anything already held. */
+export async function cacheAsset(asset, tags){
+  if (await library.has(asset.id)) return { cached:false, reason:'already held' };
+  const r = await fetch(asset.url);
+  if (!r.ok) throw new Error('download failed: ' + r.status);
+  const blob = await r.blob();
+  await library.put(asset, blob, tags);
+  return { cached:true, size:blob.size };
 }
