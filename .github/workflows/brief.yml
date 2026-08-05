@@ -32,6 +32,9 @@ jobs:
           GOOGLE_CLIENT_ID:     ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          NVIDIA_API_KEY:       ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_MODEL:         ${{ vars.NVIDIA_MODEL }}
+          PEXELS_API_KEY:       ${{ secrets.PEXELS_API_KEY }}
         run: node scripts/brief.mjs
 
       - name: Commit the brief
