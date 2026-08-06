@@ -15,7 +15,8 @@ while you sleep.
 | **`config.json`** | your cast, tone and how many clips a day |
 | **`core.js`** | shared engine — mood analysis, providers, vault, Drive, folder, Pexels |
 | **`genres.js`** | 35 genre templates |
-| **`visuals.js`** | the five accumulating visualisers |
+| **`visuals.js`** | the accumulating visualisers and the flash guard |
+| **`lyrics.js`** | six kinetic lyric templates |
 | **`lab.html`** | **Lab** — experimental, unproven, quarantined from the real work |
 
 ## How autonomous is it, really

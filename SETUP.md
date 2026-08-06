@@ -868,3 +868,87 @@ Eight families now: Indian, Electronic, Acoustic, Rock, Cinematic, Pop, Anime an
 Functional — including Drill, UK Garage, Bhangra Fusion, Carnatic, Trap Soul, Post-Punk,
 Devotional Chant and a Kids &amp; Family preset written to keep everything bright, simple and
 free of anything frightening.
+
+
+---
+
+## Lyric videos
+
+**Lyrics tab.** The app can hear the song.
+
+Groq hosts Whisper and — unusually — answers browser requests, so **Listen to the song**
+sends your audio and gets back every word with the time it was sung. That is the difference
+between lyrics that land on the voice and lyrics that drift, and it uses the Groq key you
+already have.
+
+Three ways in:
+
+**Paste, then Listen, then Match my lyrics.** The best result. Your lyric sheet is walked
+against what Whisper heard, matching word by word. Whisper mishears and singers skip words,
+so anything that cannot be matched has its timing interpolated between the words either side
+— a line keeps moving even where the transcript is wrong. It tells you how many words landed.
+
+**Listen with the box empty** and it writes down what it hears, grouped into readable lines.
+Useful when you have lost the sheet.
+
+**Space evenly** needs no key at all. Lines are spread across the track and you nudge them
+until they sit right.
+
+Every line's start time is editable, and there are buttons to shift everything 0.2 seconds
+either way for when the whole thing is consistently early or late.
+
+Whisper's limit is 25 MB. A longer file needs a smaller MP3 export, and the app says so
+rather than failing obscurely.
+
+### Six templates
+
+**Karaoke** — the line waits and fills word by word as it is sung.
+**Spotlight** — the word landing right now grows and glows, its neighbours recede.
+**Cascade** — each word drops in and settles on its own beat.
+**Typewriter** — characters appear in time with the voice, with a blinking caret.
+**Stack** — sung lines pile up the frame, the newest brightest.
+**Pulse** — one big line, breathing with the low end.
+
+All six handle Devanagari, so Hindi and Kumaoni lyrics render properly rather than as boxes.
+
+**Behind the words** chooses what sits underneath: stock footage, scene art, a visualiser,
+or plain dark. With footage or art selected the visualiser steps aside — it would only fight
+the type for attention.
+
+Everything still passes through the flash guard afterwards.
+
+---
+
+## Overriding any step
+
+Every row in **Make the whole thing** now has two buttons.
+
+**Open** jumps to the tab that step belongs to, so you can look at what it produced and
+change it by hand.
+**Just this** runs only that step. On a step already done it says **Redo** — useful when the
+title is fine but the thumbnail is not, or when you want a different shot list without
+touching anything else.
+
+The pipeline itself still resumes from wherever it stopped, so the two work together: fix
+one step by hand, then press the main button to carry on.
+
+**Make it a lyric video** adds the timing step to the pipeline, so one press can go from a
+bare MP3 to a finished lyric video with metadata and a thumbnail.
+
+---
+
+## Titles written for the click
+
+The metadata prompt was rewritten with a specific brief rather than a vague one:
+
+- **Under 60 characters** so it does not truncate on a phone, with the distinctive words
+  front-loaded — the first three or four are all most people read.
+- **The description opens with one sentence that works as a search result**, because the
+  first 120 characters are what shows.
+- **The thumbnail hook completes the title rather than repeating it.** A thumbnail echoing
+  its own title throws away half the space you have.
+
+And one instruction that matters more than the rest: never promise what the track does not
+deliver. A title that oversells earns the click and loses the watch time, and on YouTube
+watch time is worth more than the click. The prompt says so explicitly, because models left
+to their own devices drift toward clickbait.

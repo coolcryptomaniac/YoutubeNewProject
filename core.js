@@ -897,3 +897,160 @@ export function cutAt(plan, t){
   const end = i + 1 < plan.length ? plan[i + 1].at : start + 4;
   return { clip: plan[i].clip, local: (t - start) / Math.max(0.001, end - start), index: i };
 }
+
+/* ───────────────── transcription ─────────────────
+   Groq hosts Whisper and — unlike most audio APIs — answers browser
+   requests. That gives word-level timings from the song itself, which
+   is the difference between lyrics that land on the beat and lyrics
+   that drift. */
+
+export async function transcribe(file, { language = null, onProgress = null } = {}){
+  const key = store.get('groqKey');
+  if (!key) throw new Error('Transcription needs a Groq key — add one under Setup');
+  if (file.size > 24 * 1048576)
+    throw new Error(`That file is ${(file.size/1048576).toFixed(0)} MB. Groq's limit is 25 MB — export a smaller MP3.`);
+
+  const fd = new FormData();
+  fd.append('file', file, file.name || 'audio.mp3');
+  fd.append('model', 'whisper-large-v3');
+  fd.append('response_format', 'verbose_json');
+  fd.append('timestamp_granularities[]', 'word');
+  fd.append('timestamp_granularities[]', 'segment');
+  if (language) fd.append('language', language);
+
+  onProgress?.('Sending the audio to Whisper…');
+  const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method:'POST', headers:{ Authorization:'Bearer ' + key }, body: fd
+  });
+  if (!r.ok){
+    const t = await r.text();
+    if (r.status === 401) throw new Error('Groq rejected the key');
+    if (r.status === 413) throw new Error('The file is too large for Groq — export a smaller MP3');
+    if (r.status === 429) throw new Error('Groq rate limit — wait a minute and try again');
+    throw new Error('Whisper ' + r.status + ': ' + t.slice(0, 140));
+  }
+  const j = await r.json();
+  return {
+    text: j.text || '',
+    language: j.language || null,
+    words: (j.words || []).map(w => ({ w: String(w.word || '').trim(), start: w.start, end: w.end }))
+                          .filter(w => w.w),
+    segments: (j.segments || []).map(s => ({ text: String(s.text || '').trim(), start: s.start, end: s.end }))
+  };
+}
+
+/* ───────────────── lyric alignment ───────────────── */
+
+const norm = s => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+/**
+ * Map lyrics you pasted onto the words Whisper heard.
+ *
+ * Whisper mishears, and a lyric sheet has words a singer skipped, so this
+ * walks both sequences and only trusts a match when the normalised text
+ * agrees. Unmatched words inherit timing from their neighbours, which
+ * keeps a line moving even where the transcript is wrong.
+ */
+export function alignLyrics(text, heard, duration){
+  const lines = String(text).split(/\r?\n/).map(s => s.trim())
+    .filter(l => l && !/^\[.*\]$/.test(l));            // drop [Verse] markers
+  if (!lines.length) return { lines: [], source:'empty' };
+
+  if (!heard?.length) return evenLyrics(lines, duration);
+
+  const flat = [];
+  lines.forEach((line, li) =>
+    line.split(/\s+/).forEach(w => flat.push({ w, li, start:null, end:null })));
+
+  let hi = 0;
+  for (const tok of flat){
+    const target = norm(tok.w);
+    if (!target) continue;
+    // look a little way ahead for the same word
+    for (let k = hi; k < Math.min(heard.length, hi + 8); k++){
+      if (norm(heard[k].w) === target){
+        tok.start = heard[k].start; tok.end = heard[k].end;
+        hi = k + 1; break;
+      }
+    }
+  }
+
+  // fill gaps by interpolating between the words that did match
+  const anchored = flat.map((t,i) => t.start !== null ? i : -1).filter(i => i >= 0);
+  if (anchored.length < 2) return evenLyrics(lines, duration);
+
+  for (let i = 0; i < flat.length; i++){
+    if (flat[i].start !== null) continue;
+    const before = anchored.filter(a => a < i).pop();
+    const after  = anchored.find(a => a > i);
+    if (before === undefined){ flat[i].start = 0; flat[i].end = flat[after].start; }
+    else if (after === undefined){
+      const last = flat[before];
+      flat[i].start = last.end; flat[i].end = Math.min(duration, last.end + 0.4);
+    } else {
+      const span = flat[after].start - flat[before].end;
+      const share = span / (after - before);
+      flat[i].start = flat[before].end + share * (i - before - 1);
+      flat[i].end = flat[i].start + share * 0.9;
+    }
+  }
+
+  const out = lines.map((text, li) => {
+    const words = flat.filter(f => f.li === li);
+    return { text, words: words.map(w => ({ w:w.w, start:w.start, end:w.end })),
+             start: words[0]?.start ?? 0, end: words[words.length-1]?.end ?? 0 };
+  });
+  const hit = flat.filter(f => anchored.includes(flat.indexOf(f))).length;
+  return { lines: out, source:'aligned', matched: anchored.length, total: flat.length };
+}
+
+/** No transcript — spread the lines evenly and let the user nudge them. */
+export function evenLyrics(lines, duration){
+  const arr = Array.isArray(lines) ? lines
+    : String(lines).split(/\r?\n/).map(s => s.trim()).filter(l => l && !/^\[.*\]$/.test(l));
+  if (!arr.length) return { lines: [], source:'empty' };
+  const per = duration / arr.length;
+  return {
+    source:'even',
+    lines: arr.map((text, i) => {
+      const start = i * per, end = start + per * 0.92;
+      const ws = text.split(/\s+/);
+      const wper = (end - start) / ws.length;
+      return { text, start, end,
+               words: ws.map((w, j) => ({ w, start: start + j*wper, end: start + (j+1)*wper*0.95 })) };
+    })
+  };
+}
+
+/** Straight from Whisper, no lyric sheet — group its words into readable lines. */
+export function linesFromHeard(heard, { maxWords = 7, maxGap = 0.7 } = {}){
+  const lines = [];
+  let cur = [];
+  for (let i = 0; i < heard.length; i++){
+    cur.push(heard[i]);
+    const gap = heard[i+1] ? heard[i+1].start - heard[i].end : 99;
+    if (cur.length >= maxWords || gap > maxGap || i === heard.length - 1){
+      lines.push({ text: cur.map(w => w.w).join(' '),
+                   start: cur[0].start, end: cur[cur.length-1].end,
+                   words: cur.map(w => ({ ...w })) });
+      cur = [];
+    }
+  }
+  return { lines, source:'heard' };
+}
+
+/** Which line, and which word inside it, at time t. */
+export function lyricAt(lyric, t){
+  if (!lyric?.lines?.length) return null;
+  let i = lyric.lines.findIndex(l => t >= l.start && t <= l.end + 0.35);
+  if (i < 0){
+    const next = lyric.lines.findIndex(l => l.start > t);
+    i = next < 0 ? lyric.lines.length - 1 : Math.max(0, next - 1);
+    if (t < lyric.lines[i].start - 2.5 || t > lyric.lines[i].end + 2.5) return null;
+  }
+  const line = lyric.lines[i];
+  const wi = line.words.findIndex(w => t >= w.start && t <= w.end);
+  return { line, index:i, wordIndex: wi,
+           progress: clamp((t - line.start) / Math.max(0.2, line.end - line.start), 0, 1),
+           next: lyric.lines[i+1] || null };
+}

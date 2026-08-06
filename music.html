@@ -6,7 +6,7 @@
 <title>Ridge — music video studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Devanagari:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
@@ -222,6 +222,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
     <button aria-selected="false" data-p="scenes">Scenes</button>
     <button aria-selected="false" data-p="assist">Assist</button>
     <button aria-selected="false" data-p="publish">Publish</button>
+    <button aria-selected="false" data-p="lyrics">Lyrics</button>
     <button aria-selected="false" data-p="suno">Suno</button>
     <button aria-selected="false" data-p="setup">Setup</button>
   </nav>
@@ -244,6 +245,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
             <option value="pure">Visualiser only — no images at all</option>
           </select>
         </div>
+        <label class="chk"><input type="checkbox" id="ocLyrics"><span>Make it a lyric video<small>Listens to the song and times the words to the voice.</small></span></label>
         <button class="btn" id="btnOneClick">Do everything for the selected track</button>
         <div class="bar"><i id="ocBar"></i></div>
         <p class="note" id="ocNote">Writes the metadata, plans the shots, draws them, builds the thumbnail, then renders. It stops if anything fails, and picks up where it stopped.</p>
@@ -576,6 +578,54 @@ Follow @mohucool for new music.
   </div>
 </section>
 
+<!-- ═══ LYRICS ═══ -->
+<section id="p-lyrics">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Lyric video</h2>
+        <p class="sub">Paste the lyrics and the app listens to the song to work out when each word is sung — so the type lands on the voice rather than on a timer. Or let it write down what it hears.</p>
+        <div class="row" style="margin-bottom:13px">
+          <button class="btn sm" id="btnHear">Listen to the song</button>
+          <button class="btn ghost sm" id="btnAlign">Match my lyrics</button>
+          <button class="btn ghost sm" id="btnEven">Space evenly</button>
+        </div>
+        <div class="f"><label>Lyrics — one line per line, [Verse] markers are ignored</label>
+          <textarea id="lyricText" style="min-height:220px" placeholder="Paste them here, or press Listen and let it write them down"></textarea>
+        </div>
+        <p class="note" id="lyricNote">Needs a Groq key for listening. Pasting and spacing evenly works without one.</p>
+      </div>
+      <div class="card" id="lyricTimingCard" style="display:none">
+        <h2>Timing</h2>
+        <p class="sub">Nudge any line that lands early or late. Times are in seconds.</p>
+        <div id="lyricRows" style="max-height:300px;overflow:auto"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn ghost sm" id="btnShiftBack">Everything 0.2s earlier</button>
+          <button class="btn ghost sm" id="btnShiftFwd">0.2s later</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <h2>Look</h2>
+        <div class="f"><label>Template</label><select id="lyricStyle"></select></div>
+        <p class="note" id="lyricStyleNote"></p>
+        <div class="f" style="margin-top:14px"><label>Behind the words</label>
+          <select id="lyricBack">
+            <option value="auto" selected>Whatever the track already has</option>
+            <option value="reel">Stock footage</option>
+            <option value="art">Scene art</option>
+            <option value="vis">Visualiser only</option>
+            <option value="plain">Plain dark</option>
+          </select>
+        </div>
+        <label class="chk"><input type="checkbox" id="lyricOn"><span>Burn lyrics into this track<small>Applies to the preview and the render.</small></span></label>
+        <p class="note" id="lyricStatus">No lyrics loaded.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ SUNO ═══ -->
 <section id="p-suno">
   <div class="grid">
@@ -675,7 +725,9 @@ import { store, sleep, clamp, analyseAudio, MOOD_LIST, IMAGE_PROVIDERS, TEXT_PRO
          folder, folderSupported, explainGoogleError,
          pexelsPhotos, pexelsVideos, library, cacheAsset,
          budgetGB, storageReport, reclaim,
-         loadClip, cutPlan, cutAt } from './core.js';
+         loadClip, cutPlan, cutAt,
+         transcribe, alignLyrics, evenLyrics, linesFromHeard, lyricAt } from './core.js';
+import { LYRIC_STYLES, drawLyrics } from './lyrics.js';
 import { GENRES, FAMILIES, findGenre, resolveTemplate } from './genres.js';
 import { EXTRA_VISUALS, resetVisuals, flashGuard, resetGuard, guardStats } from './visuals.js';
 
@@ -736,6 +788,7 @@ $('#nav').addEventListener('click',e=>{
   $$('.panes > section').forEach(s=>s.classList.toggle('on',s.id==='p-'+b.dataset.p));
   if(b.dataset.p==='assist') fillMeta();
   if(b.dataset.p==='scenes') paintShots();
+  if(b.dataset.p==='lyrics'){ paintLyricStatus(); paintLyricRows(); if(selTrack()?.lyric) $('#lyricText').value=selTrack().lyric.lines.map(l=>l.text).join('\n'); }
   paintDoIt();
 });
 
@@ -754,7 +807,7 @@ async function addFiles(fl){
   for(const f of audio){
     const t={ id:crypto.randomUUID(), file:f, name:f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),
       dur:0, buf:null, mood:null, shots:[], imgs:[], state:'queued', blob:null, thumb:null,
-      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null, clips:[], clipMeta:[], plan:[] };
+      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null, clips:[], clipMeta:[], plan:[], lyric:null, heard:null, lyricOn:false };
     S.tracks.push(t); if(!S.sel) S.sel=t.id;
     try { await vault.putBlob('audio:'+t.id, f); } catch {}
   }
@@ -899,7 +952,15 @@ let particles=null;
 function draw(ctx,W,H,freq,wave,t,prog,ns=''){
   const A=accentOf(t), B=accent2Of(t), style=visOf(t);
   ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
-  const art=drawReel(ctx,t,W,H,clamp(prog||0,0,1)) || drawShots(ctx,t?.imgs||[],W,H,prog||0);
+  const backMode=t?.lyricOn ? ($('#lyricBack')?.value||'auto') : 'auto';
+  const art = backMode==='plain' ? false
+    : backMode==='vis' ? false
+    : backMode==='reel' ? drawReel(ctx,t,W,H,clamp(prog||0,0,1))
+    : backMode==='art'  ? drawShots(ctx,t?.imgs||[],W,H,prog||0)
+    : (drawReel(ctx,t,W,H,clamp(prog||0,0,1)) || drawShots(ctx,t?.imgs||[],W,H,prog||0));
+  // With a chosen backdrop the visualiser would only fight the type for
+  // attention, so the lyric templates get a clean surface.
+  const skipVis = t?.lyricOn && (backMode==='reel' || backMode==='art' || backMode==='plain');
   const N=freq.length;
   const energy=freq.reduce((a,b)=>a+b,0)/(N*255);
   const band=(a,b)=>{let s=0,c=0;for(let i=Math.floor(N*a);i<Math.floor(N*b);i++){s+=freq[i];c++}return c?s/c/255:0};
@@ -907,7 +968,8 @@ function draw(ctx,W,H,freq,wave,t,prog,ns=''){
   const now=performance.now()/1000;
   const alpha=art?0.78:1;
 
-  if(style==='ridge'){
+  if(skipVis){ /* backdrop only — the words carry the frame */ }
+  else if(style==='ridge'){
     for(let L=3;L>=0;L--){
       const d=L/3, base=H*(0.62+d*0.16), amp=H*0.30*(1-d*0.55);
       ctx.beginPath(); ctx.moveTo(0,H);
@@ -1038,6 +1100,11 @@ function draw(ctx,W,H,freq,wave,t,prog,ns=''){
     ctx.fillStyle=sun; ctx.beginPath();
     ctx.arc(W/2,hz,H*0.15*(1+low*0.35),Math.PI,0); ctx.fill();
     ctx.globalAlpha=1;
+  }
+
+  if(t?.lyricOn&&t.lyric?.lines?.length){
+    const cur=lyricAt(t.lyric,(prog||0)*t.dur);
+    if(cur) drawLyrics(ctx,W,H,t.lyric,cur,{low,mid,high},A,B,(prog||0)*t.dur,$('#lyricStyle')?.value||'karaoke');
   }
 
   // Nothing draws after this without passing the flash guard.
@@ -1280,11 +1347,19 @@ async function writeFor(t){
   const out=await think([
     { role:'system', content:
       'You write YouTube metadata for an independent musician releasing original AI-assisted music. ' +
-      'Reply with JSON only, keys: title, description, tags, hook. ' +
-      'title: under 70 characters, specific and human, no clickbait, no ALL CAPS. ' +
-      'description: 2 to 4 short paragraphs ending with 3 to 6 hashtags on their own line. ' +
-      'tags: 8 to 12 lowercase search terms, no "#". ' +
-      'hook: 2 to 4 words for a thumbnail, title case.' },
+      'The job is to earn a click from someone scrolling, without lying to them. ' +
+      'Reply with JSON only, keys: title, description, tags, hook.\n' +
+      'title: under 60 characters so it does not truncate on mobile. Front-load the most ' +
+      'distinctive words — the first three or four are all most people read. Name the mood or ' +
+      'the place or the feeling, not the format. No ALL CAPS, no emoji spam, no "must watch", ' +
+      'no fake urgency, and never promise something the track does not deliver — a title that ' +
+      'oversells earns the click and loses the watch time, which costs more than the click gains.\n' +
+      'description: open with one sentence that would make sense as a search result, because the ' +
+      'first 120 characters are what shows. Then two or three short paragraphs. End with 3 to 6 ' +
+      'hashtags on their own line.\n' +
+      'tags: 8 to 12 lowercase search terms people would actually type, mixing broad and specific.\n' +
+      'hook: 2 to 4 words for the thumbnail. It should complete the title rather than repeat it — ' +
+      'a thumbnail that echoes the title wastes half the space you have.' },
     { role:'user', content:
       `Track filename: "${t.name}"\nChannel: ${$('#handle').value}\nLength: ${mmss(t.dur)}\n` +
       `Detected mood: ${t.mood?.label}${t.mood?.bpm?', '+t.mood.bpm+' bpm':''}\n` +
@@ -1530,6 +1605,7 @@ function saveState(){
         at:Date.now(),
         tracks:S.tracks.map(t=>({ id:t.id, name:t.name, dur:t.dur, state:t.state,
           shots:t.shots, meta:t.meta, videoId:t.videoId, ytUrl:t.ytUrl, publishAt:t.publishAt, publishedAt:t.publishedAt||null, imported:t.imported||false,
+          lyric:t.lyric, lyricOn:t.lyricOn||false,
           mood:t.mood?{label:t.mood.label,visual:t.mood.visual,palette:t.mood.palette,bpm:t.mood.bpm,
                        energy:t.mood.energy,brightness:t.mood.brightness,dynamics:t.mood.dynamics,
                        pace:t.mood.pace,sceneMood:t.mood.sceneMood}:null }))
@@ -1551,6 +1627,7 @@ async function autoRestore(){
     const t={ id:rec.id, file:audio, name:rec.name, dur:rec.dur, buf:null, mood:rec.mood,
       imported: rec.imported || (!audio && !!vid),   // no audio but a video means it came in finished
       shots:rec.shots||[], imgs:[], clips:[], clipMeta:[], plan:[],
+      lyric:rec.lyric||null, heard:null, lyricOn:rec.lyricOn||false,
       state: rec.state==='rendering' ? 'queued' : rec.state,
       blob:vid||null, thumb:null, meta:rec.meta, videoId:rec.videoId,
       ytUrl:rec.ytUrl, publishAt:rec.publishAt||null, publishedAt:rec.publishedAt||null, err:null };
@@ -2071,22 +2148,33 @@ function pickRoute(t){
 }
 
 const OC_STEPS=[
-  { key:'meta',  label:'Write title, description and tags',
+  { key:'meta',  label:'Write title, description and tags', tab:'assist',
     done:t=>!!t.meta,          run:async t=>{ await writeFor(t); paintTracks(); } },
-  { key:'reel',  label:'Find footage and cut it to the beat',
+  { key:'reel',  label:'Find footage and cut it to the beat', tab:'scenes',
     skip:t=>pickRoute(t)!=='reel',
     done:t=>t.clips?.length>0,  run:async ()=>{ await $('#btnReel').click(); await waitIdle('#btnReel'); } },
-  { key:'shots', label:'Plan the shot list',
+  { key:'shots', label:'Plan the shot list', tab:'scenes',
     skip:t=>pickRoute(t)!=='art',
     done:t=>t.shots.length>0,  run:async ()=>{ await $('#btnShotlist').onclick(); } },
-  { key:'art',   label:'Draw the scenes',
+  { key:'art',   label:'Draw the scenes', tab:'scenes',
     skip:t=>pickRoute(t)!=='art',
     done:t=>t.shots.length>0&&t.imgs.length>=t.shots.length,
     run:async ()=>{ await $('#btnMakeShots').onclick(); } },
-  { key:'thumb', label:'Build the thumbnail',
+  { key:'lyrics',label:'Time the lyrics to the voice', tab:'lyrics',
+    skip:t=>!$('#ocLyrics')?.checked || !t.file,
+    done:t=>!!t.lyric?.lines?.length,
+    run:async t=>{
+      const heard = t.heard || await transcribe(t.file);
+      t.heard = heard;
+      const pasted = $('#lyricText').value.trim();
+      t.lyric = pasted ? alignLyrics(pasted, heard.words, t.dur) : linesFromHeard(heard.words);
+      if(!pasted) $('#lyricText').value = t.lyric.lines.map(l=>l.text).join('\n');
+      t.lyricOn = true; paintLyricStatus(); paintLyricRows();
+    } },
+  { key:'thumb', label:'Build the thumbnail', tab:'assist',
     done:t=>!!t.thumb,
     run:async t=>{ drawThumb(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92)); paintTracks(); } },
-  { key:'render',label:'Render the video',
+  { key:'render',label:'Render the video', tab:'look',
     done:t=>!!t.blob,          run:async t=>{ await renderTrack(t); } }
 ];
 
@@ -2109,8 +2197,26 @@ function paintOneClick(){
   const live=OC_STEPS.filter(s=>!s.skip||!s.skip(t));
   $('#ocSteps').innerHTML=live.map(s=>{
     const ok=s.done(t);
-    return `<div class="beatline"><span class="tick ${ok?'on':''}">${ok?'✓':'○'}</span>${s.label}</div>`;
+    return `<div class="beatline">
+      <span class="tick ${ok?'on':''}">${ok?'✓':'○'}</span>
+      <span style="flex:1">${s.label}</span>
+      <button class="btn ghost sm" data-oc-open="${s.tab||''}" style="padding:4px 9px;font-size:11px">Open</button>
+      <button class="btn ghost sm" data-oc-redo="${s.key}" style="padding:4px 9px;font-size:11px">${ok?'Redo':'Just this'}</button>
+    </div>`;
   }).join('');
+  $('#ocSteps').querySelectorAll('[data-oc-open]').forEach(b=>b.onclick=()=>{
+    const tab=b.dataset.ocOpen; if(!tab) return;
+    const nav=$(`#nav button[data-p="${tab}"]`); if(nav) nav.click();
+  });
+  $('#ocSteps').querySelectorAll('[data-oc-redo]').forEach(b=>b.onclick=async()=>{
+    if(S.busy) return;
+    const step=OC_STEPS.find(s=>s.key===b.dataset.ocRedo); if(!step) return;
+    S.busy=true; paintOneClick();
+    $('#ocNote').textContent=`${step.label}…`;
+    try{ await step.run(t); $('#ocNote').textContent=`${step.label} — done.`; }
+    catch(e){ $('#ocNote').textContent=`${step.label} failed: ${e.message}`; log(e.message,'er'); }
+    S.busy=false; paintOneClick(); paintTracks();
+  });
   const left=live.filter(s=>!s.done(t)).length;
   const btn=$('#btnOneClick');
   btn.textContent = left===0 ? 'All done — head to Publish'
@@ -2142,6 +2248,7 @@ on('#btnOneClick','click',async()=>{
 });
 
 on('#ocRoute','change',paintOneClick);
+on('#ocLyrics','change',paintOneClick);
 
 /* ── sticky thumb-reach action bar (phones only) ── */
 const DOIT={
@@ -2351,6 +2458,103 @@ function paintReel(t){
     `<div class="shot" title="${esc(c.query)} — ${esc(c.credit||'Pexels')}">
        <img src="${esc(c.thumb)}" loading="lazy" alt=""><b>${i+1}</b></div>`).join('');
 }
+
+
+/* ── lyrics ── */
+$('#lyricStyle').innerHTML=Object.entries(LYRIC_STYLES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+$('#lyricStyle').value=store.get('lyricStyle')||'karaoke';
+function paintLyricStyle(){
+  const s=LYRIC_STYLES[$('#lyricStyle').value];
+  $('#lyricStyleNote').textContent=s?s.note[0].toUpperCase()+s.note.slice(1)+'.':'';
+  store.set('lyricStyle',$('#lyricStyle').value);
+}
+on('#lyricStyle','change',paintLyricStyle); paintLyricStyle();
+on('#lyricBack','change',()=>store.set('lyricBack',$('#lyricBack').value));
+$('#lyricBack').value=store.get('lyricBack')||'auto';
+on('#lyricOn','change',()=>{ const t=selTrack(); if(t) t.lyricOn=$('#lyricOn').checked; paintLyricStatus(); });
+
+function paintLyricStatus(){
+  const t=selTrack();
+  if(!t){ $('#lyricStatus').textContent='Select a track first.'; return; }
+  $('#lyricOn').checked=!!t.lyricOn;
+  if(!t.lyric?.lines?.length){ $('#lyricStatus').textContent='No lyrics loaded for this track.'; return; }
+  const how={aligned:'matched to the voice',heard:'written down from the audio',even:'spaced evenly — nudge them below'}[t.lyric.source]||t.lyric.source;
+  $('#lyricStatus').textContent=`${t.lyric.lines.length} lines, ${how}.` +
+    (t.lyric.matched?` ${t.lyric.matched} of ${t.lyric.total} words landed on a heard word.`:'') +
+    (t.lyricOn?'':' Tick the box above to burn them in.');
+}
+
+function paintLyricRows(){
+  const t=selTrack();
+  const card=$('#lyricTimingCard');
+  if(!t?.lyric?.lines?.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  $('#lyricRows').innerHTML=t.lyric.lines.map((l,i)=>`
+    <div class="track" style="margin-top:7px;grid-template-columns:74px minmax(0,1fr)">
+      <input type="number" step="0.1" value="${l.start.toFixed(1)}" data-lyt="${i}"
+             style="padding:6px 8px;font-size:12.5px;min-height:0">
+      <div class="tname" style="font-family:${/[\u0900-\u097F]/.test(l.text)?"'Noto Sans Devanagari',sans-serif":'inherit'}">${esc(l.text)}</div>
+    </div>`).join('');
+  $('#lyricRows').querySelectorAll('[data-lyt]').forEach(inp=>inp.onchange=()=>{
+    const i=Number(inp.dataset.lyt), t2=selTrack();
+    const shift=Number(inp.value)-t2.lyric.lines[i].start;
+    const l=t2.lyric.lines[i];
+    l.start+=shift; l.end+=shift; l.words.forEach(w=>{ w.start+=shift; w.end+=shift; });
+    paintLyricStatus();
+  });
+}
+function shiftAll(by){
+  const t=selTrack(); if(!t?.lyric?.lines?.length) return;
+  for(const l of t.lyric.lines){ l.start+=by; l.end+=by; l.words.forEach(w=>{w.start+=by;w.end+=by;}); }
+  paintLyricRows(); log(`Lyrics shifted ${by>0?'later':'earlier'} by ${Math.abs(by)}s.`,'ok');
+}
+on('#btnShiftBack','click',()=>shiftAll(-0.2));
+on('#btnShiftFwd','click',()=>shiftAll(0.2));
+
+on('#btnHear','click',async()=>{
+  const t=selTrack();
+  if(!t?.file){ log('Select a track with audio first.','er'); return; }
+  $('#btnHear').disabled=true;
+  try{
+    $('#lyricNote').textContent='Listening…  a three-minute song takes about twenty seconds.';
+    const heard=await transcribe(t.file,{onProgress:m=>$('#lyricNote').textContent=m});
+    t.heard=heard;
+    if($('#lyricText').value.trim()){
+      t.lyric=alignLyrics($('#lyricText').value,heard.words,t.dur);
+    } else {
+      t.lyric=linesFromHeard(heard.words);
+      $('#lyricText').value=t.lyric.lines.map(l=>l.text).join('\n');
+    }
+    t.lyricOn=true;
+    $('#lyricNote').textContent=`Heard ${heard.words.length} words${heard.language?' in '+heard.language:''}. Check the timing below and fix anything it misheard.`;
+    log(`Transcribed “${t.name}” — ${heard.words.length} words.`,'ok');
+    paintLyricStatus(); paintLyricRows(); paintTracks(); saveState();
+  }catch(e){ $('#lyricNote').textContent=e.message; log(e.message,'er'); }
+  $('#btnHear').disabled=false;
+});
+
+on('#btnAlign','click',()=>{
+  const t=selTrack();
+  if(!t){ log('Select a track first.','er'); return; }
+  if(!$('#lyricText').value.trim()){ $('#lyricNote').textContent='Paste some lyrics first.'; return; }
+  if(!t.heard?.words?.length){ $('#lyricNote').textContent='Press Listen first — matching needs to know when each word is sung.'; return; }
+  t.lyric=alignLyrics($('#lyricText').value,t.heard.words,t.dur);
+  t.lyricOn=true;
+  $('#lyricNote').textContent = t.lyric.source==='aligned'
+    ? `Matched ${t.lyric.matched} of ${t.lyric.total} words. Anything it could not place was spaced between its neighbours.`
+    : 'Too little matched, so the lines were spaced evenly instead. Check the sheet is for this song.';
+  paintLyricStatus(); paintLyricRows(); saveState();
+});
+
+on('#btnEven','click',()=>{
+  const t=selTrack();
+  if(!t){ log('Select a track first.','er'); return; }
+  if(!$('#lyricText').value.trim()){ $('#lyricNote').textContent='Paste some lyrics first.'; return; }
+  t.lyric=evenLyrics($('#lyricText').value,t.dur||180);
+  t.lyricOn=true;
+  $('#lyricNote').textContent='Spaced evenly across the track. Nudge the lines below until they sit right.';
+  paintLyricStatus(); paintLyricRows(); saveState();
+});
 
 /* ── boot ── */
 function idleFrame(){
