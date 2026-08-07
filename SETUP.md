@@ -952,3 +952,84 @@ And one instruction that matters more than the rest: never promise what the trac
 deliver. A title that oversells earns the click and loses the watch time, and on YouTube
 watch time is worth more than the click. The prompt says so explicitly, because models left
 to their own devices drift toward clickbait.
+
+
+---
+
+## Visuals that follow the words
+
+This was the real gap. Genre and mood describe how a track *sounds* — they say nothing about
+whether it is a love song, a lament for a place, or somebody counting money they do not have.
+Cutting to the meaning instead of the mood is the difference between a montage and a music
+video.
+
+Both routes now read the song before deciding anything.
+
+**With lyrics** — from the Lyrics tab, pasted or transcribed — the track is split into
+sections and each section gets its own shot. A verse about leaving home produces a shot of
+leaving home, and the picture changes when the subject changes rather than on a timer. The
+cut plan puts a hard cut on every section boundary and subdivides inside it to the bar.
+
+**Without lyrics** it reads the title alone and says so, rather than quietly falling back on
+mood imagery and pretending.
+
+Either way it first states what it thinks the song is about, in one plain sentence, and shows
+you that before generating anything. If it has misread the song you will see it immediately —
+and both the theme box and every individual shot stay editable.
+
+Hovering a clip in the reel shows which line it was chosen to illustrate.
+
+Clips are cached as they arrive, so the same search is never paid for twice.
+
+---
+
+## Transitions
+
+Seven, under **Scenes → Transition**, applied to both footage cuts and scene stills:
+
+**Hard cut** — nothing at all, and often the most confident choice.
+**Dissolve** — the outgoing shot fades through.
+**Dip to dark** — a beat of black between shots.
+**Slide** — the new shot pushes the old one out.
+**Zoom punch** — the new shot lands oversized and settles.
+**Blur through** — defocus across the join.
+**Mixed** — varies by section so it never becomes predictable.
+
+Every one is a geometric or alpha move. None of them flash, and the guard still runs
+afterwards regardless.
+
+One of these had a bug worth mentioning: the blur curve went negative past the midpoint, and
+a negative value in a CSS filter string silently disables the *entire* filter rather than
+erroring. It would have looked like the transition simply did nothing. Found by sweeping every
+transition across its whole range and checking the outputs stayed in bounds.
+
+---
+
+## Titles that keep the song's name
+
+The filename Suno gives you **is** the song's name. Inventing a different one throws away the
+thing people search for, so the app no longer does.
+
+**Publish → Title shape** offers Song — Artist | Genre, Song | Genre, Song — Artist, just the
+song, or your own template with `{song}` `{artist}` `{genre}` `{date}`.
+
+Your name goes in **Look → Your name**. The genre comes from the genre picker.
+
+The song name is cleaned of the noise download tools add — trailing "(Official Audio)",
+"— Suno", version suffixes — then title-cased. The writing model is told explicitly to keep it
+verbatim: not to translate it, reword it, or invent a better one.
+
+**This is what gets published** shows the finished title live, with a character count and
+whether it will truncate on a phone.
+
+---
+
+## The thumbnail picks its own frame
+
+"First image" is rarely the best image. Every scene frame is now scored on contrast, colour,
+edge detail and exposure — a flat dark frame and a blown-out white one both lose to something
+with actual depth. Tested: a busy mid-toned frame scored 2.06 against 0.80 for flat dark and
+0.06 for blown white.
+
+The card tells you which frame it chose and why, and **Try another frame** steps through the
+rest if you disagree.

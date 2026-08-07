@@ -1054,3 +1054,183 @@ export function lyricAt(lyric, t){
            progress: clamp((t - line.start) / Math.max(0.2, line.end - line.start), 0, 1),
            next: lyric.lines[i+1] || null };
 }
+
+/* ───────────────── what the song is about ─────────────────
+   Genre and mood describe how a track sounds. They say nothing about
+   whether it is a love song, a lament for a place, or somebody counting
+   money. Reading the lyrics and cutting to their meaning is the whole
+   difference between a montage and a music video. */
+
+/** Split a timed lyric into sections that share a subject. */
+export function lyricSections(lyric, count){
+  const lines = lyric?.lines || [];
+  if (!lines.length) return [];
+  const n = Math.max(1, Math.min(count, lines.length));
+  const per = Math.ceil(lines.length / n);
+  const out = [];
+  for (let i = 0; i < lines.length; i += per){
+    const chunk = lines.slice(i, i + per);
+    out.push({
+      text: chunk.map(l => l.text).join(' / '),
+      start: chunk[0].start,
+      end: chunk[chunk.length - 1].end,
+      lines: chunk.length
+    });
+  }
+  return out;
+}
+
+/**
+ * Build the visual brief from the words. Returns a shot per section,
+ * each carrying the lyric it illustrates and the time it appears, so
+ * the picture changes when the subject does rather than on a timer.
+ */
+export async function readSong(ask, { name, lyricText, sections, mood, genre, dur, kind = 'art' }){
+  const wantsQueries = kind === 'reel';
+  const brief = await ask([
+    { role:'system', content:
+      'You are a music video director reading a song and deciding what the audience should see.\n' +
+      'Reply with JSON only: {"subject","arc","palette","shots"}.\n' +
+      '"subject" — one sentence naming what this song is actually about. Be specific and literal: ' +
+      'a love song, a lament for a place left behind, someone counting money they do not have, ' +
+      'a parent watching a child leave. Not "emotional journey".\n' +
+      '"arc" — one sentence on how it moves from beginning to end.\n' +
+      '"palette" — two or three colour words that suit the subject, not the genre.\n' +
+      '"shots" — one object per section given, in order, each with:\n' +
+      (wantsQueries
+        ? '  "query": a two-to-four-word stock-footage search phrase. Concrete nouns and settings only, ' +
+          'the kind that actually returns results — "empty train station", "hands counting coins", ' +
+          '"monsoon street night". No abstractions, no brand names.\n'
+        : '  "prompt": one vivid sentence describing a cinematic frame — subject, setting, light, camera.\n') +
+      '  "why": a few words naming which line or idea it illustrates.\n' +
+      'The shots must ILLUSTRATE THE LYRIC OF THAT SECTION. If the section is about leaving home, ' +
+      'show leaving home. Do not fall back on generic mood imagery when the words give you something ' +
+      'concrete. Keep one consistent world across all of them — same place, same time of day ' +
+      'progressing naturally, same palette — so it reads as one film.\n' +
+      'Never show text, letters, logos or watermarks. Never name a real person, brand or franchise.' },
+    { role:'user', content:
+      `Song: "${name}"${genre?`\nGenre: ${genre}`:''}${mood?`\nMood the audio suggests: ${mood}`:''}\n` +
+      `Length: ${Math.round(dur)}s\n\n` +
+      (lyricText?.trim()
+        ? `Lyrics:\n${lyricText.trim().slice(0, 4000)}\n\n`
+        : 'No lyrics were provided — infer the subject from the title alone and say so in "subject".\n\n') +
+      `Sections to illustrate, in order:\n` +
+      sections.map((s,i) => `${i+1}. [${s.start.toFixed(0)}s–${s.end.toFixed(0)}s] ${s.text.slice(0,200)}`).join('\n') +
+      `\n\nGive exactly ${sections.length} shots.` }
+  ], { temperature: 0.85 });
+
+  const shots = (brief.shots || []).slice(0, sections.length).map((s, i) => ({
+    ...sections[i],
+    query: String(s.query || s.prompt || '').slice(0, 120),
+    prompt: String(s.prompt || s.query || ''),
+    why: String(s.why || '')
+  }));
+  return { subject:String(brief.subject||''), arc:String(brief.arc||''),
+           palette:brief.palette||[], shots };
+}
+
+/** Cut points that land on section boundaries, subdivided to the bar. */
+export function storyPlan(sections, duration, bpm, { barsPerCut = 2 } = {}){
+  if (!sections?.length) return [];
+  const bar = bpm > 40 ? (60/bpm)*4 : 3;
+  let step = bar * barsPerCut;
+  while (step < 1.5) step *= 2;
+  while (step > 8)   step /= 2;
+
+  const plan = [];
+  sections.forEach((sec, i) => {
+    const from = i === 0 ? 0 : sec.start;
+    const to   = i === sections.length-1 ? duration : sections[i+1]?.start ?? sec.end;
+    // always cut at the section boundary, then subdivide inside it
+    for (let t = from; t < to - 0.4; t += step) plan.push({ at: t, clip: i, section: i });
+  });
+  return plan.sort((a,b) => a.at - b.at);
+}
+
+/* ───────────────── picking the best frame ─────────────────
+   For a thumbnail, "first image" is rarely the right image. This scores
+   contrast, colour and how much of the frame is doing something, and
+   returns the strongest. */
+export function scoreImage(bitmap){
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 36;
+  const x = c.getContext('2d', { willReadFrequently:true });
+  x.drawImage(bitmap, 0, 0, 64, 36);
+  const d = x.getImageData(0,0,64,36).data;
+
+  let lum = [], sat = 0;
+  for (let i = 0; i < d.length; i += 4){
+    const r=d[i]/255, g=d[i+1]/255, b=d[i+2]/255;
+    const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+    sat += mx === 0 ? 0 : (mx-mn)/mx;
+    lum.push(0.2126*r + 0.7152*g + 0.0722*b);
+  }
+  const n = lum.length;
+  const mean = lum.reduce((a,b)=>a+b,0)/n;
+  const sd = Math.sqrt(lum.reduce((a,l)=>a+(l-mean)**2,0)/n);
+
+  // edge energy — a busy frame reads better small than a flat one
+  let edge = 0;
+  for (let y = 1; y < 35; y++) for (let px = 1; px < 63; px++){
+    const i = y*64+px;
+    edge += Math.abs(lum[i]-lum[i-1]) + Math.abs(lum[i]-lum[i-64]);
+  }
+  edge /= n;
+
+  // mid luminance beats both crushed black and blown white
+  const exposure = 1 - Math.abs(mean - 0.46) * 1.8;
+  return { score: sd*2.4 + (sat/n)*1.5 + edge*3.2 + Math.max(0,exposure)*0.9,
+           contrast:+sd.toFixed(3), saturation:+(sat/n).toFixed(3),
+           edge:+edge.toFixed(3), mean:+mean.toFixed(3) };
+}
+
+export function bestImage(bitmaps){
+  if (!bitmaps?.length) return { index:-1, image:null };
+  let best = -1, bi = 0, all = [];
+  bitmaps.forEach((b,i) => {
+    const s = scoreImage(b);
+    all.push(s.score);
+    if (s.score > best){ best = s.score; bi = i; }
+  });
+  return { index: bi, image: bitmaps[bi], score:+best.toFixed(3), scores: all.map(s=>+s.toFixed(3)) };
+}
+
+/* ───────────────── transitions ─────────────────
+   Applied in the first fraction of each cut. Every one of these is a
+   geometric or alpha move — none of them flash, and the guard still
+   runs afterwards regardless. */
+
+export const TRANSITIONS = {
+  cut:        { label:'Hard cut',   note:'no transition at all — the most confident choice' },
+  dissolve:   { label:'Dissolve',   note:'the outgoing shot fades through' },
+  dip:        { label:'Dip to dark',note:'a beat of black between shots' },
+  slide:      { label:'Slide',      note:'the new shot pushes the old one out' },
+  zoom:       { label:'Zoom punch', note:'the new shot lands slightly oversized and settles' },
+  blur:       { label:'Blur through',note:'defocus across the join' },
+  mix:        { label:'Mixed',      note:'varies by section so it never gets predictable' }
+};
+
+const PICK = ['dissolve','slide','zoom','dip','blur','cut'];
+
+/**
+ * Returns how to draw the incoming shot at this instant.
+ * `local` is 0..1 through the current cut.
+ */
+export function transitionAt(kind, local, index, { length = 0.30 } = {}){
+  const k = kind === 'mix' ? PICK[index % PICK.length] : kind;
+  if (k === 'cut' || local > length) return { kind:'none', t:1, alpha:1, zoom:1, dx:0, blur:0, dim:0 };
+  const t = local / length;                       // 0 at the join, 1 when settled
+  const e = 1 - Math.pow(1 - t, 3);               // ease out
+  switch (k){
+    case 'dissolve': return { kind:k, t, alpha:e, zoom:1, dx:0, blur:0, dim:0 };
+    case 'dip':      return { kind:k, t, alpha:1, zoom:1, dx:0, blur:0,
+                              dim: Math.max(0, 1 - t*1.8) };
+    case 'slide':    return { kind:k, t, alpha:1, zoom:1, dx:(1-e), blur:0, dim:0 };
+    case 'zoom':     return { kind:k, t, alpha:e, zoom:1 + (1-e)*0.16, dx:0, blur:0, dim:0 };
+    // peaks mid-transition then clears — must never go negative, a
+    // negative filter value silently disables the whole filter string
+    case 'blur':     return { kind:k, t, alpha:1, zoom:1, dx:0,
+                              blur: Math.max(0, (1 - Math.abs(t-0.35)*2.4)) * 7, dim:0 };
+    default:         return { kind:'none', t:1, alpha:1, zoom:1, dx:0, blur:0, dim:0 };
+  }
+}

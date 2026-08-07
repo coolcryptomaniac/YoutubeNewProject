@@ -352,6 +352,7 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
         <label class="chk"><input type="checkbox" id="showTitle" checked><span>Show track title</span></label>
         <label class="chk"><input type="checkbox" id="showChannel" checked><span>Show channel handle</span></label>
         <div class="f"><label>Handle</label><input type="text" id="handle" value="@mohucool"></div>
+        <div class="f"><label>Your name — appears in titles</label><input type="text" id="artist" value="Mohit Pandey"></div>
       </div>
     </div>
   </div>
@@ -389,7 +390,9 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
           <div style="flex:1;min-width:140px"><label>Cut every</label>
             <select id="reelBars"><option value="1">1 bar — frantic</option><option value="2" selected>2 bars</option><option value="4">4 bars — slow</option></select>
           </div>
+          <div style="flex:1;min-width:140px"><label>Transition</label><select id="transition"></select></div>
         </div>
+        <p class="note" id="transNote" style="margin-top:0"></p>
         <button class="btn" id="btnReel">Build the reel</button>
         <div class="bar"><i id="reelBar"></i></div>
         <p class="note" id="reelNote">Needs a Pexels key and a decoded track.</p>
@@ -481,8 +484,10 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
       <h2>Thumbnail</h2>
       <p class="sub">1280 × 720, built from the first shot and the headline.</p>
       <div class="stage"><canvas id="th" width="1280" height="720"></canvas></div>
+      <p class="note" id="thumbPick" style="margin-top:0"></p>
       <div class="row" style="margin-top:12px">
         <button class="btn ghost sm" id="btnThumb">Build</button>
+        <button class="btn ghost sm" id="btnThumbNext">Try another frame</button>
         <button class="btn ghost sm" id="btnThumbAll">Build for all</button>
         <button class="btn ghost sm" id="btnThumbSave">Save</button>
       </div>
@@ -514,7 +519,20 @@ textarea{resize:vertical;min-height:74px;line-height:1.55}
     <div class="card">
       <h2>Fallback template</h2>
       <p class="sub">Used for any track Assist hasn't written. <code>{title}</code> is the filename, <code>{date}</code> is today.</p>
-      <div class="f"><label>Title template</label><input type="text" id="tTitle" value="{title} — original AI music"></div>
+      <div class="f"><label>Title shape</label>
+        <select id="titleShape">
+          <option value="song-artist-genre" selected>Song — Artist | Genre</option>
+          <option value="song-genre">Song | Genre</option>
+          <option value="song-artist">Song — Artist</option>
+          <option value="song">Just the song name</option>
+          <option value="custom">My own template</option>
+        </select>
+      </div>
+      <div class="f" id="tTitleWrap" style="display:none"><label>Template — {song} {artist} {genre} {date}</label><input type="text" id="tTitle" value="{song} — {artist} | {genre}"></div>
+      <div class="f"><label>This is what gets published</label>
+        <div id="titlePreview" style="background:var(--deep);border:1px solid var(--line);border-radius:4px;padding:11px;font-size:15px;font-weight:500;min-height:44px"></div>
+        <p class="note" id="titleLen"></p>
+      </div>
       <div class="f"><label>Description</label><textarea id="tDesc">Original track written and produced with AI tools.
 
 Follow @mohucool for new music.
@@ -726,7 +744,8 @@ import { store, sleep, clamp, analyseAudio, MOOD_LIST, IMAGE_PROVIDERS, TEXT_PRO
          pexelsPhotos, pexelsVideos, library, cacheAsset,
          budgetGB, storageReport, reclaim,
          loadClip, cutPlan, cutAt,
-         transcribe, alignLyrics, evenLyrics, linesFromHeard, lyricAt } from './core.js';
+         transcribe, alignLyrics, evenLyrics, linesFromHeard, lyricAt,
+         lyricSections, readSong, storyPlan, TRANSITIONS, transitionAt, bestImage } from './core.js';
 import { LYRIC_STYLES, drawLyrics } from './lyrics.js';
 import { GENRES, FAMILIES, findGenre, resolveTemplate } from './genres.js';
 import { EXTRA_VISUALS, resetVisuals, flashGuard, resetGuard, guardStats } from './visuals.js';
@@ -786,8 +805,9 @@ $('#nav').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
   $$('#nav button').forEach(x=>x.setAttribute('aria-selected',String(x===b)));
   $$('.panes > section').forEach(s=>s.classList.toggle('on',s.id==='p-'+b.dataset.p));
-  if(b.dataset.p==='assist') fillMeta();
+  if(b.dataset.p==='assist'){ fillMeta(); paintThumbPick(); }
   if(b.dataset.p==='scenes') paintShots();
+  if(b.dataset.p==='publish') paintTitlePreview();
   if(b.dataset.p==='lyrics'){ paintLyricStatus(); paintLyricRows(); if(selTrack()?.lyric) $('#lyricText').value=selTrack().lyric.lines.map(l=>l.text).join('\n'); }
   paintDoIt();
 });
@@ -807,7 +827,7 @@ async function addFiles(fl){
   for(const f of audio){
     const t={ id:crypto.randomUUID(), file:f, name:f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),
       dur:0, buf:null, mood:null, shots:[], imgs:[], state:'queued', blob:null, thumb:null,
-      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null, clips:[], clipMeta:[], plan:[], lyric:null, heard:null, lyricOn:false };
+      meta:null, videoId:null, ytUrl:null, publishAt:null, err:null, clips:[], clipMeta:[], plan:[], sections:[], story:null, shotMeta:[], lyric:null, heard:null, lyricOn:false };
     S.tracks.push(t); if(!S.sel) S.sel=t.id;
     try { await vault.putBlob('audio:'+t.id, f); } catch {}
   }
@@ -869,7 +889,7 @@ function paintTracks(){
     const a=document.createElement('a'); a.href=URL.createObjectURL(t.blob); a.download=t.name+'.webm'; a.click();
   });
   $('#nTracks').textContent=S.tracks.length||'';
-  paintMood(); paintRidge(); paintLibrary(); paintOneClick(); paintDoIt();
+  paintMood(); paintRidge(); paintLibrary(); paintOneClick(); paintDoIt(); paintTitlePreview();
 }
 
 function paintMood(){
@@ -918,23 +938,39 @@ function coverDraw(ctx,img,W,H,zoom,drift,alpha){
   const r=Math.max(W/img.width,H/img.height)*zoom, w=img.width*r, h=img.height*r;
   ctx.globalAlpha=alpha; ctx.drawImage(img,(W-w)/2+drift*W*0.03,(H-h)/2,w,h); ctx.globalAlpha=1;
 }
+function paintClip(ctx,v,W,H,zoom,dx,alpha,blur){
+  if(!v||v.readyState<2) return false;
+  if(v.paused) v.play().catch(()=>{});
+  const r=Math.max(W/v.videoWidth,H/v.videoHeight)*zoom;
+  const w=v.videoWidth*r, hh=v.videoHeight*r;
+  ctx.save();
+  if(blur>0.05) ctx.filter=`blur(${blur.toFixed(1)}px)`;
+  ctx.globalAlpha=alpha;
+  ctx.drawImage(v,(W-w)/2+dx*W,(H-hh)/2,w,hh);
+  ctx.restore();
+  return true;
+}
+
 function drawReel(ctx,t,W,H,prog){
   if(!t?.clips?.length||!t.plan?.length) return false;
   const cur=cutAt(t.plan,prog*t.dur);
   if(!cur) return false;
-  const v=t.clips[cur.clip];
-  if(!v||v.readyState<2) return false;
-  if(v.paused) v.play().catch(()=>{});
-  // a slow push-in over each cut, so a short looping clip still feels alive
-  const zoom=1.03+cur.local*0.07;
-  const r=Math.max(W/v.videoWidth,H/v.videoHeight)*zoom;
-  const w=v.videoWidth*r, hh=v.videoHeight*r;
-  ctx.drawImage(v,(W-w)/2,(H-hh)/2,w,hh);
-  // a quick flash on the cut reads as an edit rather than a glitch
-  if(cur.local<0.06){
-    ctx.globalAlpha=(0.06-cur.local)/0.06*0.5;
-    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+  const v=t.clips[cur.clip % t.clips.length];
+  if(!v) return false;
+
+  const kind=$('#transition')?.value||'mix';
+  const tr=transitionAt(kind,cur.local,cur.index);
+  // a slow push-in across each cut keeps a short looping clip alive
+  const settle=1.03+cur.local*0.07;
+
+  // the outgoing shot stays underneath while the new one arrives
+  if(tr.kind!=='none'&&tr.alpha<1){
+    const prev=t.clips[(cur.clip-1+t.clips.length)%t.clips.length];
+    paintClip(ctx,prev,W,H,settle*1.02,0,1,0);
   }
+  if(!paintClip(ctx,v,W,H,settle*tr.zoom,tr.dx,tr.alpha,tr.blur)) return false;
+
+  if(tr.dim>0){ ctx.globalAlpha=tr.dim; ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
   ctx.fillStyle='rgba(10,13,22,.34)'; ctx.fillRect(0,0,W,H);
   return true;
 }
@@ -942,8 +978,14 @@ function drawReel(ctx,t,W,H,prog){
 function drawShots(ctx,imgs,W,H,prog){
   const n=imgs.length; if(!n) return false;
   const seg=1/n, i=clamp(Math.floor(prog/seg),0,n-1), local=clamp((prog-i*seg)/seg,0,1);
-  coverDraw(ctx,imgs[i],W,H,1.04+local*0.10,local-0.5,1);
-  if(local>0.85&&imgs[i+1]) coverDraw(ctx,imgs[i+1],W,H,1.04,-0.5,(local-0.85)/0.15);
+  const kind=$('#transition')?.value||'mix';
+  const tr=transitionAt(kind,local,i,{length:0.22});
+  if(tr.kind!=='none'&&tr.alpha<1&&i>0) coverDraw(ctx,imgs[i-1],W,H,1.14,0.5,1);
+  ctx.save();
+  if(tr.blur>0.05) ctx.filter=`blur(${tr.blur.toFixed(1)}px)`;
+  coverDraw(ctx,imgs[i],W,H,(1.04+local*0.10)*tr.zoom,(local-0.5)+tr.dx,tr.alpha);
+  ctx.restore();
+  if(tr.dim>0){ ctx.globalAlpha=tr.dim; ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
   ctx.fillStyle='rgba(10,13,22,.5)'; ctx.fillRect(0,0,W,H);
   return true;
 }
@@ -1162,29 +1204,28 @@ function paintShots(){
 $('#btnShotlist').onclick=async()=>{
   const t=selTrack(); if(!t){ log('Select a track first.','er'); return; }
   const n=clamp(Number($('#shotCount').value)||15,3,30);
-  $('#shotNote').textContent='Writing the shot list…';
+  $('#shotNote').textContent='Reading the song…';
   try{
-    const out=await think([
-      { role:'system', content:
-        'You are a music video director. Reply with JSON only: {"thread":"...","shots":["...","..."]}. ' +
-        '"thread" is one sentence naming the visual through-line. ' +
-        '"shots" is an array of image-generation prompts, one per shot, in narrative order. ' +
-        'Each prompt is a single vivid sentence describing a cinematic frame — subject, setting, light, camera. ' +
-        'They must feel like one continuous piece: keep the palette, location logic and time-of-day progression consistent from shot to shot. ' +
-        'Vary the framing across wide, medium and detail shots. ' +
-        'Never mention text, letters, logos, watermarks or people\\u2019s faces in close-up.' },
-      { role:'user', content:
-        `Track: "${t.name}"\nLength: ${mmss(t.dur)}\nMood: ${t.mood?.label} (${t.mood?.bpm||'no clear'} bpm)\n` +
-        `Visual direction: ${S.template?.scene || t.mood?.sceneMood}\n` +
-        (S.template?`Genre: ${S.template.genre}. Keep every shot consistent with that world.\n`:'') +
-        ($('#threadPrompt').value.trim()?`The director wants: ${$('#threadPrompt').value.trim()}\n`:'') +
-        `\nWrite exactly ${n} shots.` }
-    ]);
-    t.shots=(out.shots||[]).slice(0,n).map(String);
+    // Sections come from the lyric where there is one, so each shot
+    // illustrates the words sung over it rather than the genre alone.
+    const sections = t.lyric?.lines?.length
+      ? lyricSections(t.lyric, n)
+      : Array.from({length:n},(_,i)=>({ text:'', start:i*t.dur/n, end:(i+1)*t.dur/n, lines:0 }));
+
+    const story = await readSong(think, {
+      name: t.name,
+      lyricText: $('#lyricText')?.value || t.lyric?.lines?.map(l=>l.text).join('\n') || '',
+      sections, mood: t.mood?.label, genre: S.template?.genre, dur: t.dur, kind:'art'
+    });
+
+    t.story=story;
+    t.shots=story.shots.map(s=>s.prompt);
+    t.shotMeta=story.shots;
     t.imgs=[];
-    if(out.thread&&!$('#threadPrompt').value.trim()) $('#threadPrompt').value=out.thread;
-    $('#shotNote').textContent=`${t.shots.length} shots written. Generate the images when you're ready.`;
-    log(`Shot list for “${t.name}”: ${t.shots.length} shots.`,'ok');
+    if(!$('#threadPrompt').value.trim()) $('#threadPrompt').value=story.subject;
+    $('#shotNote').textContent=`${t.shots.length} shots. Reading it as: ${story.subject}` +
+      (t.lyric?.lines?.length?' — from the lyrics.':' — from the title, since there are no lyrics yet.');
+    log(`Story: ${story.subject}`,'ok');
     paintShots(); saveState();
   }catch(e){ $('#shotNote').textContent=e.message; log(e.message,'er'); }
 };
@@ -1359,13 +1400,21 @@ async function writeFor(t){
       'hashtags on their own line.\n' +
       'tags: 8 to 12 lowercase search terms people would actually type, mixing broad and specific.\n' +
       'hook: 2 to 4 words for the thumbnail. It should complete the title rather than repeat it — ' +
-      'a thumbnail that echoes the title wastes half the space you have.' },
+      'a thumbnail that echoes the title wastes half the space you have.\n' +
+      'IMPORTANT: the song already has a name and you must keep it. Use it verbatim as the song ' +
+      'part of the title. Do not invent a different one, translate it, or reword it — it is what ' +
+      'people will search for and what the artist called it.' },
     { role:'user', content:
-      `Track filename: "${t.name}"\nChannel: ${$('#handle').value}\nLength: ${mmss(t.dur)}\n` +
+      `The song's name, which must be kept: "${songName(t)}"\n` +
+      `Artist: ${$('#artist').value}\nChannel: ${$('#handle').value}\nLength: ${mmss(t.dur)}\n` +
+      (S.template?`Genre: ${S.template.genre}\n`:'') +
+      (t.story?.subject?`What the song is about: ${t.story.subject}\n`:'') +
+      (t.lyric?.lines?.length?`Lyrics:\n${t.lyric.lines.map(l=>l.text).join('\n').slice(0,1500)}\n`:'') +
       `Detected mood: ${t.mood?.label}${t.mood?.bpm?', '+t.mood.bpm+' bpm':''}\n` +
       ($('#hint').value.trim()?`Hint: ${$('#hint').value.trim()}\n`:'') + 'Write the metadata.' }
   ]);
-  t.meta={ title:String(out.title||t.name).slice(0,100), description:String(out.description||'').slice(0,5000),
+  const shaped=buildTitle(t);
+  t.meta={ title: shaped || String(out.title||t.name).slice(0,100), description:String(out.description||'').slice(0,5000),
     tags:Array.isArray(out.tags)?out.tags.map(String):[], hook:String(out.hook||'').slice(0,40) };
   return t.meta;
 }
@@ -1422,7 +1471,14 @@ function drawThumb(){
   const style=$('#thumbStyle')?.value||'bottomBar';
   ctx.fillStyle='#0A0D16'; ctx.fillRect(0,0,W,H);
 
-  const bg=S.bridgeImage||t?.imgs?.[0];
+  // "first image" is rarely the best one — score them and take the strongest
+  let bg=S.bridgeImage;
+  if(!bg&&t?.imgs?.length){
+    if(t.bestIdx===undefined||t.bestIdxOf!==t.imgs.length){
+      const b=bestImage(t.imgs); t.bestIdx=b.index; t.bestIdxOf=t.imgs.length; t.bestScores=b.scores;
+    }
+    bg=t.imgs[t.bestIdx]||t.imgs[0];
+  }
   const drawArt=(x,y,w,hh)=>{
     if(!bg) return;
     ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,hh); ctx.clip();
@@ -1509,7 +1565,7 @@ on('#thumbStyle','change',drawThumb);
 on('#thumbInk','change',drawThumb);
 $('#handle').addEventListener('input',drawThumb);
 $('#btnThumb').onclick=async()=>{ const t=selTrack(); if(!t) return;
-  drawThumb(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92));
+  drawThumb(); paintThumbPick(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92));
   paintTracks(); log('Thumbnail built.','ok'); };
 $('#btnThumbAll').onclick=async()=>{ const keep=S.sel;
   for(const t of S.tracks){ S.sel=t.id; drawThumb(); t.thumb=await new Promise(r=>$('#th').toBlob(r,'image/jpeg',0.92)); }
@@ -1923,6 +1979,7 @@ function applyGenre(){
   $$('#visBtns button').forEach(x=>x.classList.toggle('on',x.dataset.v===t.visual));
   $$('.sw').forEach(x=>x.classList.remove('on'));
   $('#genreNote').textContent=t.why+' Scene art and thumbnails follow it too.';
+  paintTitlePreview();
   $('#visSub').textContent=`Set by ${t.genre}. Override below if you want something else.`;
 }
 $('#genrePick').addEventListener('change',applyGenre);
@@ -2399,55 +2456,46 @@ on('#btnReel','click',async()=>{
   const n=clamp(Number($('#reelCount').value)||8,3,14);
   $('#btnReel').disabled=true;
   try{
-    $('#reelNote').textContent='Writing search terms…';
-    const out=await think([
-      { role:'system', content:
-        'You choose stock footage for a music video. Reply with JSON only: {"thread","queries"}. ' +
-        '"thread" is one sentence naming the visual through-line. ' +
-        '"queries" is an array of short stock-footage search phrases, two to four words each — ' +
-        'the kind of thing that actually returns results on a stock site, so concrete nouns and ' +
-        'settings rather than abstractions. No brand names, no people by name. ' +
-        'Order them so the reel builds: establishing shots first, closer and more intense later.' },
-      { role:'user', content:
-        `Track: "${t.name}", ${mmss(t.dur)}, ${t.mood?.label||'unknown mood'}` +
-        (t.mood?.bpm?`, ${t.mood.bpm} bpm`:'') + '\n' +
-        (S.template?`Genre: ${S.template.genre}. Look: ${S.template.scene}\n`:'') +
-        ($('#reelTheme').value.trim()?`About: ${$('#reelTheme').value.trim()}\n`:'') +
-        `Give me exactly ${n} search phrases.` }
-    ]);
-    const queries=(out.queries||[]).slice(0,n).map(String);
-    if(out.thread&&!$('#reelTheme').value.trim()) $('#reelTheme').value=out.thread;
-    if(!queries.length) throw new Error('no search terms came back');
+    $('#reelNote').textContent='Reading the song…';
+    const sections = t.lyric?.lines?.length
+      ? lyricSections(t.lyric, n)
+      : Array.from({length:n},(_,i)=>({ text:'', start:i*t.dur/n, end:(i+1)*t.dur/n, lines:0 }));
 
-    t.clips=[]; t.clipMeta=[];
-    for(let i=0;i<queries.length;i++){
-      $('#reelNote').textContent=`Finding “${queries[i]}” — ${i+1} of ${queries.length}`;
-      $('#reelBar').style.width=(i/queries.length*100)+'%';
+    const story = await readSong(think, {
+      name: t.name,
+      lyricText: $('#lyricText')?.value || t.lyric?.lines?.map(l=>l.text).join('\n') || $('#reelTheme').value,
+      sections, mood: t.mood?.label, genre: S.template?.genre, dur: t.dur, kind:'reel'
+    });
+    t.story=story;
+    if(!$('#reelTheme').value.trim()) $('#reelTheme').value=story.subject;
+
+    t.clips=[]; t.clipMeta=[]; t.sections=[];
+    for(let i=0;i<story.shots.length;i++){
+      const sh=story.shots[i];
+      $('#reelNote').textContent=`“${sh.query}” — ${i+1} of ${story.shots.length}${sh.why?' · '+sh.why:''}`;
+      $('#reelBar').style.width=(i/story.shots.length*100)+'%';
       try{
-        const hits=await pexelsVideos(queries[i],{count:3});
-        // shortest usable clip keeps downloads small and cuts feel tighter
+        const hits=await pexelsVideos(sh.query,{count:3});
         const pick=hits.filter(v=>v.dur&&v.dur<=30).sort((a,b)=>a.dur-b.dur)[0]||hits[0];
         if(!pick) continue;
-        const r=await fetch(pick.url);
-        if(!r.ok) continue;
+        const r=await fetch(pick.url); if(!r.ok) continue;
         const blob=await r.blob();
         t.clips.push(await loadClip(blob));
-        t.clipMeta.push({ ...pick, query:queries[i] });
+        t.clipMeta.push({ ...pick, query:sh.query, why:sh.why, section:i });
+        t.sections.push(sh);
+        // keep it so the same search is never paid for twice
+        try{ await cacheAsset(pick,{ genre:S.template?.genre||null, mood:t.mood?.mood||null, query:sh.query }); }catch{}
         paintReel(t);
-      }catch(e){ log(`“${queries[i]}”: ${e.message}`,'er'); }
+      }catch(e){ log(`“${sh.query}”: ${e.message}`,'er'); }
     }
     $('#reelBar').style.width='0%';
     if(!t.clips.length){ $('#reelNote').textContent='No clips came back. Try a plainer theme.'; }
     else {
-      t.plan=cutPlan(t.dur,t.mood?.bpm,t.clips.length,{barsPerCut:Number($('#reelBars').value)});
-      const per=t.plan.length>1?(t.plan[1].at-t.plan[0].at):0;
-      $('#reelNote').textContent=
-        `${t.clips.length} clips, cutting every ${per.toFixed(1)}s` +
-        (t.mood?.bpm?` — on the bar at ${t.mood.bpm} bpm.`:' — no clear tempo, so evenly spaced.') +
-        ' Render from the Look tab.';
-      log(`Reel ready: ${t.clips.length} clips, ${t.plan.length} cuts.`,'ok');
+      t.plan=storyPlan(t.sections, t.dur, t.mood?.bpm, { barsPerCut:Number($('#reelBars').value) });
+      $('#reelNote').textContent=`${t.clips.length} clips across ${t.sections.length} sections, ${t.plan.length} cuts. Reading it as: ${story.subject}`;
+      log(`Reel follows the lyric: ${t.clips.length} clips.`,'ok');
     }
-    paintTracks();
+    paintTracks(); paintLibStats();
   }catch(e){ $('#reelNote').textContent=e.message; log(e.message,'er'); }
   $('#btnReel').disabled=false;
 });
@@ -2455,7 +2503,7 @@ on('#btnReel','click',async()=>{
 function paintReel(t){
   const g=$('#reelGrid'); if(!g) return;
   g.innerHTML=(t.clipMeta||[]).map((c,i)=>
-    `<div class="shot" title="${esc(c.query)} — ${esc(c.credit||'Pexels')}">
+    `<div class="shot" title="${esc(c.query)}${c.why?' — '+esc(c.why):''} · ${esc(c.credit||'Pexels')}">
        <img src="${esc(c.thumb)}" loading="lazy" alt=""><b>${i+1}</b></div>`).join('');
 }
 
@@ -2555,6 +2603,91 @@ on('#btnEven','click',()=>{
   $('#lyricNote').textContent='Spaced evenly across the track. Nudge the lines below until they sit right.';
   paintLyricStatus(); paintLyricRows(); saveState();
 });
+
+
+/* ── transitions ── */
+$('#transition').innerHTML=Object.entries(TRANSITIONS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('');
+$('#transition').value=store.get('transition')||'mix';
+{ const v=TRANSITIONS[$('#transition').value], n=$('#transNote');
+  if(v&&n) n.textContent=v.note[0].toUpperCase()+v.note.slice(1)+'.'; }
+on('#transition','change',()=>{
+  store.set('transition',$('#transition').value);
+  const v=TRANSITIONS[$('#transition').value];
+  const n=$('#transNote'); if(v&&n) n.textContent=v.note[0].toUpperCase()+v.note.slice(1)+'.';
+});
+
+
+/* ── titles built round the real song name ─────────────────
+   The filename Suno gives you IS the song's name. Inventing a
+   different one loses the thing people search for. */
+$('#artist').value=store.get('artist')||'Mohit Pandey';
+on('#artist','input',()=>{ store.set('artist',$('#artist').value); drawThumb(); paintTitlePreview(); });
+$('#titleShape').value=store.get('titleShape')||'song-artist-genre';
+on('#titleShape','change',()=>{
+  store.set('titleShape',$('#titleShape').value);
+  $('#tTitleWrap').style.display=$('#titleShape').value==='custom'?'block':'none';
+  paintTitlePreview();
+});
+$('#tTitleWrap').style.display=$('#titleShape').value==='custom'?'block':'none';
+
+/** The song's own name, cleaned of the noise download tools add. */
+function songName(t){
+  return (t.name||'')
+    .replace(/\s*[\(\[]?(official|lyric|lyrics|audio|video|hd|4k|extended|v\d+)[\)\]]?\s*/gi,' ')
+    .replace(/\s*[-–—]\s*(suno|udio|ai)\b.*/i,'')
+    .replace(/\s{2,}/g,' ').trim()
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function paintTitlePreview(){
+  const t=selTrack(), el=$('#titlePreview'); if(!el) return;
+  if(!t){ el.textContent='Select a track.'; $('#titleLen').textContent=''; return; }
+  const title=t.meta?.title||buildTitle(t);
+  el.textContent=title;
+  const n=title.length;
+  $('#titleLen').textContent=`${n} characters. ` +
+    (n<=60 ? 'Fits on a phone without truncating.'
+     : n<=70 ? 'A little long — phones may cut the tail.'
+     : 'Too long; the end will be hidden on most phones.') +
+    (t.meta?.title?' Written by Assist — edit it there.':' Built from the song name.');
+}
+
+function buildTitle(t){
+  const song=songName(t), artist=$('#artist').value.trim(), genre=S.template?.genre||'';
+  const shape=$('#titleShape').value;
+  if(shape==='custom'){
+    return $('#tTitle').value
+      .replace(/\{song\}|\{title\}/g,song).replace(/\{artist\}/g,artist)
+      .replace(/\{genre\}/g,genre)
+      .replace(/\{date\}/g,new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}))
+      .replace(/\s*\|\s*$/,'').replace(/\s*—\s*$/,'').trim();
+  }
+  const parts=[song];
+  if(shape.includes('artist')&&artist) parts.push('— '+artist);
+  if(shape.includes('genre')&&genre)   parts.push('| '+genre);
+  return parts.join(' ').slice(0,100);
+}
+
+
+/* ── pick the frame that reads best small ── */
+on('#btnThumbNext','click',()=>{
+  const t=selTrack();
+  if(!t?.imgs?.length){ log('No scene images yet.','er'); return; }
+  S.bridgeImage=null;
+  t.bestIdx=((t.bestIdx??0)+1)%t.imgs.length;
+  t.bestIdxOf=t.imgs.length;
+  drawThumb(); paintThumbPick();
+});
+function paintThumbPick(){
+  const t=selTrack(), el=$('#thumbPick'); if(!el) return;
+  if(S.bridgeImage){ el.textContent='Using the image you brought in.'; return; }
+  if(!t?.imgs?.length){ el.textContent='No scene images yet — generate some, or paste one in.'; return; }
+  const scores=t.bestScores||[];
+  el.textContent=`Frame ${(t.bestIdx??0)+1} of ${t.imgs.length}` +
+    (scores.length?` — picked for contrast and detail (scored ${scores[t.bestIdx??0]?.toFixed(2)} against ${Math.min(...scores).toFixed(2)}–${Math.max(...scores).toFixed(2)}).`:'.');
+}
+
+on('#tTitle','input',paintTitlePreview);
 
 /* ── boot ── */
 function idleFrame(){
