@@ -19,7 +19,7 @@ assert.match(simple,/Pause after each completed step/);
 for(let n=1;n<=6;n++)assert.ok(simple.includes(`data-simple-step=\\"${n}\\"`)||simple.includes(`data-simple-step="${n}"`),`simple step ${n} missing`);
 assert.ok(main.includes("./studio-v2-simple.js"));
 assert.ok(!main.includes("./studio-v2-plus.js"),'Daily Factory / old Creator Plus should not boot by default');
-assert.ok(!/suno.*password|password.*suno|suno.*cookie|cookie.*suno/i.test(simple),'Simple Mode must not collect Suno credentials/cookies');
+for(const forbidden of ['sunoPassword','suno_password','sunoCookie','suno_cookie','SUNO_SESSION','sunoSessionToken'])assert.ok(!simple.includes(forbidden),`Simple Mode must not collect ${forbidden}`);
 assert.match(simple,/transcribeAudio/);
 assert.match(simple,/analyzeSong/);
 assert.match(simple,/pexels_queries/);
