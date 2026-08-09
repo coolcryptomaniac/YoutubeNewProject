@@ -24,6 +24,7 @@ jobs:
           node --check lyrics.js
           node --check studio-v2.js
           node --check studio-v2-lite.js
+          node --check studio-v2-credentials.js
           node --check studio-v2-media.js
           node --check studio-v2-ai.js
           node --check studio-v2-visuals.js
@@ -43,11 +44,13 @@ jobs:
           node --experimental-default-type=module tests/studio-v2-plus-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-simple-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-lite-selftest.mjs
+          node --experimental-default-type=module tests/studio-v2-credentials-selftest.mjs
       - name: Required V2 files
         run: |
           test -f studio-v2.html
           test -f studio-v2-lite.css
           test -f studio-v2-lite.js
+          test -f studio-v2-credentials.js
           test -f studio-v2-core.js
           test -f studio-v2-youtube.js
           test -f studio-v2-media.js
@@ -60,15 +63,18 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          const js=fs.readFileSync('studio-v2-lite.js','utf8');
           const html=fs.readFileSync('studio-v2.html','utf8');
-          const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
           const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
-          const missing=[...refs].filter(x=>!ids.has(x));
-          if(missing.length){console.error('Missing V2.5 DOM ids:',missing);process.exit(1)}
+          for(const file of ['studio-v2-lite.js','studio-v2-credentials.js']){
+            const js=fs.readFileSync(file,'utf8');
+            const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
+            const missing=[...refs].filter(x=>!ids.has(x));
+            if(missing.length){console.error(`Missing DOM ids for ${file}:`,missing);process.exit(1)}
+          }
           if(!html.includes('./studio-v2-lite.js'))throw new Error('V2.5 lean editor is not the page entrypoint');
+          if(!html.includes('./studio-v2-credentials.js'))throw new Error('Persistent credential vault is not loaded');
           if(/Pexels key/i.test(html))throw new Error('Pexels API key must not appear in the lean UI');
-          console.log(`V2.5 lean DOM references OK: ${refs.size}`);
+          console.log('V2 lean DOM + persistent credential references OK.');
           NODE
       - name: Check V2.5 client files for obvious secret prefixes
         shell: bash
@@ -77,7 +83,7 @@ jobs:
           from pathlib import Path
           bad=[]
           needles=['g'+'sk'+'_','sk'+'-ant'+'-']
-          for name in ('studio-v2-lite.js','studio-v2.html','studio-v2-groq.js'):
+          for name in ('studio-v2-lite.js','studio-v2.html','studio-v2-groq.js','studio-v2-credentials.js'):
             text=Path(name).read_text(errors='ignore')
             for n in needles:
               pos=text.find(n)
