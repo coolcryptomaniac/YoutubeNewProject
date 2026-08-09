@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Ridge Studio V2 — music video lab</title>
+  <link rel="stylesheet" href="./studio-v2.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">RIDGE / STUDIO V2</p>
+      <h1>Music in. <span>Video out.</span></h1>
+      <p class="lede">A serverless music-video studio for GitHub Pages. Suno handoff, scene art, audio-reactive visuals, local rendering and YouTube upload.</p>
+    </div>
+    <div class="status-stack">
+      <span class="chip" id="storageChip">Local only</span>
+      <span class="chip" id="audioChip">No track</span>
+      <span class="chip" id="ytChip">YouTube disconnected</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="step">01 / MUSIC</p>
+            <h2>Suno handoff, without fake APIs</h2>
+          </div>
+          <span class="badge">manual bridge</span>
+        </div>
+        <p class="muted">Build a strong prompt here, open Suno, generate there, then drag the downloaded MP3/WAV back into Ridge. No cookies, scraping or unofficial endpoints.</p>
+        <div class="form-grid two">
+          <label>Template
+            <select id="templateSelect"></select>
+          </label>
+          <label>Language
+            <select id="languageSelect">
+              <option>Hindi</option>
+              <option>English</option>
+              <option>Kumaoni</option>
+              <option>Hinglish</option>
+              <option>Instrumental</option>
+            </select>
+          </label>
+        </div>
+        <label>Theme / story
+          <textarea id="themeInput" rows="3" placeholder="e.g. leaving Almora for the city, then missing the quiet hills"></textarea>
+        </label>
+        <label>Suno-ready prompt
+          <textarea id="sunoPrompt" rows="5"></textarea>
+        </label>
+        <div class="actions">
+          <button class="primary" id="buildPromptBtn">Build prompt</button>
+          <button id="copyPromptBtn">Copy</button>
+          <button id="openSunoBtn">Copy + open Suno</button>
+        </div>
+      </article>
+
+      <article class="panel drop-panel">
+        <div class="panel-head">
+          <div>
+            <p class="step">02 / TRACK</p>
+            <h2>Drop the finished song</h2>
+          </div>
+          <span class="badge">MP3 / WAV / M4A</span>
+        </div>
+        <label class="dropzone" id="audioDrop">
+          <input id="audioFile" type="file" accept="audio/*" hidden>
+          <strong>Drop audio here</strong>
+          <span>or click to choose a file</span>
+        </label>
+        <div class="track-card" id="trackCard" hidden>
+          <div>
+            <strong id="trackName">Track</strong>
+            <span id="trackMeta">—</span>
+          </div>
+          <audio id="audioPlayer" controls></audio>
+        </div>
+        <div class="meters" id="meters">
+          <div><span>Energy</span><b id="energyMeter">—</b></div>
+          <div><span>Brightness</span><b id="brightnessMeter">—</b></div>
+          <div><span>Dynamics</span><b id="dynamicsMeter">—</b></div>
+          <div><span>Duration</span><b id="durationMeter">—</b></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="studio-grid">
+      <article class="panel canvas-panel">
+        <div class="panel-head">
+          <div>
+            <p class="step">03 / LOOK</p>
+            <h2>Compose the music video</h2>
+          </div>
+          <div class="preview-actions">
+            <button id="previewBtn">Preview</button>
+            <button id="stopPreviewBtn">Stop</button>
+          </div>
+        </div>
+        <div class="stage-wrap">
+          <canvas id="stage" width="1280" height="720"></canvas>
+          <div class="stage-hud"><span id="hudTemplate">Template</span><span id="hudVisualizer">Visualizer</span></div>
+        </div>
+        <div class="render-row">
+          <button class="primary big" id="renderBtn">Render WebM</button>
+          <button id="downloadBtn" disabled>Download video</button>
+          <button id="posterBtn">Save poster frame</button>
+        </div>
+        <div class="progress"><i id="renderProgress"></i></div>
+        <p class="muted small" id="renderStatus">Rendering happens in real time in this tab so the audio and canvas stay synchronized.</p>
+      </article>
+
+      <aside class="control-stack">
+        <article class="panel">
+          <p class="step">VISUALIZER</p>
+          <div class="visual-grid" id="visualGrid"></div>
+          <label class="inline-check"><input id="autoVisual" type="checkbox" checked> Follow template automatically</label>
+        </article>
+
+        <article class="panel">
+          <p class="step">SCENES</p>
+          <label class="dropzone compact" id="imageDrop">
+            <input id="sceneFiles" type="file" accept="image/*" multiple hidden>
+            <strong>Add scene images</strong>
+            <span>JPG / PNG / WebP · multiple files</span>
+          </label>
+          <div class="scene-strip" id="sceneStrip"></div>
+          <label class="inline-check"><input id="sceneReactive" type="checkbox" checked> Beat-reactive scene zoom</label>
+        </article>
+
+        <article class="panel">
+          <p class="step">OVERLAY</p>
+          <label>Video title<input id="videoTitle" type="text" placeholder="Song title"></label>
+          <label>Subtitle<input id="videoSubtitle" type="text" placeholder="Artist / channel"></label>
+          <div class="form-grid two">
+            <label>Title position
+              <select id="titlePosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select>
+            </label>
+            <label>Film grain
+              <select id="grainSelect"><option value="0">Off</option><option value="0.05">Light</option><option value="0.1" selected>Medium</option><option value="0.18">Heavy</option></select>
+            </label>
+          </div>
+        </article>
+      </aside>
+    </section>
+
+    <section class="bottom-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <div><p class="step">04 / ASSIST</p><h2>Use ChatGPT or Claude</h2></div>
+          <span class="badge">no API key in browser</span>
+        </div>
+        <p class="muted">Generate a metadata brief here, copy it, then open either assistant. This keeps long-lived OpenAI/Anthropic keys out of a public GitHub Pages app.</p>
+        <textarea id="aiBrief" rows="7"></textarea>
+        <div class="actions">
+          <button id="buildAiBriefBtn">Build brief</button>
+          <button id="openChatGPTBtn">Copy + ChatGPT</button>
+          <button id="openClaudeBtn">Copy + Claude</button>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><p class="step">05 / PUBLISH</p><h2>Upload to YouTube</h2></div>
+          <span class="badge">resumable upload</span>
+        </div>
+        <label>Google OAuth client ID<input id="googleClientId" type="text" placeholder="1234...apps.googleusercontent.com"></label>
+        <div class="actions">
+          <button id="connectYoutubeBtn">Connect YouTube</button>
+          <button id="disconnectYoutubeBtn">Disconnect</button>
+        </div>
+        <div class="form-grid two">
+          <label>Privacy
+            <select id="privacySelect"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select>
+          </label>
+          <label>Category
+            <select id="categorySelect"><option value="10">Music</option><option value="22">People & Blogs</option><option value="24">Entertainment</option></select>
+          </label>
+        </div>
+        <label>Description<textarea id="descriptionInput" rows="5" placeholder="Description, credits and links"></textarea></label>
+        <label>Tags<input id="tagsInput" type="text" placeholder="music, indie, pahadi, visualizer"></label>
+        <label class="inline-check"><input id="uploadPoster" type="checkbox" checked> Set current poster frame as custom thumbnail when permitted</label>
+        <button class="primary big" id="uploadYoutubeBtn" disabled>Upload rendered video</button>
+        <div class="progress"><i id="uploadProgress"></i></div>
+        <p class="muted small" id="uploadStatus">Render a video and connect YouTube first.</p>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <span>Ridge Studio V2 · browser-only</span>
+    <span>No Firestore · no server · no Suno scraping</span>
+  </footer>
+
+  <script type="module" src="./studio-v2.js"></script>
+</body>
+</html>
