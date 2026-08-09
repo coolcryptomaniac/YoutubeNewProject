@@ -15,9 +15,10 @@
 </header>
 <main>
 <section class="setup panel">
-  <div><p class="kicker">SETUP ONCE</p><h2>Only the keys that matter</h2></div>
-  <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="gsk_…"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password" placeholder="pk_… or leave empty"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
-  <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="ytState" class="chip">YouTube disconnected</span></div>
+  <div><p class="kicker">SETUP ONCE</p><h2>Only the keys that matter</h2><p class="muted">Saved locally in a version-independent browser vault so future V2 builds reuse them. Provider secrets are never committed to GitHub.</p></div>
+  <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="Groq API key"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password" placeholder="Browser/app key or leave empty"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
+  <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="ytState" class="chip">YouTube disconnected</span><span id="credentialState" class="chip">Checking saved settings…</span></div>
+  <div class="row"><button id="backupCredentials">Backup keys</button><button id="restoreCredentials">Restore keys</button><button id="forgetCredentials">Forget saved keys</button><input id="credentialFile" type="file" accept="application/json,.json" hidden><span class="muted">Backup files are encrypted with the passphrase you choose. YouTube access tokens are never stored.</span></div>
 </section>
 
 <section class="step-card panel" data-step="1">
@@ -63,7 +64,8 @@
 
 <section class="panel status-panel"><p class="kicker">STATUS</p><h2 id="status">Ready.</h2><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio V2.5 · separate from Claude studio · no Pexels API key · no Suno credential automation</footer>
+<footer>Ridge Studio V2.5 · separate from Claude studio · persistent local credentials · encrypted backup/restore</footer>
 <script type="module" src="./studio-v2-lite.js"></script>
+<script type="module" src="./studio-v2-credentials.js"></script>
 </body>
 </html>
