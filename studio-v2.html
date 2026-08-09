@@ -1,133 +1,69 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
-  <title>Ridge Studio V2.3 — Creator Plus</title>
-  <link rel="stylesheet" href="./studio-v2.css">
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Ridge Studio V2.5 — AI Music Video Editor</title>
+<link rel="stylesheet" href="./studio-v2-lite.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">RIDGE / STUDIO V2.3 CREATOR PLUS</p>
-      <h1>Song → <span>cinematic video</span> → YouTube.</h1>
-      <p class="lede">Separate from the Claude studio. Memory-safe media, free-tier AI, Groq metadata, Pexels stock video, lyrics videos, 30 audio-reactive visualizers, fantasy/rain/mythology/anime-style worlds, local original music fallback and retriable YouTube publishing.</p>
-    </div>
-    <div class="status-stack">
-      <span class="chip" id="storageChip">Storage checking…</span>
-      <span class="chip" id="memoryChip">Heap-safe cache</span>
-      <span class="chip" id="audioChip">No track</span>
-      <span class="chip" id="ytChip">YouTube disconnected</span>
-    </div>
-  </header>
+<header class="hero">
+  <div><p class="eyebrow">RIDGE / STUDIO V2.5</p><h1>Song in. <span>Kickass edit out.</span></h1><p>One lean workflow: lyrics + song → Groq understands it → Pexels searches / AI visuals → phonk-grade beat edit → thumbnail → YouTube.</p></div>
+  <div class="hero-actions"><button class="primary mega" id="fullAuto">FULL AUTO</button><button id="resumeAuto" hidden>Resume Auto</button><label><input type="checkbox" id="pauseEach"> Pause after each step</label><span id="storage" class="chip">Storage…</span></div>
+</header>
+<main>
+<section class="setup panel">
+  <div><p class="kicker">SETUP ONCE</p><h2>Only the keys that matter</h2></div>
+  <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="gsk_…"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password" placeholder="pk_… or leave empty"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
+  <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="ytState" class="chip">YouTube disconnected</span></div>
+</section>
 
-  <main>
-    <section class="oneclick panel hero-panel">
-      <div class="oneclick-copy">
-        <p class="step">00 / ONE CLICK</p>
-        <h2>Create the complete release</h2>
-        <p class="muted">Ridge plans the release, creates music only when a verified free-tier music route exists, builds visuals and lyrics, makes the thumbnail, renders locally, then publishes with your YouTube OAuth. Creator Plus adds Groq, Pexels and an always-free local music fallback below.</p>
-        <div class="pipeline" id="pipelineSteps"><span>Plan</span><span>Music</span><span>Scenes</span><span>Lyrics</span><span>Thumbnail</span><span>Render</span><span>Publish</span></div>
-      </div>
-      <div class="oneclick-action">
-        <button class="primary mega" id="oneClickBtn">ONE CLICK → CREATE + PUBLISH</button>
-        <label class="inline-check"><input id="autoPublish" type="checkbox" checked> Upload to YouTube at the end</label>
-        <label class="inline-check"><input id="autoVideoClips" type="checkbox"> Add up to 2 AI video clips only if a free-tier video model is available</label>
-        <p class="status" id="oneClickStatus">Ready. Manual controls remain available below.</p>
-      </div>
-    </section>
+<section class="step-card panel" data-step="1">
+  <div class="step-head"><span class="num">1</span><div><h2>Lyrics + song</h2><p class="step-status">Write the idea, generate/edit lyrics, then make or load the song.</p></div></div>
+  <div class="grid three"><label>Song idea<textarea id="idea" rows="3" placeholder="Dark rainy drive through the hills, anger turning into freedom…"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option></select></label><label>Theme<select id="theme"></select></label></div>
+  <label>Lyrics<textarea id="lyrics" rows="10" placeholder="Groq lyrics appear here. Every line stays editable."></textarea></label><div class="subline"><span id="lyricCount">No timed lyrics</span><span id="mood">Not analyzed yet</span></div>
+  <div class="grid two"><label>Song source<select id="songSource"><option value="suno">Suno guided</option><option value="upload">Choose an existing/downloaded song</option><option value="local">Always-free local instrumental</option></select></label><label>Suno / music prompt<textarea id="sunoPrompt" rows="3" placeholder="Groq prepares this automatically."></textarea></label></div>
+  <input id="songFile" type="file" accept="audio/*" hidden>
+  <div class="audio-card"><audio id="audio" controls preload="metadata"></audio><span id="audioName">No song loaded</span></div>
+  <div class="actions"><button id="generateLyrics">Generate lyrics</button><button class="primary" id="runSong">Make / load song</button><button onclick="document.querySelector('#songFile').click()">Choose song</button><button data-restart="1">Restart from here</button></div>
+</section>
 
-    <section class="hero-grid">
-      <article class="panel">
-        <div class="panel-head"><div><p class="step">01 / CREATIVE</p><h2>Song idea + visual world</h2></div><span class="badge">V2 only</span></div>
-        <div class="form-grid two">
-          <label>Template<select id="templateSelect"></select></label>
-          <label>Language<select id="languageSelect"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option><option>Instrumental</option></select></label>
-        </div>
-        <label>Theme / story<textarea id="themeInput" rows="3" placeholder="e.g. leaving Almora for the city, then missing the quiet hills"></textarea></label>
-        <label>Music-generation prompt<textarea id="musicPrompt" rows="5"></textarea></label>
-        <div class="actions"><button id="buildPromptBtn">Rebuild prompt</button><button id="copyPromptBtn">Copy prompt</button><button id="openSunoBtn">Suno Assist ↗</button></div>
-        <p class="muted small">Suno remains an assisted handoff. V2 does not scrape cookies/session tokens or private Suno endpoints.</p>
-      </article>
+<section class="step-card panel" data-step="2">
+  <div class="step-head"><span class="num">2</span><div><h2>Groq understands the real song</h2><p class="step-status">Whisper listens to the audio; Groq builds accurate lyrics, title, description, hashtags, search phrases and visual direction.</p></div></div>
+  <div class="grid two"><label>Final title<input id="title" type="text"></label><label>Thumbnail headline<input id="thumbHeadline" type="text"></label></div>
+  <label>Description<textarea id="description" rows="5"></textarea></label><label>Hashtags | tags<input id="hashtags" type="text" placeholder="#phonk #musicvideo | phonk, drift, anime edit"></label>
+  <div class="actions"><button class="primary" id="analyze">Analyze song</button><button data-restart="2">Restart from here</button></div>
+</section>
 
-      <article class="panel">
-        <div class="panel-head"><div><p class="step">02 / AI ENGINE</p><h2>Free-tier lock</h2></div><span class="badge safe">NO PAID FALLBACK</span></div>
-        <p class="muted">Your browser-safe Pollinations key is used only after V2 checks the live model catalogue. Models marked paid-only are excluded. If no eligible free music/video route exists, V2 stops that stage instead of spending paid credits.</p>
-        <label>Pollinations browser/app key<input id="pollinationsKey" type="password" autocomplete="off" placeholder="pk_…"></label>
-        <div class="actions"><button id="testAiKeyBtn">Test key + free models</button><button id="refreshFreeModelsBtn">Refresh free models</button><button id="clearAiKeyBtn">Forget key</button></div>
-        <p class="status free-lock" id="freeTierStatus">Free-tier lock ON.</p>
-        <div class="form-grid two">
-          <label>Text / packaging<select id="textModel"><option value="">Checking…</option></select></label>
-          <label>Music<select id="musicModel"><option value="">Checking…</option></select></label>
-          <label>Image<select id="imageModel"><option value="">Checking…</option></select></label>
-          <label>Video<select id="videoModel"><option value="">Checking…</option></select></label>
-        </div>
-        <div class="form-grid three">
-          <label>Song length<select id="musicDuration"><option value="30">30 sec</option><option value="60">60 sec</option><option value="120" selected>2 min</option><option value="180">3 min</option><option value="240">4 min</option><option value="300">5 min</option></select></label>
-          <label>Scene count<select id="sceneCount"><option>4</option><option selected>6</option><option>8</option><option>10</option><option>12</option></select></label>
-          <label>AI clip length<select id="clipDuration"><option value="4">4 sec</option><option value="5" selected>5 sec</option><option value="8">8 sec</option></select></label>
-        </div>
-        <p class="status" id="aiStatus">Test your key to verify current free-tier routes.</p>
-      </article>
-    </section>
+<section class="step-card panel" data-step="3">
+  <div class="step-head"><span class="num">3</span><div><h2>Find + import visuals</h2><p class="step-status">No Pexels API key. Groq fills the search; download what you like and V2 copies the newest files into its browser disk vault.</p></div></div>
+  <div class="pexels-desk"><input id="pexelsSearch" type="search" placeholder="Groq visual search"><button id="openPexelsPhotos">Pexels Photos ↗</button><button id="openPexelsVideos">Pexels Videos ↗</button></div><div class="chips" id="searchChips"></div>
+  <div class="folder"><button id="chooseFolder">Choose Downloads folder</button><span id="folderName">No folder selected</span><button class="primary" id="scanFolder">Import newest downloads</button><button id="addMedia">Add downloaded files</button><input id="mediaFiles" type="file" accept="image/*,video/*" multiple hidden></div>
+  <div class="row switches"><label><input type="checkbox" id="useDownloads" checked> Use downloaded media</label><label><input type="checkbox" id="usePollinations" checked> Add Pollinations images</label><button id="generateImages">Generate 4 AI images</button></div>
+  <div class="progress"><i id="mediaProgress"></i></div><p id="mediaStatus" class="muted">Downloaded images/videos are resized if needed and stored disk-backed.</p><div class="scene-strip" id="sceneStrip"></div><div class="subline"><span id="sceneCount">0 scenes</span></div>
+  <div class="actions"><button class="primary" id="buildVisuals">Build / refresh visuals</button><button data-restart="3">Clear + restart visuals</button></div>
+</section>
 
-    <section class="hero-grid">
-      <article class="panel drop-panel">
-        <div class="panel-head"><div><p class="step">03 / TRACK</p><h2>Load or create the song</h2></div><span class="badge">stream-decoded</span></div>
-        <label class="dropzone" id="audioDrop"><input id="audioFile" type="file" accept="audio/*" hidden><strong>Drop MP3 / WAV / M4A here</strong><span>or use free-tier music generation when available</span></label>
-        <div class="actions"><button class="primary" id="generateMusicBtn">Generate music now</button><button id="clearAudioBtn">Clear track</button></div>
-        <div class="track-card" id="trackCard" hidden><div><strong id="trackName">Track</strong><span id="trackMeta">—</span></div><audio id="audioPlayer" controls preload="metadata"></audio></div>
-        <div class="meters"><div><span>Low</span><b id="energyMeter">—</b></div><div><span>Mid</span><b id="brightnessMeter">—</b></div><div><span>High</span><b id="dynamicsMeter">—</b></div><div><span>Duration</span><b id="durationMeter">—</b></div></div>
-      </article>
+<section class="step-card panel edit-panel" data-step="4">
+  <div class="step-head"><span class="num">4</span><div><h2>AI automatic editor</h2><p class="step-status">Beat-reactive cuts, zoom, shake, flash, glitch, speed lines, lyrics, intro/outro and visualizer render together.</p></div></div>
+  <div class="editor-grid">
+    <div><div class="stage"><canvas id="stage" width="1280" height="720"></canvas></div><div class="actions"><button id="previewBtn">Play preview</button><button id="stopBtn">Stop</button><button class="primary" id="renderBtn">Render final WebM</button><button id="downloadVideo" disabled>Download video</button></div><div class="progress"><i id="renderProgress"></i></div><p id="renderStatus" class="muted">Ready to render.</p></div>
+    <div class="controls"><label>Edit style<select id="editStyle"></select></label><label>Visualizer<select id="visualizer"></select></label><label>Lyrics animation<select id="lyricStyle"></select></label><label>Intro / outro pattern<select id="cardStyle"></select></label><label>Thumbnail pattern<select id="thumbStyle"></select></label><label class="check"><input type="checkbox" id="introOutro" checked> Use intro + outro</label><label>Intro text<input id="introText" type="text" placeholder="Auto from Groq"></label><label>Outro text<input id="outroText" type="text" placeholder="Auto from Groq"></label><div class="thumb-box"><img id="thumb" hidden alt="thumbnail"><span>Thumbnail preview</span></div><div class="actions"><button id="makeThumb">Make thumbnail</button><button id="downloadThumb" disabled>Download JPG</button></div></div>
+  </div>
+  <div class="actions"><button data-restart="4">Render again from here</button></div>
+</section>
 
-      <article class="panel">
-        <div class="panel-head"><div><p class="step">04 / MEDIA</p><h2>Images + video scenes</h2></div><span class="badge">disk-backed vault</span></div>
-        <label class="dropzone compact" id="imageDrop"><input id="sceneFiles" type="file" accept="image/*,video/*" multiple hidden><strong>Add many images or video clips</strong><span>Large images are resized once; only current/next scenes are decoded.</span></label>
-        <div class="actions"><button id="generateScenesBtn">Generate AI scenes</button><button id="generateClipsBtn">Generate free AI clips</button><button id="clearScenesBtn">Clear scenes</button></div>
-        <div class="scene-strip" id="sceneStrip"></div><div class="progress"><i id="sceneProgress"></i></div>
-        <p class="status" id="sceneStatus">IndexedDB media vault · decoded cache capped.</p>
-      </article>
-    </section>
+<section class="step-card panel" data-step="5">
+  <div class="step-head"><span class="num">5</span><div><h2>YouTube</h2><p class="step-status">Final checkpoint. Upload only when you like the render.</p></div></div>
+  <div class="grid two"><label>Privacy<select id="privacy"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><div class="muted">Thumbnail uploads with the video when your channel allows custom thumbnails.</div></div>
+  <button class="primary big" id="uploadBtn" disabled>Upload final video</button><div class="progress"><i id="uploadProgress"></i></div><p id="uploadStatus" class="muted">Connect YouTube and render first.</p><div class="actions"><button data-restart="5">Retry upload</button></div>
+</section>
 
-    <section class="studio-grid">
-      <article class="panel canvas-panel">
-        <div class="panel-head"><div><p class="step">05 / LOOK + RENDER</p><h2>Cinematic music / lyrics video</h2></div><div class="preview-actions"><button id="previewBtn">Preview</button><button id="stopPreviewBtn">Stop</button></div></div>
-        <div class="stage-wrap"><canvas id="stage" width="1280" height="720"></canvas><div class="stage-hud"><span id="hudTemplate">Template</span><span id="hudVisualizer">Visualizer</span><span id="hudQuality">Auto quality</span></div></div>
-        <div class="render-controls form-grid three">
-          <label>Resolution<select id="resolutionSelect"><option value="auto" selected>Auto safe</option><option value="720">1280 × 720</option><option value="1080">1920 × 1080</option></select></label>
-          <label>FPS<select id="fpsSelect"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select></label>
-          <label>Renderer<select id="renderStore"><option value="opfs" selected>Disk-backed</option><option value="memory">Memory fallback</option></select></label>
-        </div>
-        <div class="render-row"><button class="primary big" id="renderBtn">Render final WebM</button><button id="downloadBtn" disabled>Download video</button><button id="posterBtn">Save poster</button></div>
-        <div class="progress"><i id="renderProgress"></i></div><p class="status" id="renderStatus">NaN-safe render state · disk-backed chunks when supported.</p>
-      </article>
-
-      <aside class="control-stack">
-        <article class="panel"><p class="step">VISUALIZER · 30</p><div class="visual-grid" id="visualGrid"></div><label class="inline-check"><input id="autoVisual" type="checkbox" checked> Follow template automatically</label><label class="inline-check"><input id="sceneReactive" type="checkbox" checked> Beat-reactive scene movement</label></article>
-        <article class="panel"><p class="step">TITLE OVERLAY</p><label>Video title<input id="videoTitle" type="text" placeholder="Song title"></label><label>Subtitle<input id="videoSubtitle" type="text" placeholder="Artist / channel"></label><div class="form-grid two"><label>Title position<select id="titlePosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label><label>Film grain<select id="grainSelect"><option value="0">Off</option><option value="0.025">Light</option><option value="0.055" selected>Cinematic</option><option value="0.09">Heavy</option></select></label></div></article>
-        <article class="panel lyrics-card">
-          <div class="panel-head"><div><p class="step">LYRICS VIDEO</p><h2>Auto-timed typography</h2></div><span class="badge">new</span></div>
-          <label class="inline-check"><input id="lyricsEnabled" type="checkbox" checked> Render lyrics into the final video</label>
-          <div class="form-grid two"><label>Mode<select id="lyricsMode"><option value="hybrid" selected>Hybrid · visual + lyrics</option><option value="lyrics">Lyrics focus</option><option value="visual">Visual focus</option></select></label><label>Style<select id="lyricsStyle"><option value="cinematic" selected>Cinematic</option><option value="karaoke">Karaoke</option><option value="minimal">Minimal</option><option value="neon">Neon</option></select></label></div>
-          <label>Lyrics<textarea id="lyricsInput" rows="10" placeholder="[Verse]\nFirst line…\nSecond line…\n\n[Chorus]\nHook…"></textarea></label>
-          <div class="actions"><button id="useGeneratedLyricsBtn">Use generated lyrics</button><button id="syncLyricsBtn">Auto-sync to song</button></div>
-          <p class="status" id="lyricsStatus">Paste lyrics or generate a package.</p>
-        </article>
-        <article class="panel thumbnail-card"><p class="step">THUMBNAIL</p><div class="thumb-preview" id="thumbPreview"><span>No thumbnail yet</span></div><label>Headline<input id="thumbnailHeadline" type="text" placeholder="2–5 words"></label><div class="actions"><button id="generateThumbBtn">Generate thumbnail</button><button id="downloadThumbBtn" disabled>Download JPG</button></div></article>
-      </aside>
-    </section>
-
-    <section class="bottom-grid">
-      <article class="panel"><div class="panel-head"><div><p class="step">06 / PACKAGE</p><h2>Title, description, lyrics, tags + prompts</h2></div><span class="badge">free AI or deterministic fallback</span></div><textarea id="aiBrief" rows="7"></textarea><div class="actions"><button id="generatePackageBtn">Generate package</button><button id="buildAiBriefBtn">Build external brief</button><button id="openChatGPTBtn">Copy + ChatGPT</button><button id="openClaudeBtn">Copy + Claude</button></div><label>Pinned comment<input id="pinnedComment" type="text" placeholder="Generated idea"></label><p class="status" id="packageStatus">One Click fills publishing fields and lyrics automatically when a free text route is available.</p></article>
-
-      <article class="panel"><div class="panel-head"><div><p class="step">07 / PUBLISH</p><h2>YouTube publisher</h2></div><span class="badge">authenticated + retriable</span></div><label>Google OAuth Web Client ID<input id="googleClientId" type="text" placeholder="1234…apps.googleusercontent.com"></label><div class="actions"><button id="connectYoutubeBtn">Connect YouTube</button><button id="disconnectYoutubeBtn">Disconnect</button></div><div class="form-grid two"><label>Privacy<select id="privacySelect"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><label>Category<select id="categorySelect"><option value="10">Music</option><option value="22">People & Blogs</option><option value="24">Entertainment</option></select></label></div><label>Description<textarea id="descriptionInput" rows="6" placeholder="Description, credits and links"></textarea></label><label>Tags<input id="tagsInput" type="text" placeholder="music, indie, pahadi, visualizer"></label><label class="inline-check"><input id="uploadPoster" type="checkbox" checked> Upload generated thumbnail / poster when permitted</label><button class="primary big" id="uploadYoutubeBtn" disabled>Upload final video</button><div class="progress"><i id="uploadProgress"></i></div><p class="status" id="uploadStatus">Render a video and connect YouTube first.</p></article>
-    </section>
-
-    <section class="panel activity-panel"><div class="panel-head"><div><p class="step">ACTIVITY</p><h2>Pipeline log</h2></div><button id="clearLogBtn">Clear</button></div><div class="log" id="activityLog"><div>Studio V2.3 Creator Plus ready.</div></div></section>
-  </main>
-  <footer><span>Ridge Studio V2.3 Creator Plus · separate from Claude studio</span><span>Free-first · private batch drafts · no Firestore · no Suno scraping</span></footer>
-  <script type="module" src="./studio-v2-main.js"></script>
+<section class="panel status-panel"><p class="kicker">STATUS</p><h2 id="status">Ready.</h2><div id="log" class="log"></div></section>
+</main>
+<footer>Ridge Studio V2.5 · separate from Claude studio · no Pexels API key · no Suno credential automation</footer>
+<script type="module" src="./studio-v2-lite.js"></script>
 </body>
 </html>
