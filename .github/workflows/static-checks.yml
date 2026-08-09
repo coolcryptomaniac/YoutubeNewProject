@@ -33,19 +33,21 @@ jobs:
           node --check studio-v2-music.js
           node --check studio-v2-creative.js
           node --check studio-v2-creative-boot.js
-          node --check studio-v2-plus.js
+          node --check studio-v2-simple.js
           node --check studio-v2-main.js
       - name: V2 regression self-tests
         run: |
           node --experimental-default-type=module tests/studio-v2-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-youtube-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-plus-selftest.mjs
+          node --experimental-default-type=module tests/studio-v2-simple-selftest.mjs
       - name: Required V2 files
         run: |
           test -f studio-v2.html
           test -f studio-v2.css
           test -f studio-v2.js
           test -f studio-v2-main.js
+          test -f studio-v2-simple.js
           test -f studio-v2-core.js
           test -f studio-v2-youtube.js
           test -f studio-v2-media.js
@@ -55,7 +57,6 @@ jobs:
           test -f studio-v2-stock.js
           test -f studio-v2-music.js
           test -f studio-v2-creative.js
-          test -f studio-v2-plus.js
       - name: V2 DOM references
         run: |
           node --input-type=module <<'NODE'
@@ -65,10 +66,11 @@ jobs:
           const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
           const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
           const missing=[...refs].filter(x=>!ids.has(x));
-          if(missing.length){console.error('Missing DOM ids:',missing);process.exit(1)}
-          console.log(`DOM references OK: ${refs.size}`);
+          if(missing.length){console.error('Missing core DOM ids:',missing);process.exit(1)}
           const main=fs.readFileSync('studio-v2-main.js','utf8');
-          if(!main.includes("./studio-v2-creative-boot.js")||!main.includes("./studio-v2-plus.js")||!main.includes("./studio-v2.js")) throw new Error('Creator Plus boot order missing');
+          if(!main.includes("./studio-v2-creative-boot.js")||!main.includes("./studio-v2.js")||!main.includes("./studio-v2-simple.js")) throw new Error('Simple Mode boot order missing');
+          if(main.includes("./studio-v2-plus.js")) throw new Error('Old Creator Plus/Daily Factory must not boot in Simple Mode');
+          console.log(`Core DOM references OK: ${refs.size}; Simple Mode is default.`);
           NODE
       - name: Reject committed secret-like tokens
         shell: bash
