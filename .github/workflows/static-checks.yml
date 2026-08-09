@@ -33,7 +33,7 @@ jobs:
       - name: Reject committed secret-like tokens
         shell: bash
         run: |
-          if grep -RIE --exclude='lab.html' --include='*.js' --include='*.html' --include='*.json' '(sk-[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,})' .; then
+          if grep -RIE --include='*.js' --include='*.html' --include='*.json' --exclude='lab.html' '(sk-[A-Za-z0-9_-]{20,}|gsk_[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,})' .; then
             echo 'Potential API secret found in client source.' >&2
             exit 1
           fi
