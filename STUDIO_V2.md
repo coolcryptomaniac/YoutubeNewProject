@@ -1,44 +1,58 @@
 # Ridge Studio V2
 
-`studio-v2.html` is an additive GitHub Pages music-video studio. It does not require Firestore, Firebase, a server, npm, or a build step.
+`studio-v2.html` is the separate, browser-first one-click music-video workflow. It remains independent from the Claude-built `music.html` studio.
 
-## What it adds
+## V2.1 memory architecture
 
-- 12 reusable music/visual templates.
-- 10 audio-reactive visualisers: Spectrum, Radial, Wave, Orbit, Ribbon, Tunnel, Particles, Mountain, Kaleido and Rain.
-- Multi-image scene backgrounds with slow motion and crossfades.
-- Real-time browser rendering to WebM with the track embedded as audio.
-- Poster-frame JPEG export.
-- Google OAuth and direct resumable YouTube upload, with optional custom-thumbnail upload.
-- Suno handoff: build/copy a music prompt, open Suno, then drop the downloaded audio back into Ridge.
-- ChatGPT and Claude handoff buttons that copy a detailed packaging prompt and open the selected assistant, without storing either provider's secret API key in the page.
+V2.1 does not try to “increase the JavaScript heap”; browsers control that limit. It avoids exhausting it instead:
 
-## Install
+- Uploaded images are decoded **one at a time**, resized/compressed, written to IndexedDB, and the original decoded bitmap is released immediately.
+- The renderer keeps at most **three decoded images** and **two video elements** hot at once.
+- Uploaded and generated video scenes stay as blobs in IndexedDB and are only decoded when they are the current/next scene.
+- Audio is not kept decoded while you edit. It is decoded only for the final render and released when rendering finishes.
+- On Chromium, final MediaRecorder chunks stream to **Origin Private File System (OPFS)**. The finished `File` is disk-backed, so a long render no longer requires a same-sized array of video chunks in RAM.
+- `navigator.storage.estimate()` is shown in the UI, and V2 requests persistent origin storage where the browser allows it.
 
-Copy these files into the repository root:
+## One-click workflow
 
-- `studio-v2.html`
-- `studio-v2.css`
-- `studio-v2.js`
-- `AGENTS.md`
-- `CLAUDE.md`
+The **ONE CLICK → CREATE + PUBLISH** button can:
 
-Copy `.github/workflows/static-checks.yml` into the same path in the repository.
+1. Create the AI release package (song prompt, title, description, tags, thumbnail direction and scene prompts).
+2. Generate a song if no audio is loaded.
+3. Generate scene images.
+4. Optionally generate two real AI video clips.
+5. Generate a 1280×720 thumbnail with a readable headline.
+6. Render the full audio-reactive WebM.
+7. Upload the video and thumbnail to YouTube when OAuth is connected.
 
-Because the repo is already a static GitHub Pages site, the V2 studio will be available at:
+You can still run every stage manually.
 
-`https://coolcryptomaniac.github.io/YoutubeNewProject/studio-v2.html`
+## AI engine
 
-If the Pages site uses a custom domain, use `/studio-v2.html` on that domain instead.
+V2.1 uses Pollinations as the optional unified generation provider because it supports browser-safe **publishable keys (`pk_…`)** and exposes text, image, video and music generation from one API. Keep secret `sk_…` keys out of GitHub Pages.
 
-## YouTube setup
+V2 exposes selectable text routing (OpenAI / Claude / Gemini / DeepSeek through Pollinations), image models, video models, and music models including ElevenMusic and Stable Audio. Generation consumes whatever credits/budget are attached to your Pollinations account/key; it is not assumed to be unlimited or free.
 
-Use the same Google OAuth Web Client ID as the existing app. The authorized JavaScript origin must include the GitHub Pages origin. The V2 page stores only the client ID in localStorage; the short-lived OAuth access token is held in memory and disappears on refresh.
+Without a Pollinations key:
 
-## Browser notes
-
-Chrome/Edge are the preferred browsers because the workflow depends on `MediaRecorder`, `canvas.captureStream()`, Web Audio and Google Identity Services. Rendering is real-time: a four-minute song takes about four minutes to render and the tab should remain visible.
+- your own uploaded audio works;
+- anonymous Pollinations image generation is attempted as a fallback;
+- metadata has a deterministic fallback;
+- automatic music and video generation are disabled.
 
 ## Suno
 
-Do not paste Suno cookies or session tokens into this project and do not depend on unofficial reverse-engineered endpoints. V2 intentionally treats Suno as a handoff: prompt -> Suno website -> downloaded audio -> Ridge.
+Suno remains an assisted handoff. V2 copies the generated music prompt and opens Suno. A static GitHub Pages app cannot safely fill or operate a logged-in Suno page because of browser same-origin isolation, and V2 deliberately does not scrape private endpoints, copy session cookies, or embed Suno account credentials.
+
+If you want a fully automatic song in the one-click pipeline, choose one of the supported music generators in **AI Engine** instead.
+
+## YouTube
+
+Use the same Google OAuth Web Client ID as the existing project. V2 requests only the YouTube upload scope. Privacy defaults to **Private**. OAuth access tokens are held in memory and disappear on refresh.
+
+## Rendering notes
+
+- Chrome/Edge are preferred for OPFS, MediaRecorder, Canvas capture and Web Audio.
+- Rendering is real time so a three-minute song takes about three minutes.
+- `Auto safe` chooses 720p on lower-memory devices and 1080p on devices reporting at least ~6 GB via `navigator.deviceMemory`.
+- 60 fps is available but 30 fps is the recommended default for mobile stability.
