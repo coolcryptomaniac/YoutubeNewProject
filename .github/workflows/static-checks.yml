@@ -23,30 +23,36 @@ jobs:
           node --check visuals.js
           node --check lyrics.js
           node --check studio-v2.js
-          node --check studio-v2-ai.js
           node --check studio-v2-media.js
+          node --check studio-v2-ai.js
           node --check studio-v2-visuals.js
+          node --check studio-v2-core.js
+          node --check studio-v2-youtube.js
+      - name: V2 regression self-tests
+        run: |
+          node --experimental-default-type=module tests/studio-v2-selftest.mjs
+          node --experimental-default-type=module tests/studio-v2-youtube-selftest.mjs
       - name: Required V2 files
         run: |
           test -f studio-v2.html
           test -f studio-v2.css
           test -f studio-v2.js
-          test -f studio-v2-ai.js
+          test -f studio-v2-core.js
+          test -f studio-v2-youtube.js
           test -f studio-v2-media.js
+          test -f studio-v2-ai.js
           test -f studio-v2-visuals.js
-          test -f AGENTS.md
-          test -f CLAUDE.md
       - name: V2 DOM references
         run: |
-          node - <<'NODE'
-          const fs=require('fs');
-          const html=fs.readFileSync('studio-v2.html','utf8');
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
           const js=fs.readFileSync('studio-v2.js','utf8');
-          const ids=new Set([...html.matchAll(/id="([A-Za-z][\w-]*)"/g)].map(x=>x[1]));
-          const refs=[...js.matchAll(/\$\('#([^']+)'\)/g)].map(x=>x[1]).filter(x=>!x.includes(' ')&&!x.includes('['));
-          const missing=[...new Set(refs.filter(x=>!ids.has(x)))];
+          const html=fs.readFileSync('studio-v2.html','utf8');
+          const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
+          const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
+          const missing=[...refs].filter(x=>!ids.has(x));
           if(missing.length){console.error('Missing DOM ids:',missing);process.exit(1)}
-          console.log(`Checked ${refs.length} direct V2 DOM references.`);
+          console.log(`DOM references OK: ${refs.size}`);
           NODE
       - name: Reject committed secret-like tokens
         shell: bash
