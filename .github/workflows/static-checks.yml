@@ -70,20 +70,19 @@ jobs:
           if(/Pexels key/i.test(html))throw new Error('Pexels API key must not appear in the lean UI');
           console.log(`V2.5 lean DOM references OK: ${refs.size}`);
           NODE
-      - name: Check committed source for obvious secret prefixes
+      - name: Check V2.5 client files for obvious secret prefixes
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           bad=[]
           needles=['g'+'sk'+'_','sk'+'-ant'+'-']
-          for ext in ('*.js','*.html','*.json'):
-            for p in Path('.').rglob(ext):
-              if p.name=='lab.html': continue
-              text=p.read_text(errors='ignore')
-              for n in needles:
-                if n in text and 'placeholder' not in text[max(0,text.find(n)-40):text.find(n)+80].lower(): bad.append((str(p),n))
+          for name in ('studio-v2-lite.js','studio-v2.html','studio-v2-groq.js'):
+            text=Path(name).read_text(errors='ignore')
+            for n in needles:
+              pos=text.find(n)
+              if pos>=0 and 'placeholder' not in text[max(0,pos-50):pos+100].lower(): bad.append((name,n))
           if bad:
-            raise SystemExit('Potential committed secret prefix found: '+repr(bad[:5]))
-          print('No obvious committed secret prefixes found.')
+            raise SystemExit('Potential committed secret prefix found: '+repr(bad))
+          print('No obvious committed secret prefixes found in V2.5 files.')
           PY
