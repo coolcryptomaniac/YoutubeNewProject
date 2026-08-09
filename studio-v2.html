@@ -4,16 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>Ridge Studio V2.2 — one-click music video creator</title>
+  <title>Ridge Studio V2.3 — Creator Plus</title>
   <link rel="stylesheet" href="./studio-v2.css">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">RIDGE / STUDIO V2.2</p>
+      <p class="eyebrow">RIDGE / STUDIO V2.3 CREATOR PLUS</p>
       <h1>Song → <span>cinematic video</span> → YouTube.</h1>
-      <p class="lede">Separate from the Claude studio. Memory-safe media, free-tier-locked AI, lyrics videos, 20 audio-reactive visualizers, cinematic thumbnail/metadata generation, disk-backed rendering and retriable YouTube publishing.</p>
+      <p class="lede">Separate from the Claude studio. Memory-safe media, free-tier AI, Groq metadata, Pexels stock video, lyrics videos, 30 audio-reactive visualizers, fantasy/rain/mythology/anime-style worlds, local original music fallback and retriable YouTube publishing.</p>
     </div>
     <div class="status-stack">
       <span class="chip" id="storageChip">Storage checking…</span>
@@ -28,7 +28,7 @@
       <div class="oneclick-copy">
         <p class="step">00 / ONE CLICK</p>
         <h2>Create the complete release</h2>
-        <p class="muted">Ridge plans the release, creates music only when a verified free-tier music route exists, builds visuals and lyrics, makes the thumbnail, renders locally, then publishes with your YouTube OAuth. It never intentionally falls back to a paid-only AI model.</p>
+        <p class="muted">Ridge plans the release, creates music only when a verified free-tier music route exists, builds visuals and lyrics, makes the thumbnail, renders locally, then publishes with your YouTube OAuth. Creator Plus adds Groq, Pexels and an always-free local music fallback below.</p>
         <div class="pipeline" id="pipelineSteps"><span>Plan</span><span>Music</span><span>Scenes</span><span>Lyrics</span><span>Thumbnail</span><span>Render</span><span>Publish</span></div>
       </div>
       <div class="oneclick-action">
@@ -105,7 +105,7 @@
       </article>
 
       <aside class="control-stack">
-        <article class="panel"><p class="step">VISUALIZER · 20</p><div class="visual-grid" id="visualGrid"></div><label class="inline-check"><input id="autoVisual" type="checkbox" checked> Follow template automatically</label><label class="inline-check"><input id="sceneReactive" type="checkbox" checked> Beat-reactive scene movement</label></article>
+        <article class="panel"><p class="step">VISUALIZER · 30</p><div class="visual-grid" id="visualGrid"></div><label class="inline-check"><input id="autoVisual" type="checkbox" checked> Follow template automatically</label><label class="inline-check"><input id="sceneReactive" type="checkbox" checked> Beat-reactive scene movement</label></article>
         <article class="panel"><p class="step">TITLE OVERLAY</p><label>Video title<input id="videoTitle" type="text" placeholder="Song title"></label><label>Subtitle<input id="videoSubtitle" type="text" placeholder="Artist / channel"></label><div class="form-grid two"><label>Title position<select id="titlePosition"><option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option></select></label><label>Film grain<select id="grainSelect"><option value="0">Off</option><option value="0.025">Light</option><option value="0.055" selected>Cinematic</option><option value="0.09">Heavy</option></select></label></div></article>
         <article class="panel lyrics-card">
           <div class="panel-head"><div><p class="step">LYRICS VIDEO</p><h2>Auto-timed typography</h2></div><span class="badge">new</span></div>
@@ -125,9 +125,9 @@
       <article class="panel"><div class="panel-head"><div><p class="step">07 / PUBLISH</p><h2>YouTube publisher</h2></div><span class="badge">authenticated + retriable</span></div><label>Google OAuth Web Client ID<input id="googleClientId" type="text" placeholder="1234…apps.googleusercontent.com"></label><div class="actions"><button id="connectYoutubeBtn">Connect YouTube</button><button id="disconnectYoutubeBtn">Disconnect</button></div><div class="form-grid two"><label>Privacy<select id="privacySelect"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><label>Category<select id="categorySelect"><option value="10">Music</option><option value="22">People & Blogs</option><option value="24">Entertainment</option></select></label></div><label>Description<textarea id="descriptionInput" rows="6" placeholder="Description, credits and links"></textarea></label><label>Tags<input id="tagsInput" type="text" placeholder="music, indie, pahadi, visualizer"></label><label class="inline-check"><input id="uploadPoster" type="checkbox" checked> Upload generated thumbnail / poster when permitted</label><button class="primary big" id="uploadYoutubeBtn" disabled>Upload final video</button><div class="progress"><i id="uploadProgress"></i></div><p class="status" id="uploadStatus">Render a video and connect YouTube first.</p></article>
     </section>
 
-    <section class="panel activity-panel"><div class="panel-head"><div><p class="step">ACTIVITY</p><h2>Pipeline log</h2></div><button id="clearLogBtn">Clear</button></div><div class="log" id="activityLog"><div>Studio V2.2 ready.</div></div></section>
+    <section class="panel activity-panel"><div class="panel-head"><div><p class="step">ACTIVITY</p><h2>Pipeline log</h2></div><button id="clearLogBtn">Clear</button></div><div class="log" id="activityLog"><div>Studio V2.3 Creator Plus ready.</div></div></section>
   </main>
-  <footer><span>Ridge Studio V2.2 · separate from Claude studio</span><span>Free-tier lock · no Firestore · no Suno scraping</span></footer>
-  <script type="module" src="./studio-v2.js"></script>
+  <footer><span>Ridge Studio V2.3 Creator Plus · separate from Claude studio</span><span>Free-first · private batch drafts · no Firestore · no Suno scraping</span></footer>
+  <script type="module" src="./studio-v2-main.js"></script>
 </body>
 </html>
