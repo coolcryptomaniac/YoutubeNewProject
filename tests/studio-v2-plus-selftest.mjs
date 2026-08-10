@@ -7,7 +7,7 @@ import {GROQ_MODEL} from '../studio-v2-groq.js';
 assert.equal(EXTRA_TEMPLATES.length,12);
 assert.equal(Object.keys(EXTRA_VISUALS).length,10);
 assert.equal(THEME_PACKS.length,12);
-assert.equal(GROQ_MODEL,'llama-3.1-8b-instant');
+assert.equal(GROQ_MODEL,'openai/gpt-oss-20b');
 assert.ok(EXTRA_TEMPLATES.some(x=>x.id==='rain-temple'));
 assert.ok(EXTRA_TEMPLATES.some(x=>x.id==='ninja-storm'));
 assert.ok(EXTRA_TEMPLATES.every(x=>!JSON.stringify(x).toLowerCase().includes('naruto')),'use original anime worlds, not copyrighted franchise prompts');

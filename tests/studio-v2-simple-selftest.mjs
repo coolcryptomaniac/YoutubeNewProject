@@ -5,7 +5,7 @@ import {GROQ_MODEL,GROQ_WHISPER_MODEL,GroqHelper} from '../studio-v2-groq.js';
 const simple=fs.readFileSync(new URL('../studio-v2-simple.js',import.meta.url),'utf8');
 const main=fs.readFileSync(new URL('../studio-v2-main.js',import.meta.url),'utf8');
 
-assert.equal(GROQ_MODEL,'llama-3.1-8b-instant');
+assert.equal(GROQ_MODEL,'openai/gpt-oss-20b');
 assert.equal(GROQ_WHISPER_MODEL,'whisper-large-v3-turbo');
 assert.equal(typeof GroqHelper.prototype.lyrics,'function');
 assert.equal(typeof GroqHelper.prototype.transcribeAudio,'function');
