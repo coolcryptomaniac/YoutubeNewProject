@@ -16,91 +16,75 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: JavaScript syntax
+
+      - name: V3 JavaScript syntax
         run: |
-          node --check core.js
-          node --check genres.js
-          node --check visuals.js
-          node --check lyrics.js
-          node --check studio-v2.js
-          node --check studio-v2-lite.js
-          node --check studio-v2-credentials.js
-          node --check studio-v2-media.js
-          node --check studio-v2-ai.js
-          node --check studio-v2-visuals.js
-          node --check studio-v2-core.js
-          node --check studio-v2-youtube.js
-          node --check studio-v2-groq.js
-          node --check studio-v2-stock.js
-          node --check studio-v2-music.js
-          node --check studio-v2-creative.js
-          node --check studio-v2-creative-boot.js
-          node --check studio-v2-simple.js
-          node --check studio-v2-main.js
-          node --check studio-v2-prompts.js
-          node --check studio-v2-learning.js
-          node --check studio-v2-bank.js
-          node --check studio-v2-combo.js
-      - name: V2 regression self-tests
-        run: |
-          node --experimental-default-type=module tests/studio-v2-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-youtube-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-plus-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-simple-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-lite-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-credentials-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-v26-selftest.mjs
-          node --experimental-default-type=module tests/studio-v2-v27-selftest.mjs
-      - name: Required V2 files
+          node --check studio-v3.js
+          node --check studio-v3-storage.js
+          node --check studio-v3-groq.js
+          node --check studio-v3-themes.js
+          node --check studio-v3-render.js
+          node --check studio-v3-publish.js
+
+      - name: V3 architecture regression tests
+        run: node --experimental-default-type=module tests/studio-v3-selftest.mjs
+
+      - name: Required V3 runtime files
         run: |
           test -f studio-v2.html
-          test -f studio-v2-lite.css
-          test -f studio-v2-lite.js
-          test -f studio-v2-credentials.js
-          test -f studio-v2-core.js
-          test -f studio-v2-youtube.js
-          test -f studio-v2-media.js
-          test -f studio-v2-ai.js
-          test -f studio-v2-visuals.js
-          test -f studio-v2-groq.js
-          test -f studio-v2-music.js
-          test -f studio-v2-creative.js
-          test -f studio-v2-prompts.js
-          test -f studio-v2-learning.js
-          test -f studio-v2-bank.js
-          test -f studio-v2-combo.js
-      - name: V2.7 DOM references
+          test -f studio-v3.css
+          test -f studio-v3.js
+          test -f studio-v3-storage.js
+          test -f studio-v3-groq.js
+          test -f studio-v3-themes.js
+          test -f studio-v3-render.js
+          test -f studio-v3-publish.js
+
+      - name: V3 DOM and runtime budget
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const html=fs.readFileSync('studio-v2.html','utf8');
+          const js=fs.readFileSync('studio-v3.js','utf8');
           const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
-          for(const file of ['studio-v2-lite.js','studio-v2-credentials.js','studio-v2-combo.js']){
-            const js=fs.readFileSync(file,'utf8');
-            const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
-            const missing=[...refs].filter(x=>!ids.has(x));
-            if(missing.length){console.error(`Missing DOM ids for ${file}:`,missing);process.exit(1)}
-          }
-          if(!html.includes('./studio-v2-lite.js'))throw new Error('Lean editor is not the page entrypoint');
-          if(!html.includes('./studio-v2-credentials.js'))throw new Error('Persistent credential vault is not loaded');
-          if(!html.includes('./studio-v2-combo.js'))throw new Error('Combo/learning layer is not loaded');
-          if(/Pexels key/i.test(html))throw new Error('Pexels API key must not appear in the lean UI');
-          if(!html.includes('CREATE VIDEO')||!html.includes('Advanced controls'))throw new Error('V2.7 simple shell missing');
-          console.log('V2.7 DOM + simple shell + credentials + combo references OK.');
+          const refs=new Set([...js.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
+          const missing=[...refs].filter(x=>!ids.has(x));
+          if(missing.length){console.error('Missing V3 DOM ids:',missing);process.exit(1)}
+          if(!html.includes('./studio-v3.js')||!html.includes('./studio-v3.css'))throw new Error('V3 runtime entrypoints missing');
+          for(const legacy of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-credentials.js'])if(html.includes(legacy))throw new Error('Legacy runtime still loaded: '+legacy);
+          const moduleScripts=[...html.matchAll(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)/g)].map(x=>x[1]);
+          if(moduleScripts.length!==1||moduleScripts[0]!=='./studio-v3.js')throw new Error('V3 should load exactly one local module entrypoint');
+          console.log(`V3 DOM OK: ${refs.size} references · one local module entrypoint`);
           NODE
-      - name: Check V2.7 client files for obvious secret prefixes
+
+      - name: V3 crash-risk guardrails
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          render=Path('studio-v3-render.js').read_text()
+          storage=Path('studio-v3-storage.js').read_text()
+          themes=Path('studio-v3-themes.js').read_text()
+          if 'decodeAudioData' in render: raise SystemExit('V3 must not full-decode song PCM during final render')
+          if 'class SceneLease' not in render or 'bitmap.close' not in render: raise SystemExit('Single-scene lease cleanup missing')
+          if '280*1024*1024' not in render: raise SystemExit('Memory fallback safety limit missing')
+          if "mode:'read'" not in storage or 'showDirectoryPicker' not in storage: raise SystemExit('Read-only folder flow missing')
+          if 'putAsset' in storage: raise SystemExit('Media blobs must not be copied into V3 IndexedDB')
+          if 'particles.push' in themes or 'stars.push' in themes: raise SystemExit('Unbounded animation state detected')
+          print('V3 crash-risk guardrails OK.')
+          PY
+
+      - name: Reject committed secret-like tokens
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           bad=[]
-          needles=['g'+'sk'+'_','sk'+'-ant'+'-']
-          for name in ('studio-v2-lite.js','studio-v2.html','studio-v2-groq.js','studio-v2-credentials.js','studio-v2-combo.js','studio-v2-prompts.js','studio-v2-learning.js','studio-v2-bank.js'):
+          needles=['g'+'sk'+'_','sk'+'-ant'+'-','sk'+'-proj'+'-']
+          for name in ('studio-v2.html','studio-v3.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js'):
             text=Path(name).read_text(errors='ignore')
             for n in needles:
               pos=text.find(n)
-              if pos>=0 and 'placeholder' not in text[max(0,pos-50):pos+100].lower(): bad.append((name,n))
-          if bad:
-            raise SystemExit('Potential committed secret prefix found: '+repr(bad))
-          print('No obvious committed secret prefixes found in V2.7 files.')
+              if pos>=0 and 'placeholder' not in text[max(0,pos-60):pos+120].lower(): bad.append((name,n))
+          if bad: raise SystemExit('Potential committed secret prefix found: '+repr(bad))
+          print('No obvious committed secret prefixes found in V3 runtime.')
           PY
