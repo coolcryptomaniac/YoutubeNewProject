@@ -4,87 +4,82 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Ridge Studio V2.7 — Create · Edit · Publish</title>
-<link rel="stylesheet" href="./studio-v2-lite.css">
+<title>Ridge Studio 3 — Create · Edit · Publish</title>
+<link rel="stylesheet" href="./studio-v3.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<header class="hero simple-hero">
-  <div><p class="eyebrow">RIDGE / STUDIO V2.7</p><h1>Add a song. <span>Create the video.</span></h1><p>One calm workflow. Ready-made ninja-anime, phonk, rain, lofi and cinematic templates. Advanced controls stay out of the way until you need them.</p></div>
-  <div class="hero-actions"><button class="primary mega" id="fullAuto">CREATE VIDEO</button><button id="resumeAuto" hidden>Resume</button><span id="storage" class="chip">Storage…</span></div>
+<div class="modal" id="firstRun" hidden>
+  <div class="modal-card">
+    <span class="pill">FIRST SETUP</span>
+    <h2>Use your own phone media — without copying it all into the browser.</h2>
+    <p>Choose one folder. Ridge asks for <b>read-only</b> access to that folder, indexes image/video names and sizes, and loads only the current scene when editing. The browser will always show the permission prompt; Ridge cannot silently read other folders.</p>
+    <div class="modal-actions"><button class="primary" id="firstRunFolder">Choose media folder</button><button id="firstRunSkip">Continue without a folder</button></div>
+    <small>On browsers without persistent folder access, use the file/folder picker in Settings. Procedural Naru templates also work with no external media.</small>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand"><span>RIDGE STUDIO 3</span><strong>Create · Edit · Publish</strong></div>
+  <div class="top-actions"><span class="health" id="storageState">Storage…</span><button id="settingsToggle">Settings</button></div>
 </header>
 
 <main>
-<section class="panel quick-start">
-  <div class="quick-top"><div><p class="kicker">1 · CREATE</p><h2>Choose a look + add your song</h2></div><span id="canonicalState" class="chip">One story package</span></div>
-  <div class="quick-grid">
-    <label>Ready-made template<select id="comboPreset"></select></label>
-    <label>Language<select id="language"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option></select></label>
-    <label>Song<input id="songFile" type="file" accept="audio/*"></label>
-  </div>
-  <label>Song idea <small>optional if the song already exists</small><textarea id="idea" rows="2" placeholder="A rain-soaked breakup song about revisiting the same tea stall..."></textarea></label>
-  <div class="actions"><button id="applyCombo">Apply template</button><button class="primary" id="comboAuto">APPLY + CREATE</button><button id="learnedCombo">Use learned favorite</button></div>
-  <div class="subline"><span id="comboState">Template keeps visuals, lyrics treatment, thumbnail and edit mood together.</span><span id="audioName">No song loaded</span></div>
-  <audio id="audio" controls preload="metadata"></audio>
-</section>
-
-<section class="panel edit-panel-simple">
-  <div class="quick-top"><div><p class="kicker">2 · EDIT</p><h2>Preview, fix, render</h2></div><span id="mood" class="chip">Waiting for song</span></div>
-  <div class="simple-editor">
-    <div>
-      <div class="stage"><canvas id="stage" width="1280" height="720"></canvas></div>
-      <div class="actions"><button id="previewBtn">Preview</button><button id="stopBtn">Stop</button><button class="primary" id="renderBtn">RENDER</button><button id="downloadVideo" disabled>Download</button></div>
-      <div class="progress"><i id="renderProgress"></i></div><p id="renderStatus" class="muted">Stable editor ready.</p>
+  <section class="hero card">
+    <div class="hero-copy"><span class="eyebrow">ONE CLICK MUSIC VIDEO</span><h1>Add a song. <em>Release a video.</em></h1><p>One lightweight editor, one scene decoded at a time, beat-aware cuts, readable lyrics, thumbnail, then publish.</p></div>
+    <div class="create-controls">
+      <label class="song-pick"><input id="songFile" type="file" accept="audio/*" hidden><span>Song</span><b id="songName">Choose MP3 / WAV / M4A</b></label>
+      <label>Ready-made look<select id="theme"></select></label>
+      <label>Format<select id="aspect"><option value="landscape">YouTube · 16:9</option><option value="vertical">Reels / Shorts · 9:16</option></select></label>
+      <button class="primary create" id="createBtn">CREATE VIDEO</button>
     </div>
-    <div class="simple-meta">
-      <label>Title<input id="title" type="text"></label>
-      <label>Description<textarea id="description" rows="5"></textarea></label>
-      <label>Hashtags + tags<input id="hashtags" type="text"></label>
-      <label>Lyrics<textarea id="lyrics" rows="8"></textarea></label>
-      <div class="subline"><span id="lyricCount">No timed lyrics</span><span id="languageCheck">Language check waiting.</span></div>
-      <div class="actions"><button id="generateLyrics">Rewrite / polish lyrics</button><button id="analyze">Re-analyze song</button><button data-restart="2">Restart analysis</button></div>
+  </section>
+
+  <section class="workspace">
+    <article class="card preview-card">
+      <div class="section-head"><div><span class="eyebrow">PREVIEW</span><h2>Automatic edit</h2></div><span class="health" id="qualityState">Safe quality</span></div>
+      <div class="stage"><canvas id="stage" width="960" height="540"></canvas></div>
+      <audio id="audio" controls preload="metadata"></audio>
+      <div class="actions"><button id="previewBtn">Play preview</button><button id="stopBtn">Stop</button><button id="editToggle">Edit release</button></div>
+      <div class="progress"><i id="progressBar"></i></div>
+      <p class="status" id="status">Starting…</p>
+    </article>
+
+    <aside class="card publish-card">
+      <span class="eyebrow">PUBLISH</span><h2>Release when it looks right</h2>
+      <div class="thumb-wrap"><img id="thumb" hidden alt="Generated thumbnail"><span>Thumbnail appears after create</span></div>
+      <div class="actions"><button id="makeThumb">Refresh thumbnail</button><button id="downloadThumb" disabled>Download JPG</button></div>
+      <button class="wide" id="downloadBtn" disabled>Download video</button>
+      <button class="primary wide" id="shareBtn" disabled>Share to Instagram / Facebook / LinkedIn</button>
+      <p class="hint" id="shareHint">Render a video first.</p>
+      <div class="youtube-box"><div><b>YouTube</b><span id="youtubeState">Not connected</span></div><div class="actions"><button id="connectYoutube">Connect</button><button class="primary" id="youtubePublish" disabled>Publish</button></div></div>
+    </aside>
+  </section>
+
+  <section class="card edit-panel" id="editPanel" hidden>
+    <div class="section-head"><div><span class="eyebrow">EDIT</span><h2>Only the things that matter</h2></div><span class="health" id="storyLock">Song meaning not analyzed.</span></div>
+    <div class="grid two"><label>Song idea <small>optional</small><textarea id="idea" rows="2" placeholder="What is this song really about?"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>Hinglish</option><option>English</option><option>Kumaoni</option></select></label></div>
+    <label>Title<input id="title" type="text"></label>
+    <label>Description<textarea id="description" rows="4"></textarea></label>
+    <label>Hashtags<input id="hashtags" type="text" placeholder="#music #musicvideo"></label>
+    <label>Lyrics<textarea id="lyrics" rows="9" placeholder="Paste/edit lyrics here. If you change lyrics, Ridge marks metadata for refresh."></textarea></label>
+    <div class="grid two"><label>Intro<input id="intro" type="text"></label><label>Outro<input id="outro" type="text"></label></div>
+    <p class="hint">After changing lyrics or language, press <b>CREATE VIDEO</b> again. Groq re-locks the song story before rebuilding title/description.</p>
+  </section>
+
+  <section class="card settings" id="settingsPanel" hidden>
+    <div class="section-head"><div><span class="eyebrow">SETTINGS</span><h2>Set once</h2></div><span class="health" id="mediaState">Media…</span></div>
+    <div class="settings-grid">
+      <div class="setting-group"><h3>Local media folder</h3><p>Files stay in the selected folder. Ridge stores only the folder handle/index when the browser allows it.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
+      <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your existing Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
+      <div class="setting-group"><h3>Suno</h3><p>Official Suno Platform/API now exists. Ridge keeps this integration isolated so a Suno API change cannot crash the editor.</p><button id="openSuno">Open official Suno Platform ↗</button><span class="hint">Until API credentials/endpoints are configured, use Suno separately and select the downloaded song here.</span></div>
+      <div class="setting-group"><h3>Social publishing</h3><p>On phones, the default is the native share sheet: one rendered file can be sent to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details><p class="hint">Instagram professional API publishing and LinkedIn direct API require additional OAuth/app setup; Ridge will not pretend a static page can securely exchange client secrets. Use native Share now; direct connectors can sit behind a small secure gateway later.</p></div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="panel publish-card">
-  <div class="quick-top"><div><p class="kicker">3 · PUBLISH</p><h2>Thumbnail + YouTube</h2></div><span id="ytState" class="chip">YouTube disconnected</span></div>
-  <div class="publish-grid">
-    <div class="thumb-box"><img id="thumb" hidden alt="thumbnail"><span>Thumbnail appears here</span></div>
-    <div><label>Thumbnail headline<input id="thumbHeadline" type="text"></label><label>Privacy<select id="privacy"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><div class="actions"><button id="makeThumb">Refresh thumbnail</button><button id="downloadThumb" disabled>Download JPG</button><button class="primary" id="uploadBtn" disabled>PUBLISH TO YOUTUBE</button></div><div class="progress"><i id="uploadProgress"></i></div><p id="uploadStatus" class="muted">Render first, then publish.</p></div>
-  </div>
-</section>
-
-<details class="panel advanced" id="advancedPanel">
-  <summary><b>Advanced controls</b><span>visual bank · Pexels · lyrics effects · intro/outro · keys · learning</span></summary>
-  <div class="advanced-body">
-    <section class="setup inner">
-      <div><p class="kicker">SETUP</p><h2>Saved credentials</h2></div>
-      <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="Groq API key"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
-      <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="credentialState" class="chip">Checking saved settings…</span></div>
-      <div class="row"><button id="backupCredentials">Backup keys</button><button id="restoreCredentials">Restore keys</button><button id="forgetCredentials">Forget saved keys</button><input id="credentialFile" type="file" accept="application/json,.json" hidden></div>
-    </section>
-
-    <section class="step-card inner" data-step="1"><div class="step-head"><span class="num">1</span><div><h2>Song creation</h2><p class="step-status">Choose existing song, Suno guided, or local instrumental.</p></div></div><div class="grid two"><label>Song source<select id="songSource"><option value="upload">Existing/downloaded song</option><option value="suno">Suno guided</option><option value="local">Local instrumental</option></select></label><label>Theme<select id="theme"></select></label></div><label>Music / Suno prompt<textarea id="sunoPrompt" rows="3"></textarea></label><div class="actions"><button class="primary" id="runSong">Make / load song</button><button data-restart="1">Restart</button></div></section>
-
-    <section class="step-card inner" data-step="2"><div class="step-head"><span class="num">2</span><div><h2>Canonical song analysis</h2><p class="step-status">Song meaning is locked before title/description/thumbnail are written.</p></div></div></section>
-
-    <section class="step-card inner" data-step="3"><div class="step-head"><span class="num">3</span><div><h2>Visuals</h2><p class="step-status">Naru templates work without external media; add Pexels/downloaded media only when useful.</p></div></div><div class="pexels-desk"><input id="pexelsSearch" type="search" placeholder="Song-matched search"><button id="openPexelsPhotos">Pexels Photos ↗</button><button id="openPexelsVideos">Pexels Videos ↗</button></div><div class="chips" id="searchChips"></div><div class="folder"><button id="chooseFolder">Choose Downloads folder</button><span id="folderName">No folder selected</span><button id="scanFolder">Import newest</button><button id="addMedia">Add media files</button><input id="mediaFiles" type="file" accept="image/*,video/*" multiple hidden></div><div class="row switches"><label><input type="checkbox" id="useDownloads" checked> Use downloaded media</label><label><input type="checkbox" id="usePollinations" checked> Add AI images</label><button id="generateImages">Generate 3 images</button><button class="primary" id="buildVisuals">Prepare visuals</button></div><div class="progress"><i id="mediaProgress"></i></div><p id="mediaStatus" class="muted">Project is capped at 18 scenes and only 1–2 are decoded at once.</p><div class="scene-strip" id="sceneStrip"></div><span id="sceneCount">0 scenes</span><div class="media-bank-head"><div><b>Reusable media bank</b><span id="bankState">Loading…</span></div><div class="actions"><button id="useBank">Use matching saved media</button><button id="refreshBank">Refresh</button><button id="clearMediaBank">Clear bank</button></div></div><div class="media-bank" id="mediaBank"></div><button data-restart="3">Restart visuals</button></section>
-
-    <section class="step-card inner" data-step="4"><div class="step-head"><span class="num">4</span><div><h2>Style banks</h2><p class="step-status">Stable effects use one accent per beat instead of stacking everything.</p></div></div><div class="grid three"><label>Edit style<select id="editStyle"></select></label><label>Visualizer<select id="visualizer"></select></label><label>Lyrics animation<select id="lyricStyle"></select></label><label>Intro/outro<select id="cardStyle"></select></label><label>Thumbnail style<select id="thumbStyle"></select></label><label class="check"><input type="checkbox" id="introOutro" checked> Intro + outro</label></div><div class="grid two"><label>Intro text<input id="introText" type="text"></label><label>Outro text<input id="outroText" type="text"></label></div><button data-restart="4">Render again</button></section>
-
-    <section class="step-card inner" data-step="5"><div class="step-head"><span class="num">5</span><div><h2>Upload retry</h2><p class="step-status">Uses the same locked title, description, tags and thumbnail.</p></div></div><button data-restart="5">Retry upload</button></section>
-
-    <section class="inner learning"><p class="kicker">LOCAL LEARNING</p><div class="row"><button class="primary" id="loveResult">♥ Good result</button><button id="needsWork">Needs work</button><button id="resetLearning">Reset learning</button><span id="learningState" class="chip">Local learning: 0</span></div></section>
-    <label class="check"><input type="checkbox" id="pauseEach"> Pause after each automatic stage</label>
-  </div>
-</details>
-
-<section class="panel status-panel"><p class="kicker">STATUS</p><h2 id="status">Ready.</h2><div id="log" class="log"></div></section>
+  <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio V2.7 · simple Create → Edit → Publish · stable phone-safe renderer · original ninja-anime packs</footer>
-<script type="module" src="./studio-v2-lite.js"></script>
-<script type="module" src="./studio-v2-credentials.js"></script>
-<script type="module" src="./studio-v2-combo.js"></script>
+<footer>Ridge Studio 3 · local-first media · streaming render · one scene decoded at a time</footer>
+<script type="module" src="./studio-v3.js"></script>
 </body>
 </html>
