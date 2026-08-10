@@ -1,0 +1,8 @@
+{
+  "name":"ridge-cloud-media",
+  "private":true,
+  "type":"module",
+  "scripts":{"dev":"wrangler dev","deploy":"wrangler deploy"},
+  "dependencies":{"@huggingface/inference":"^4.13.23"},
+  "devDependencies":{"wrangler":"^4.30.0"}
+}

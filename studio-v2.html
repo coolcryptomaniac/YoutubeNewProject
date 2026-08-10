@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Ridge Studio 3 — Create · Edit · Publish</title>
+<title>Ridge Studio 3.1 — Create · Edit · Publish</title>
 <link rel="stylesheet" href="./studio-v3.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -13,28 +13,25 @@
   <div class="modal-card">
     <span class="pill">FIRST SETUP</span>
     <h2>Use your own phone media — without copying it all into the browser.</h2>
-    <p>Choose one folder. Ridge asks for <b>read-only</b> access to that folder, indexes image/video names and sizes, and loads only the current scene when editing. The browser will always show the permission prompt; Ridge cannot silently read other folders.</p>
+    <p>Choose one folder. Ridge asks for <b>read-only</b> access, indexes names/sizes, and loads only the current scene. You can skip this completely: procedural templates and optional cloud stock still work.</p>
     <div class="modal-actions"><button class="primary" id="firstRunFolder">Choose media folder</button><button id="firstRunSkip">Continue without a folder</button></div>
-    <small>On browsers without persistent folder access, use the file/folder picker in Settings. Procedural Naru templates also work with no external media.</small>
+    <small>The browser owns the permission prompt. Ridge cannot silently read other folders.</small>
   </div>
 </div>
-
 <header class="topbar">
-  <div class="brand"><span>RIDGE STUDIO 3</span><strong>Create · Edit · Publish</strong></div>
+  <div class="brand"><span>RIDGE STUDIO 3.1</span><strong>Create · Edit · Publish</strong></div>
   <div class="top-actions"><span class="health" id="storageState">Storage…</span><button id="settingsToggle">Settings</button></div>
 </header>
-
 <main>
   <section class="hero card">
-    <div class="hero-copy"><span class="eyebrow">ONE CLICK MUSIC VIDEO</span><h1>Add a song. <em>Release a video.</em></h1><p>One lightweight editor, one scene decoded at a time, beat-aware cuts, readable lyrics, thumbnail, then publish.</p></div>
+    <div class="hero-copy"><span class="eyebrow">ONE CLICK MUSIC VIDEO</span><h1>Add a song. <em>Release a video.</em></h1><p>Choose Auto or one of 72 genre/mood templates. Ridge can mix your local media, cloud Pexels clips, verified-free AI snippets and procedural visuals across the full song.</p></div>
     <div class="create-controls">
       <label class="song-pick"><input id="songFile" type="file" accept="audio/*" hidden><span>Song</span><b id="songName">Choose MP3 / WAV / M4A</b></label>
-      <label>Ready-made look<select id="theme"></select></label>
+      <label>Video template<select id="templateSelect"></select><small id="templateState">72 template recipes</small></label>
       <label>Format<select id="aspect"><option value="landscape">YouTube · 16:9</option><option value="vertical">Reels / Shorts · 9:16</option></select></label>
       <button class="primary create" id="createBtn">CREATE VIDEO</button>
     </div>
   </section>
-
   <section class="workspace">
     <article class="card preview-card">
       <div class="section-head"><div><span class="eyebrow">PREVIEW</span><h2>Automatic edit</h2></div><span class="health" id="qualityState">Safe quality</span></div>
@@ -44,7 +41,6 @@
       <div class="progress"><i id="progressBar"></i></div>
       <p class="status" id="status">Starting…</p>
     </article>
-
     <aside class="card publish-card">
       <span class="eyebrow">PUBLISH</span><h2>Release when it looks right</h2>
       <div class="thumb-wrap"><img id="thumb" hidden alt="Generated thumbnail"><span>Thumbnail appears after create</span></div>
@@ -55,31 +51,28 @@
       <div class="youtube-box"><div><b>YouTube</b><span id="youtubeState">Not connected</span></div><div class="actions"><button id="connectYoutube">Connect</button><button class="primary" id="youtubePublish" disabled>Publish</button></div></div>
     </aside>
   </section>
-
   <section class="card edit-panel" id="editPanel" hidden>
     <div class="section-head"><div><span class="eyebrow">EDIT</span><h2>Only the things that matter</h2></div><span class="health" id="storyLock">Song meaning not analyzed.</span></div>
     <div class="grid two"><label>Song idea <small>optional</small><textarea id="idea" rows="2" placeholder="What is this song really about?"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>Hinglish</option><option>English</option><option>Kumaoni</option></select></label></div>
     <label>Title<input id="title" type="text"></label>
     <label>Description<textarea id="description" rows="4"></textarea></label>
     <label>Hashtags<input id="hashtags" type="text" placeholder="#music #musicvideo"></label>
-    <label>Lyrics<textarea id="lyrics" rows="9" placeholder="Paste/edit lyrics here. If you change lyrics, Ridge marks metadata for refresh."></textarea></label>
+    <label>Lyrics<textarea id="lyrics" rows="9" placeholder="Paste/edit lyrics here. If you change lyrics, Ridge refreshes the release package next time you create."></textarea></label>
     <div class="grid two"><label>Intro<input id="intro" type="text"></label><label>Outro<input id="outro" type="text"></label></div>
-    <p class="hint">After changing lyrics or language, press <b>CREATE VIDEO</b> again. Groq re-locks the song story before rebuilding title/description.</p>
   </section>
-
   <section class="card settings" id="settingsPanel" hidden>
     <div class="section-head"><div><span class="eyebrow">SETTINGS</span><h2>Set once</h2></div><span class="health" id="mediaState">Media…</span></div>
     <div class="settings-grid">
-      <div class="setting-group"><h3>Local media folder</h3><p>Files stay in the selected folder. Ridge stores only the folder handle/index when the browser allows it.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
-      <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your existing Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
-      <div class="setting-group"><h3>Suno</h3><p>Official Suno Platform/API now exists. Ridge keeps this integration isolated so a Suno API change cannot crash the editor.</p><button id="openSuno">Open official Suno Platform ↗</button><span class="hint">Until API credentials/endpoints are configured, use Suno separately and select the downloaded song here.</span></div>
-      <div class="setting-group"><h3>Social publishing</h3><p>On phones, the default is the native share sheet: one rendered file can be sent to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details><p class="hint">Instagram professional API publishing and LinkedIn direct API require additional OAuth/app setup; Ridge will not pretend a static page can securely exchange client secrets. Use native Share now; direct connectors can sit behind a small secure gateway later.</p></div>
+      <div class="setting-group"><h3>Local media folder</h3><p>Files stay in your selected folder. Ridge stores only a handle/index where the browser allows it.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
+      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Put your Pexels key in a small cloud worker, not in this page. The worker caches searches for 24h and streams selected clips instead of copying the whole library to your phone.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Use cloud Pexels stock in CREATE</label><label>Verified-free AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><div class="actions"><button id="testCloud">Test cloud</button><span class="health" id="cloudState">Not configured</span></div><p class="hint">AI generation only runs when the cloud adapter can verify a provider marks the selected model free. Paid fallback is disabled. Short clips are mixed with Pexels/local/procedural scenes to cover the full song.</p></div>
+      <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
+      <div class="setting-group"><h3>Suno</h3><p>Suno developer API access is currently restricted. Ridge keeps it as an optional provider so your editor does not depend on approval.</p><button id="openSuno">Open Suno ↗</button><span class="hint">If your developer application is approved, the API adapter can be added without changing the editor core. Until then, generate/download in Suno and choose the song here.</span></div>
+      <div class="setting-group"><h3>Social publishing</h3><p>On phones, native Share sends the rendered file to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details></div>
     </div>
   </section>
-
   <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio 3 · local-first media · streaming render · one scene decoded at a time</footer>
+<footer>Ridge Studio 3.1 · local-first · cloud stock optional · 72 template recipes · streaming render</footer>
 <script type="module" src="./studio-v3.js"></script>
 </body>
 </html>
