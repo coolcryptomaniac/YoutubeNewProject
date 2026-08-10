@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Ridge Studio 3.1 — Create · Edit · Publish</title>
+<title>Ridge Studio 3.2 — Create · Edit · Publish</title>
 <link rel="stylesheet" href="./studio-v3.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -19,7 +19,7 @@
   </div>
 </div>
 <header class="topbar">
-  <div class="brand"><span>RIDGE STUDIO 3.1</span><strong>Create · Edit · Publish</strong></div>
+  <div class="brand"><span>RIDGE STUDIO 3.2</span><strong>Create · Edit · Publish</strong></div>
   <div class="top-actions"><span class="health" id="storageState">Storage…</span><button id="settingsToggle">Settings</button></div>
 </header>
 <main>
@@ -64,7 +64,7 @@
     <div class="section-head"><div><span class="eyebrow">SETTINGS</span><h2>Set once</h2></div><span class="health" id="mediaState">Media…</span></div>
     <div class="settings-grid">
       <div class="setting-group"><h3>Local media folder</h3><p>Files stay in your selected folder. Ridge stores only a handle/index where the browser allows it.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
-      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Put your Pexels key in a small cloud worker, not in this page. The worker caches searches for 24h and streams selected clips instead of copying the whole library to your phone.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Use cloud Pexels stock in CREATE</label><label>Verified-free AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><div class="actions"><button id="testCloud">Test cloud</button><span class="health" id="cloudState">Not configured</span></div><p class="hint">AI generation only runs when the cloud adapter can verify a provider marks the selected model free. Paid fallback is disabled. Short clips are mixed with Pexels/local/procedural scenes to cover the full song.</p></div>
+      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Put provider keys in a small cloud worker, not in this page. The worker caches Pexels searches and keeps NVIDIA/Hugging Face credentials away from browser JavaScript.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Use cloud Pexels stock in CREATE</label><label>Verified-free AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><label>NVIDIA secret sauce<select id="nvidiaMode"><option value="off">Off · current Groq only</option><option value="shadow">Shadow · compare, do not replace</option><option value="prefer">Prefer NVIDIA when confident</option></select></label><div class="actions"><button id="testCloud">Test cloud</button><button id="applyNvidia" disabled>Use latest NVIDIA version</button><span class="health" id="cloudState">Not configured</span></div><span class="hint" id="nvidiaState">NVIDIA key stays in Ridge Cloud, never in this page.</span><p class="hint">Shadow is the safe default: the existing Groq release remains live while NVIDIA NIM creates a second candidate. Paid fallback remains disabled for the separate AI-video adapter.</p></div>
       <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
       <div class="setting-group"><h3>Suno</h3><p>Suno developer API access is currently restricted. Ridge keeps it as an optional provider so your editor does not depend on approval.</p><button id="openSuno">Open Suno ↗</button><span class="hint">If your developer application is approved, the API adapter can be added without changing the editor core. Until then, generate/download in Suno and choose the song here.</span></div>
       <div class="setting-group"><h3>Social publishing</h3><p>On phones, native Share sends the rendered file to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details></div>
@@ -72,7 +72,7 @@
   </section>
   <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio 3.1 · local-first · cloud stock optional · 72 template recipes · streaming render</footer>
+<footer>Ridge Studio 3.2 · local-first · Groq primary · NVIDIA secret sauce optional · 72 template recipes</footer>
 <script type="module" src="./studio-v3.js"></script>
 </body>
 </html>
