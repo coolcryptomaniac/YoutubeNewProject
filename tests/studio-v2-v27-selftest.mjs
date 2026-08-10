@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {COMBO_PRESETS,buildMeaningPrompt,buildAnalysisPrompt,languageCompliance} from '../studio-v2-prompts.js';
+const html=fs.readFileSync('studio-v2.html','utf8');
+const js=fs.readFileSync('studio-v2-lite.js','utf8');
+const groq=fs.readFileSync('studio-v2-groq.js','utf8');
+const bank=fs.readFileSync('studio-v2-bank.js','utf8');
+assert.ok(COMBO_PRESETS.length>=10);
+assert.ok(COMBO_PRESETS.filter(x=>x.id.startsWith('naru-')).length>=5,'ready-made Naru combos required');
+assert.match(buildMeaningPrompt({transcript:'मैं बारिश में घर लौटता हूँ',language:'Hindi'}),/source of truth for sung words/i);
+const ap=buildAnalysisPrompt({meaning:{canonical_meaning:'बारिश में घर लौटना',canonical_hook:'घर लौट आ'},workingLyrics:'घर लौट आ',language:'Hindi'});
+assert.match(ap,/STRICT CONSISTENCY/);assert.match(ap,/Do not translate title\/description into English/);
+assert.equal(languageCompliance('मैं घर लौट रहा हूँ','Hindi').ok,true);
+assert.match(groq,/temperature:\.24/);assert.match(groq,/temperature:\.34/);assert.match(groq,/buildMeaningPrompt/);
+assert.match(js,/effectLane/);assert.match(js,/maxDecoded:memGB<=3\?1:2/);assert.match(js,/phone-safe/);assert.match(js,/proceduralNaru/);
+assert.match(bank,/maxItems=48/);assert.match(bank,/maxBytes=320\*1024\*1024/);assert.match(bank,/80\*1024\*1024/);
+for(const text of ['1 · CREATE','2 · EDIT','3 · PUBLISH','Advanced controls'])assert.ok(html.includes(text));
+console.log('studio-v2-v27-selftest: PASS — one-story metadata lock, calm edit budget, phone-safe memory, ready-made Naru packs');
