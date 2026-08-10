@@ -4,74 +4,85 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Ridge Studio V2.6 — One-Click Music Video Engine</title>
+<title>Ridge Studio V2.7 — Create · Edit · Publish</title>
 <link rel="stylesheet" href="./studio-v2-lite.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-<header class="hero">
-  <div><p class="eyebrow">RIDGE / STUDIO V2.6</p><h1>One story. <span>One consistent release.</span></h1><p>Curated songwriting → real-song analysis → reusable media bank → beat-synced edit → thumbnail → YouTube.</p></div>
-  <div class="hero-actions"><button class="primary mega" id="fullAuto">FULL AUTO</button><button id="resumeAuto" hidden>Resume Auto</button><label><input type="checkbox" id="pauseEach"> Pause after each step</label><span id="storage" class="chip">Storage…</span></div>
+<header class="hero simple-hero">
+  <div><p class="eyebrow">RIDGE / STUDIO V2.7</p><h1>Add a song. <span>Create the video.</span></h1><p>One calm workflow. Ready-made ninja-anime, phonk, rain, lofi and cinematic templates. Advanced controls stay out of the way until you need them.</p></div>
+  <div class="hero-actions"><button class="primary mega" id="fullAuto">CREATE VIDEO</button><button id="resumeAuto" hidden>Resume</button><span id="storage" class="chip">Storage…</span></div>
 </header>
+
 <main>
-<section class="setup panel">
-  <div><p class="kicker">SETUP ONCE</p><h2>Keys stay backed up</h2><p class="muted">Saved in the stable local credential vault. Future V2 builds reuse the same values.</p></div>
-  <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="Groq API key"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password" placeholder="Browser/app key or leave empty"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
-  <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="ytState" class="chip">YouTube disconnected</span><span id="credentialState" class="chip">Checking saved settings…</span></div>
-  <div class="row"><button id="backupCredentials">Backup keys</button><button id="restoreCredentials">Restore keys</button><button id="forgetCredentials">Forget saved keys</button><input id="credentialFile" type="file" accept="application/json,.json" hidden></div>
-</section>
-
-<section class="combo-bar panel">
-  <div><p class="kicker">ONE-CLICK COMBOS</p><h2>Pick the feeling, then create</h2></div>
-  <div class="combo-row"><select id="comboPreset"></select><button id="applyCombo">Apply combo</button><button class="primary" id="comboAuto">Apply + Full Auto</button><button id="learnedCombo">Use learned favorite</button></div>
-  <div class="subline"><span id="comboState">Curated combos keep language, song mood, edit speed, lyrics animation and visuals aligned.</span><span id="canonicalState">Canonical song package ready.</span></div>
-</section>
-
-<section class="step-card panel" data-step="1">
-  <div class="step-head"><span class="num">1</span><div><h2>Meaningful lyrics + song</h2><p class="step-status">Groq drafts, then performs a second editorial pass for grammar, natural language, story continuity and singability.</p></div></div>
-  <div class="grid three"><label>Song idea<textarea id="idea" rows="3" placeholder="Dark rainy drive through the hills, anger turning into freedom…"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option></select></label><label>Theme<select id="theme"></select></label></div>
-  <label>Lyrics<textarea id="lyrics" rows="10" placeholder="Groq lyrics appear here. Every line stays editable."></textarea></label><div class="subline"><span id="lyricCount">No timed lyrics</span><span id="mood">Not analyzed yet</span><span id="languageCheck">Language check waiting.</span></div>
-  <div class="grid two"><label>Song source<select id="songSource"><option value="suno">Suno guided</option><option value="upload">Choose an existing/downloaded song</option><option value="local">Always-free local instrumental</option></select></label><label>Suno / music prompt<textarea id="sunoPrompt" rows="3" placeholder="Groq prepares this automatically."></textarea></label></div>
-  <input id="songFile" type="file" accept="audio/*" hidden>
-  <div class="audio-card"><audio id="audio" controls preload="metadata"></audio><span id="audioName">No song loaded</span></div>
-  <div class="actions"><button id="generateLyrics">Generate + polish lyrics</button><button class="primary" id="runSong">Make / load song</button><button onclick="document.querySelector('#songFile').click()">Choose song</button><button data-restart="1">Restart from here</button></div>
-</section>
-
-<section class="step-card panel" data-step="2">
-  <div class="step-head"><span class="num">2</span><div><h2>Groq understands the real song</h2><p class="step-status">Whisper listens to the audio; one canonical package drives title, cleaned lyrics, description, thumbnail, searches and edit choices.</p></div></div>
-  <div class="grid two"><label>Final title<input id="title" type="text"></label><label>Thumbnail headline<input id="thumbHeadline" type="text"></label></div>
-  <label>Description<textarea id="description" rows="5"></textarea></label><label>Hashtags | tags<input id="hashtags" type="text" placeholder="#phonk #musicvideo | phonk, drift, anime edit"></label>
-  <div class="actions"><button class="primary" id="analyze">Analyze song</button><button data-restart="2">Restart from here</button></div>
-</section>
-
-<section class="step-card panel" data-step="3">
-  <div class="step-head"><span class="num">3</span><div><h2>Find visuals + grow your media bank</h2><p class="step-status">Groq fills Pexels search phrases. Download clips/photos; every import is copied into a reusable on-device browser bank.</p></div></div>
-  <div class="pexels-desk"><input id="pexelsSearch" type="search" placeholder="Groq visual search"><button id="openPexelsPhotos">Pexels Photos ↗</button><button id="openPexelsVideos">Pexels Videos ↗</button></div><div class="chips" id="searchChips"></div>
-  <div class="folder"><button id="chooseFolder">Choose Downloads folder</button><span id="folderName">No folder selected</span><button class="primary" id="scanFolder">Import newest downloads</button><button id="addMedia">Add downloaded files</button><input id="mediaFiles" type="file" accept="image/*,video/*" multiple hidden></div>
-  <div class="row switches"><label><input type="checkbox" id="useDownloads" checked> Use downloaded media</label><label><input type="checkbox" id="usePollinations" checked> Add Pollinations images</label><button id="generateImages">Generate 4 AI images</button></div>
-  <div class="media-bank-head"><div><b>Reusable media bank</b><span id="bankState">Loading…</span></div><div class="actions"><button class="primary" id="useBank">Use matching saved media</button><button id="refreshBank">Refresh</button><button id="clearMediaBank">Clear bank</button></div></div><div class="media-bank" id="mediaBank"></div>
-  <div class="progress"><i id="mediaProgress"></i></div><p id="mediaStatus" class="muted">Downloaded images/videos are resized if needed and stored disk-backed.</p><div class="scene-strip" id="sceneStrip"></div><div class="subline"><span id="sceneCount">0 scenes</span></div>
-  <div class="actions"><button class="primary" id="buildVisuals">Build / refresh visuals</button><button data-restart="3">Clear + restart visuals</button></div>
-</section>
-
-<section class="step-card panel edit-panel" data-step="4">
-  <div class="step-head"><span class="num">4</span><div><h2>Beat-synced automatic editor</h2><p class="step-status">Fast cuts, bass zoom, shake, flash, glitch, speed lines, lyrics, intro/outro and the visualizer render together.</p></div></div>
-  <div class="editor-grid">
-    <div><div class="stage"><canvas id="stage" width="1280" height="720"></canvas></div><div class="actions"><button id="previewBtn">Play preview</button><button id="stopBtn">Stop</button><button class="primary" id="renderBtn">Render final WebM</button><button id="downloadVideo" disabled>Download video</button></div><div class="progress"><i id="renderProgress"></i></div><p id="renderStatus" class="muted">Ready to render.</p></div>
-    <div class="controls"><label>Edit bank<select id="editStyle"></select></label><label>Visualizer bank<select id="visualizer"></select></label><label>Lyrics animation bank<select id="lyricStyle"></select></label><label>Intro / outro pattern<select id="cardStyle"></select></label><label>Thumbnail pattern<select id="thumbStyle"></select></label><label class="check"><input type="checkbox" id="introOutro" checked> Use intro + outro</label><label>Intro text<input id="introText" type="text" placeholder="Auto from Groq"></label><label>Outro text<input id="outroText" type="text" placeholder="Auto from Groq"></label><div class="thumb-box"><img id="thumb" hidden alt="thumbnail"><span>Thumbnail preview</span></div><div class="actions"><button id="makeThumb">Make thumbnail</button><button id="downloadThumb" disabled>Download JPG</button></div></div>
+<section class="panel quick-start">
+  <div class="quick-top"><div><p class="kicker">1 · CREATE</p><h2>Choose a look + add your song</h2></div><span id="canonicalState" class="chip">One story package</span></div>
+  <div class="quick-grid">
+    <label>Ready-made template<select id="comboPreset"></select></label>
+    <label>Language<select id="language"><option>Hindi</option><option>English</option><option>Kumaoni</option><option>Hinglish</option></select></label>
+    <label>Song<input id="songFile" type="file" accept="audio/*"></label>
   </div>
-  <div class="actions"><button data-restart="4">Render again from here</button></div>
+  <label>Song idea <small>optional if the song already exists</small><textarea id="idea" rows="2" placeholder="A rain-soaked breakup song about revisiting the same tea stall..."></textarea></label>
+  <div class="actions"><button id="applyCombo">Apply template</button><button class="primary" id="comboAuto">APPLY + CREATE</button><button id="learnedCombo">Use learned favorite</button></div>
+  <div class="subline"><span id="comboState">Template keeps visuals, lyrics treatment, thumbnail and edit mood together.</span><span id="audioName">No song loaded</span></div>
+  <audio id="audio" controls preload="metadata"></audio>
 </section>
 
-<section class="step-card panel" data-step="5">
-  <div class="step-head"><span class="num">5</span><div><h2>YouTube</h2><p class="step-status">The same canonical title, description, tags and thumbnail are used for upload.</p></div></div>
-  <div class="grid two"><label>Privacy<select id="privacy"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><div class="muted">Thumbnail uploads with the video when your channel allows custom thumbnails.</div></div>
-  <button class="primary big" id="uploadBtn" disabled>Upload final video</button><div class="progress"><i id="uploadProgress"></i></div><p id="uploadStatus" class="muted">Connect YouTube and render first.</p><div class="actions"><button data-restart="5">Retry upload</button></div>
+<section class="panel edit-panel-simple">
+  <div class="quick-top"><div><p class="kicker">2 · EDIT</p><h2>Preview, fix, render</h2></div><span id="mood" class="chip">Waiting for song</span></div>
+  <div class="simple-editor">
+    <div>
+      <div class="stage"><canvas id="stage" width="1280" height="720"></canvas></div>
+      <div class="actions"><button id="previewBtn">Preview</button><button id="stopBtn">Stop</button><button class="primary" id="renderBtn">RENDER</button><button id="downloadVideo" disabled>Download</button></div>
+      <div class="progress"><i id="renderProgress"></i></div><p id="renderStatus" class="muted">Stable editor ready.</p>
+    </div>
+    <div class="simple-meta">
+      <label>Title<input id="title" type="text"></label>
+      <label>Description<textarea id="description" rows="5"></textarea></label>
+      <label>Hashtags + tags<input id="hashtags" type="text"></label>
+      <label>Lyrics<textarea id="lyrics" rows="8"></textarea></label>
+      <div class="subline"><span id="lyricCount">No timed lyrics</span><span id="languageCheck">Language check waiting.</span></div>
+      <div class="actions"><button id="generateLyrics">Rewrite / polish lyrics</button><button id="analyze">Re-analyze song</button><button data-restart="2">Restart analysis</button></div>
+    </div>
+  </div>
 </section>
 
-<section class="panel status-panel"><p class="kicker">LOCAL LEARNING</p><h2 id="status">Ready.</h2><p class="muted">Feedback stays on this device and tunes future prompt/style preferences. It never uploads your history to GitHub.</p><div class="row"><button class="primary" id="loveResult">♥ Good result</button><button id="needsWork">Needs work</button><button id="resetLearning">Reset learning</button><span id="learningState" class="chip">Local learning: 0</span></div><div id="log" class="log"></div></section>
+<section class="panel publish-card">
+  <div class="quick-top"><div><p class="kicker">3 · PUBLISH</p><h2>Thumbnail + YouTube</h2></div><span id="ytState" class="chip">YouTube disconnected</span></div>
+  <div class="publish-grid">
+    <div class="thumb-box"><img id="thumb" hidden alt="thumbnail"><span>Thumbnail appears here</span></div>
+    <div><label>Thumbnail headline<input id="thumbHeadline" type="text"></label><label>Privacy<select id="privacy"><option value="private" selected>Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label><div class="actions"><button id="makeThumb">Refresh thumbnail</button><button id="downloadThumb" disabled>Download JPG</button><button class="primary" id="uploadBtn" disabled>PUBLISH TO YOUTUBE</button></div><div class="progress"><i id="uploadProgress"></i></div><p id="uploadStatus" class="muted">Render first, then publish.</p></div>
+  </div>
+</section>
+
+<details class="panel advanced" id="advancedPanel">
+  <summary><b>Advanced controls</b><span>visual bank · Pexels · lyrics effects · intro/outro · keys · learning</span></summary>
+  <div class="advanced-body">
+    <section class="setup inner">
+      <div><p class="kicker">SETUP</p><h2>Saved credentials</h2></div>
+      <div class="setup-grid"><label>Groq key<input id="groqKey" type="password" placeholder="Groq API key"></label><label>Pollinations key <small>optional</small><input id="pollinationsKey" type="password"></label><label>YouTube OAuth Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label></div>
+      <div class="row"><button id="testGroq">Test Groq</button><button id="connectYoutube">Connect YouTube</button><span id="credentialState" class="chip">Checking saved settings…</span></div>
+      <div class="row"><button id="backupCredentials">Backup keys</button><button id="restoreCredentials">Restore keys</button><button id="forgetCredentials">Forget saved keys</button><input id="credentialFile" type="file" accept="application/json,.json" hidden></div>
+    </section>
+
+    <section class="step-card inner" data-step="1"><div class="step-head"><span class="num">1</span><div><h2>Song creation</h2><p class="step-status">Choose existing song, Suno guided, or local instrumental.</p></div></div><div class="grid two"><label>Song source<select id="songSource"><option value="upload">Existing/downloaded song</option><option value="suno">Suno guided</option><option value="local">Local instrumental</option></select></label><label>Theme<select id="theme"></select></label></div><label>Music / Suno prompt<textarea id="sunoPrompt" rows="3"></textarea></label><div class="actions"><button class="primary" id="runSong">Make / load song</button><button data-restart="1">Restart</button></div></section>
+
+    <section class="step-card inner" data-step="2"><div class="step-head"><span class="num">2</span><div><h2>Canonical song analysis</h2><p class="step-status">Song meaning is locked before title/description/thumbnail are written.</p></div></div></section>
+
+    <section class="step-card inner" data-step="3"><div class="step-head"><span class="num">3</span><div><h2>Visuals</h2><p class="step-status">Naru templates work without external media; add Pexels/downloaded media only when useful.</p></div></div><div class="pexels-desk"><input id="pexelsSearch" type="search" placeholder="Song-matched search"><button id="openPexelsPhotos">Pexels Photos ↗</button><button id="openPexelsVideos">Pexels Videos ↗</button></div><div class="chips" id="searchChips"></div><div class="folder"><button id="chooseFolder">Choose Downloads folder</button><span id="folderName">No folder selected</span><button id="scanFolder">Import newest</button><button id="addMedia">Add media files</button><input id="mediaFiles" type="file" accept="image/*,video/*" multiple hidden></div><div class="row switches"><label><input type="checkbox" id="useDownloads" checked> Use downloaded media</label><label><input type="checkbox" id="usePollinations" checked> Add AI images</label><button id="generateImages">Generate 3 images</button><button class="primary" id="buildVisuals">Prepare visuals</button></div><div class="progress"><i id="mediaProgress"></i></div><p id="mediaStatus" class="muted">Project is capped at 18 scenes and only 1–2 are decoded at once.</p><div class="scene-strip" id="sceneStrip"></div><span id="sceneCount">0 scenes</span><div class="media-bank-head"><div><b>Reusable media bank</b><span id="bankState">Loading…</span></div><div class="actions"><button id="useBank">Use matching saved media</button><button id="refreshBank">Refresh</button><button id="clearMediaBank">Clear bank</button></div></div><div class="media-bank" id="mediaBank"></div><button data-restart="3">Restart visuals</button></section>
+
+    <section class="step-card inner" data-step="4"><div class="step-head"><span class="num">4</span><div><h2>Style banks</h2><p class="step-status">Stable effects use one accent per beat instead of stacking everything.</p></div></div><div class="grid three"><label>Edit style<select id="editStyle"></select></label><label>Visualizer<select id="visualizer"></select></label><label>Lyrics animation<select id="lyricStyle"></select></label><label>Intro/outro<select id="cardStyle"></select></label><label>Thumbnail style<select id="thumbStyle"></select></label><label class="check"><input type="checkbox" id="introOutro" checked> Intro + outro</label></div><div class="grid two"><label>Intro text<input id="introText" type="text"></label><label>Outro text<input id="outroText" type="text"></label></div><button data-restart="4">Render again</button></section>
+
+    <section class="step-card inner" data-step="5"><div class="step-head"><span class="num">5</span><div><h2>Upload retry</h2><p class="step-status">Uses the same locked title, description, tags and thumbnail.</p></div></div><button data-restart="5">Retry upload</button></section>
+
+    <section class="inner learning"><p class="kicker">LOCAL LEARNING</p><div class="row"><button class="primary" id="loveResult">♥ Good result</button><button id="needsWork">Needs work</button><button id="resetLearning">Reset learning</button><span id="learningState" class="chip">Local learning: 0</span></div></section>
+    <label class="check"><input type="checkbox" id="pauseEach"> Pause after each automatic stage</label>
+  </div>
+</details>
+
+<section class="panel status-panel"><p class="kicker">STATUS</p><h2 id="status">Ready.</h2><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio V2.6 · separate from Claude studio · persistent credentials · local learning · reusable media bank</footer>
+<footer>Ridge Studio V2.7 · simple Create → Edit → Publish · stable phone-safe renderer · original ninja-anime packs</footer>
 <script type="module" src="./studio-v2-lite.js"></script>
 <script type="module" src="./studio-v2-credentials.js"></script>
 <script type="module" src="./studio-v2-combo.js"></script>
