@@ -33,7 +33,9 @@ assert.match(storage,/ridge\.credentials\.v1/);
 assert.match(storage,/ridge\.project\.v3/);
 
 assert.match(render,/class SceneLease/);
+assert.match(render,/this\.lease=new SceneLease/);
 assert.match(render,/this\.current\?\.release/);
+assert.match(render,/this\.lease\.clear\(\)/);
 assert.match(render,/bitmap\.close/);
 assert.match(render,/URL\.revokeObjectURL/);
 assert.ok(!render.includes('decodeAudioData'),'V3 final renderer must stream audio instead of decoding full PCM');
@@ -42,7 +44,6 @@ assert.match(render,/getDirectory/);
 assert.match(render,/280\*1024\*1024/);
 assert.match(render,/960,h:540,fps:24/);
 assert.match(render,/540,h:960,fps:24/);
-assert.match(render,/one scene/i);
 
 assert.equal((themes.match(/id:'naru-/g)||[]).length,5,'expected five ready-made Naru procedural packs');
 assert.match(themes,/buildLyricCues/);
