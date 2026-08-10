@@ -50,6 +50,7 @@ jobs:
           node --experimental-default-type=module tests/studio-v2-lite-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-credentials-selftest.mjs
           node --experimental-default-type=module tests/studio-v2-v26-selftest.mjs
+          node --experimental-default-type=module tests/studio-v2-v27-selftest.mjs
       - name: Required V2 files
         run: |
           test -f studio-v2.html
@@ -68,7 +69,7 @@ jobs:
           test -f studio-v2-learning.js
           test -f studio-v2-bank.js
           test -f studio-v2-combo.js
-      - name: V2.6 DOM references
+      - name: V2.7 DOM references
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -82,11 +83,12 @@ jobs:
           }
           if(!html.includes('./studio-v2-lite.js'))throw new Error('Lean editor is not the page entrypoint');
           if(!html.includes('./studio-v2-credentials.js'))throw new Error('Persistent credential vault is not loaded');
-          if(!html.includes('./studio-v2-combo.js'))throw new Error('V2.6 combo/learning layer is not loaded');
+          if(!html.includes('./studio-v2-combo.js'))throw new Error('Combo/learning layer is not loaded');
           if(/Pexels key/i.test(html))throw new Error('Pexels API key must not appear in the lean UI');
-          console.log('V2.6 DOM + credentials + combo learning references OK.');
+          if(!html.includes('CREATE VIDEO')||!html.includes('Advanced controls'))throw new Error('V2.7 simple shell missing');
+          console.log('V2.7 DOM + simple shell + credentials + combo references OK.');
           NODE
-      - name: Check V2.6 client files for obvious secret prefixes
+      - name: Check V2.7 client files for obvious secret prefixes
         shell: bash
         run: |
           python - <<'PY'
@@ -100,5 +102,5 @@ jobs:
               if pos>=0 and 'placeholder' not in text[max(0,pos-50):pos+100].lower(): bad.append((name,n))
           if bad:
             raise SystemExit('Potential committed secret prefix found: '+repr(bad))
-          print('No obvious committed secret prefixes found in V2.6 files.')
+          print('No obvious committed secret prefixes found in V2.7 files.')
           PY
