@@ -34,6 +34,12 @@ export class CloudMediaClient{
     }
     return out;
   }
+  async nvidiaRefine(project,{signal}={}){
+    if(!this.enabled)throw new Error('Ridge Cloud is not configured.');
+    const current={title:project?.title||'',description:project?.description||'',hashtags:project?.hashtags||[],tags:project?.tags||[],clean_lyrics:project?.lyrics||'',intro:project?.intro||'',outro:project?.outro||'',story:project?.story||'',hook_meaning:project?.hookMeaning||''};
+    const r=await fetch(this.url('/api/nvidia/refine'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:project?.language||'English',current}),signal});
+    const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||`NVIDIA reviewer ${r.status}`);return j;
+  }
 }
 
 export function visualPrompts(project,template){
