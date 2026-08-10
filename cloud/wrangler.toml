@@ -1,0 +1,7 @@
+name = "ridge-cloud-media"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+HF_VIDEO_MODEL = "Lightricks/LTX-Video-0.9.8-13B-distilled"
+FREE_VIDEO_ONLY = "true"
