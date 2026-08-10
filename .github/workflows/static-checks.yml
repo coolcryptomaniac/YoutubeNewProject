@@ -25,6 +25,9 @@ jobs:
           node --check studio-v3-themes.js
           node --check studio-v3-render.js
           node --check studio-v3-publish.js
+          node --check studio-v3-templates.js
+          node --check studio-v3-cloud.js
+          node --check cloud/src/worker.js
 
       - name: V3 architecture regression tests
         run: node --experimental-default-type=module tests/studio-v3-selftest.mjs
@@ -39,6 +42,11 @@ jobs:
           test -f studio-v3-themes.js
           test -f studio-v3-render.js
           test -f studio-v3-publish.js
+          test -f studio-v3-templates.js
+          test -f studio-v3-cloud.js
+          test -f cloud/src/worker.js
+          test -f cloud/wrangler.toml
+          test -f cloud/package.json
 
       - name: V3 DOM and runtime budget
         run: |
@@ -57,20 +65,27 @@ jobs:
           console.log(`V3 DOM OK: ${refs.size} references · one local module entrypoint`);
           NODE
 
-      - name: V3 crash-risk guardrails
+      - name: V3 crash-risk and free-tier guardrails
         run: |
           python - <<'PY'
           from pathlib import Path
           render=Path('studio-v3-render.js').read_text()
           storage=Path('studio-v3-storage.js').read_text()
           themes=Path('studio-v3-themes.js').read_text()
+          templates=Path('studio-v3-templates.js').read_text()
+          cloud=Path('studio-v3-cloud.js').read_text()
+          worker=Path('cloud/src/worker.js').read_text()
           if 'decodeAudioData' in render: raise SystemExit('V3 must not full-decode song PCM during final render')
           if 'class SceneLease' not in render or 'bitmap.close' not in render: raise SystemExit('Single-scene lease cleanup missing')
           if '280*1024*1024' not in render: raise SystemExit('Memory fallback safety limit missing')
           if "mode:'read'" not in storage or 'showDirectoryPicker' not in storage: raise SystemExit('Read-only folder flow missing')
           if 'putAsset' in storage: raise SystemExit('Media blobs must not be copied into V3 IndexedDB')
           if 'particles.push' in themes or 'stars.push' in themes: raise SystemExit('Unbounded animation state detected')
-          print('V3 crash-risk guardrails OK.')
+          if "TEMPLATE_COUNT=VIDEO_TEMPLATES.length" not in templates: raise SystemExit('Template catalog missing')
+          if 'Math.min(10' not in cloud: raise SystemExit('Free video retry window must be capped at 10 minutes')
+          if 'FREE_VIDEO_ONLY' not in worker or 'isVerifiedFree' not in worker: raise SystemExit('Cloud AI-video free-only gate missing')
+          if 'paid fallback disabled' not in worker: raise SystemExit('Paid fallback refusal missing')
+          print('V3.1 crash-risk + cloud/free-tier guardrails OK.')
           PY
 
       - name: Reject committed secret-like tokens
@@ -80,11 +95,12 @@ jobs:
           from pathlib import Path
           bad=[]
           needles=['g'+'sk'+'_','sk'+'-ant'+'-','sk'+'-proj'+'-']
-          for name in ('studio-v2.html','studio-v3.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js'):
+          files=('studio-v2.html','studio-v3.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js','studio-v3-templates.js','studio-v3-cloud.js','cloud/src/worker.js')
+          for name in files:
             text=Path(name).read_text(errors='ignore')
             for n in needles:
               pos=text.find(n)
               if pos>=0 and 'placeholder' not in text[max(0,pos-60):pos+120].lower(): bad.append((name,n))
           if bad: raise SystemExit('Potential committed secret prefix found: '+repr(bad))
-          print('No obvious committed secret prefixes found in V3 runtime.')
+          print('No obvious committed secret prefixes found in V3.1 runtime.')
           PY
