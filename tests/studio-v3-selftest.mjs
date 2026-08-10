@@ -11,9 +11,11 @@ const groq=fs.readFileSync('studio-v3-groq.js','utf8');
 const publish=fs.readFileSync('studio-v3-publish.js','utf8');
 const cloud=fs.readFileSync('studio-v3-cloud.js','utf8');
 const worker=fs.readFileSync('cloud/src/worker.js','utf8');
+const wrangler=fs.readFileSync('cloud/wrangler.toml','utf8');
+const deploy=fs.readFileSync('.github/workflows/deploy-ridge-cloud.yml','utf8');
 const css=fs.readFileSync('studio-v3.css','utf8');
 
-assert.match(html,/Ridge Studio 3\.1/);
+assert.match(html,/Ridge Studio 3\.2/);
 assert.match(html,/CREATE VIDEO/);
 assert.match(html,/Create · Edit · Publish/);
 assert.match(html,/\.\/studio-v3\.js/);
@@ -23,7 +25,8 @@ for(const old of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-cred
 const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
 const refs=new Set([...app.matchAll(/\$\(['"]#([A-Za-z0-9_-]+)['"]\)/g)].map(x=>x[1]));
 const missing=[...refs].filter(x=>!ids.has(x));assert.deepEqual(missing,[],`V3 missing DOM ids: ${missing.join(', ')}`);
-for(const id of ['firstRun','firstRunFolder','firstRunSkip','songFile','createBtn','stage','shareBtn','youtubePublish','settingsPanel','folderFiles','templateSelect','cloudUrl','cloudStock','freeVideoMinutes','testCloud'])assert.ok(ids.has(id),`missing core UI id ${id}`);
+for(const id of ['firstRun','firstRunFolder','firstRunSkip','songFile','createBtn','stage','shareBtn','youtubePublish','settingsPanel','folderFiles','templateSelect','cloudUrl','cloudStock','freeVideoMinutes','testCloud','nvidiaMode','nvidiaState','applyNvidia'])assert.ok(ids.has(id),`missing core UI id ${id}`);
+assert.ok(!html.includes('NVIDIA_API_KEY'),'NVIDIA key must not have a browser input or literal secret name in the page');
 
 assert.equal(TEMPLATE_COUNT,72,'expected 72 compact genre/mood recipes');
 assert.equal(VIDEO_TEMPLATES.length,72);
@@ -44,12 +47,15 @@ assert.equal((themes.match(/id:'naru-/g)||[]).length,5,'expected five ready-made
 
 assert.match(groq,/lockMeaning/);assert.match(groq,/packageFromLock/);assert.match(groq,/Do not translate the song into another language/);assert.match(groq,/openai\/gpt-oss-20b/);assert.match(groq,/whisper-large-v3-turbo/);
 assert.match(app,/prepareUserGesture\(state\.song\)/);assert.match(app,/firstRunFolder/);assert.match(app,/closeFirstRun/);assert.match(app,/https:\/\/suno\.com\//);assert.match(app,/prepareCloudMedia/);assert.match(app,/generateFreeClips/);assert.match(app,/pickTemplate/);
+assert.match(app,/nvidiaMode:'shadow'/);assert.match(app,/maybeNvidiaRefine/);assert.match(app,/applyNvidiaCandidate/);assert.match(app,/review\.confidence/);assert.match(app,/\.78/);
 assert.ok(!/suno.*password|password.*suno|suno.*cookie|cookie.*suno/i.test(app),'no Suno credential scraping');assert.ok(!/Pollinations|PexelsClient|SceneManager|ridge-media-bank-v1/.test(app),'old heavy media/provider runtime leaked into V3 app');
 
-assert.match(cloud,/windowMinutes=3/);assert.match(cloud,/Math\.min\(10/);assert.match(cloud,/40\*1024\*1024/);assert.match(cloud,/No verified-free video model/);
+assert.match(cloud,/windowMinutes=3/);assert.match(cloud,/Math\.min\(10/);assert.match(cloud,/40\*1024\*1024/);assert.match(cloud,/No verified-free video model/);assert.match(cloud,/nvidiaRefine/);assert.match(cloud,/api\/nvidia\/refine/);
 assert.match(worker,/api\.pexels\.com\/v1\/videos\/search/);assert.match(worker,/max-age=86400/);assert.match(worker,/videos\.pexels\.com/);assert.match(worker,/FREE_VIDEO_ONLY/);assert.match(worker,/isVerifiedFree/);assert.match(worker,/is_free===true/);assert.match(worker,/return json\(\{error:'No provider currently marks this model as free; paid fallback disabled'/);
+assert.match(worker,/env\.NVIDIA_API_KEY/);assert.match(worker,/integrate\.api\.nvidia\.com\/v1\/chat\/completions/);assert.match(worker,/sarvamai\/sarvam-m/);assert.match(worker,/LOCKED STORY/);assert.match(worker,/api\/nvidia\/refine/);
+assert.match(wrangler,/NVIDIA_TEXT_MODEL = "sarvamai\/sarvam-m"/);assert.match(deploy,/secrets\.NVIDIA_API_KEY/);assert.match(deploy,/wrangler secret put NVIDIA_API_KEY/);
 
 assert.match(publish,/navigator\.share/);assert.match(publish,/youtube\/v3\/videos/);assert.match(publish,/video_reels/);assert.match(publish,/instagramDirect:false/);assert.match(publish,/linkedinDirect:false/);assert.match(publish,/8\*1024\*1024/);
 assert.match(css,/min-height:44px/);assert.match(css,/@media\(max-width:620px\)/);assert.match(css,/grid-template-columns:1fr/);
 
-console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, local+cloud streaming media, free-only AI video gate`);
+console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, Groq primary + NVIDIA shadow, local+cloud streaming media`);
