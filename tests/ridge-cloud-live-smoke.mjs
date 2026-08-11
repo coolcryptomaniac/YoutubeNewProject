@@ -23,7 +23,7 @@ const nr=await fetch(base+'/api/nvidia/refine',{method:'POST',headers:{'Content-
 const raw=await nr.text();let n={};try{n=JSON.parse(raw)}catch{n={raw:raw.slice(0,500)}}
 if(nr.status!==200)throw new Error(`NVIDIA refine ${nr.status}: ${JSON.stringify(n).slice(0,800)}`);
 assert.equal(n.ok,true,'NVIDIA response must be ok');
-assert.match(n.model||'',/sarvam|nvidia/i,'NVIDIA model identity missing');
+assert.match(n.model||'',/llama-3\.3-70b-instruct|nvidia/i,'NVIDIA model identity missing');
 assert.ok(n.candidate?.title&&n.candidate?.description&&n.candidate?.clean_lyrics,'NVIDIA candidate is incomplete');
 assert.match(n.candidate.title,/\p{Script=Devanagari}/u,'Hindi title should remain in Devanagari');
 
