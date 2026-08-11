@@ -20,8 +20,8 @@ assert.match(p.videos[0].mediaUrl||'',/^https:\/\//,'Pexels result must expose s
 
 const sample={language:'Hindi',current:{title:'बारिश की रात',description:'बारिश की रात में बिछड़े प्रेम की याद लौटती है।',hashtags:['#music'],tags:['music'],clean_lyrics:'बारिश गिरती है\nतेरी याद लौटती है\nरात फिर वही कहानी कहती है',intro:'एक बारिश भरी रात',outro:'यादें रह जाती हैं',story:'बारिश वाली रात में बिछड़े प्रेम की याद',hook_meaning:'हर बूंद पुराने प्रेम की याद जगाती है'}};
 const nr=await fetch(base+'/api/nvidia/refine',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sample),signal:timeout(65000)});
-assert.equal(nr.status,200,'NVIDIA refine smoke call must return 200');
-const n=await nr.json();
+const raw=await nr.text();let n={};try{n=JSON.parse(raw)}catch{n={raw:raw.slice(0,500)}}
+if(nr.status!==200)throw new Error(`NVIDIA refine ${nr.status}: ${JSON.stringify(n).slice(0,800)}`);
 assert.equal(n.ok,true,'NVIDIA response must be ok');
 assert.match(n.model||'',/sarvam|nvidia/i,'NVIDIA model identity missing');
 assert.ok(n.candidate?.title&&n.candidate?.description&&n.candidate?.clean_lyrics,'NVIDIA candidate is incomplete');
