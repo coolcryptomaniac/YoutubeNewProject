@@ -59,12 +59,12 @@ async function nvidiaRefine(request,env){
   if(!env.NVIDIA_API_KEY)return json({error:'NVIDIA NIM secret not configured'},503);
   const body=await request.json().catch(()=>({})),language=String(body.language||'English').slice(0,40),current=compactRelease(body.current||{});
   if(!current.title&&!current.clean_lyrics&&!current.story)return json({error:'canonical release package required'},400);
-  const model=String(env.NVIDIA_TEXT_MODEL||'sarvamai/sarvam-m').slice(0,120);
+  const model=String(env.NVIDIA_TEXT_MODEL||'meta/llama-3.3-70b-instruct').slice(0,120);
   const system=`You are Ridge Studio's second-opinion music release editor. You are NOT allowed to invent a new song story. The canonical story and hook are locked. Improve only when clearly better. Preserve the selected language and script. Return one JSON object only.`;
   const prompt=`Review this canonical release package as a careful human editor.\n\nLANGUAGE: ${language}\nLOCKED STORY: ${current.story}\nLOCKED HOOK MEANING: ${current.hook_meaning}\n\nCURRENT RELEASE JSON:\n${JSON.stringify(current)}\n\nRules:\n- Never translate into a different language unless the selected language explicitly requires code-switching.\n- Hindi/Kumaoni should remain naturally written in Devanagari; Hinglish should remain natural Roman-script Hinglish; English should remain idiomatic English.\n- Fix grammar, gender/verb agreement, robotic phrasing, literal translation artifacts, forced rhymes and metadata drift.\n- Title, description, lyrics, intro and outro must describe the same locked story/hook.\n- Do not add facts not present in the song.\n- If the current version is already stronger, keep it.\n\nReturn exactly: {"title":"...","description":"...","hashtags":[...],"tags":[...],"clean_lyrics":"...","intro":"...","outro":"...","confidence":0.0,"verdict":"keep_current|nvidia_better","changes_summary":"short explanation"}.`;
   try{
-    const r=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.NVIDIA_API_KEY}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:prompt}],temperature:.25,top_p:.9,max_tokens:8000,stream:false})});
-    const raw=await r.text();if(!r.ok)return json({error:`NVIDIA ${r.status}`,detail:raw.slice(0,280),model},r.status===429?429:503);
+    const r=await fetch('https://integrate.api.nvidia.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.NVIDIA_API_KEY}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:prompt}],temperature:.2,top_p:.7,max_tokens:4096,stream:false})});
+    const raw=await r.text();if(!r.ok)return json({error:`NVIDIA ${r.status}`,detail:raw.slice(0,500),model},r.status===429?429:503);
     const payload=JSON.parse(raw),obj=parseModelJson(payload?.choices?.[0]?.message?.content||''),candidate=compactRelease({...current,...obj});
     const confidence=clamp(obj.confidence,0,1),verdict=obj.verdict==='nvidia_better'?'nvidia_better':'keep_current';
     return json({ok:true,provider:'nvidia-nim',model,confidence,verdict,changesSummary:String(obj.changes_summary||'').slice(0,500),candidate});
@@ -73,7 +73,7 @@ async function nvidiaRefine(request,env){
 
 export default{async fetch(request,env){
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
-  if(u.pathname==='/api/health')return json({ok:true,pexels:!!env.PEXELS_API_KEY,freeVideo:!!env.HF_TOKEN,freeOnly:String(env.FREE_VIDEO_ONLY||'true')==='true',nvidia:!!env.NVIDIA_API_KEY,nvidiaModel:env.NVIDIA_TEXT_MODEL||'sarvamai/sarvam-m'});
+  if(u.pathname==='/api/health')return json({ok:true,pexels:!!env.PEXELS_API_KEY,freeVideo:!!env.HF_TOKEN,freeOnly:String(env.FREE_VIDEO_ONLY||'true')==='true',nvidia:!!env.NVIDIA_API_KEY,nvidiaModel:env.NVIDIA_TEXT_MODEL||'meta/llama-3.3-70b-instruct'});
   if(u.pathname==='/api/pexels/search'&&request.method==='GET')return pexelsSearch(request,env);
   if(u.pathname==='/api/media'&&request.method==='GET')return proxyMedia(request);
   if(u.pathname==='/api/video/generate'&&request.method==='POST')return generateVideo(request,env);
