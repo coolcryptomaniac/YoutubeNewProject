@@ -1,6 +1,6 @@
 # Ridge Cloud Media (optional)
 
-Ridge Studio itself remains a static GitHub Pages app. This Worker is optional and adds cloud Pexels search/proxy, a strictly free-only AI-video adapter, and an optional NVIDIA NIM second-opinion editor.
+Ridge Studio itself remains a static GitHub Pages app. This Worker is optional and adds cloud Pexels search/proxy, a free-credit-only AI-video adapter, and an optional NVIDIA NIM second-opinion editor.
 
 ## Why this exists
 
@@ -17,13 +17,17 @@ Ridge Studio itself remains a static GitHub Pages app. This Worker is optional a
 
 The Worker reads `NVIDIA_API_KEY` only from a Cloudflare Worker secret. Do **not** put the key in `studio-v2.html`, `studio-v3.js`, `wrangler.toml`, a GitHub issue, or chat.
 
-Default model: `sarvamai/sarvam-m` through NVIDIA NIM. The model name is a non-secret Worker variable (`NVIDIA_TEXT_MODEL`) so it can be changed later without changing the browser app.
+Default second-opinion model: `meta/llama-3.3-70b-instruct` through NVIDIA NIM. The model name is a non-secret Worker variable (`NVIDIA_TEXT_MODEL`) so it can be changed without changing the browser app.
+
+A live integration smoke test is intentionally used instead of trusting catalog pages alone. In August 2026 that test caught that the previous `sarvamai/sarvam-m` NVIDIA endpoint had already returned HTTP 410/end-of-life, so Ridge moved to the current Llama endpoint before promoting NVIDIA in Studio.
 
 Studio modes:
 
 - **Off** — existing Groq/current pipeline only.
 - **Shadow** — NVIDIA creates a second candidate but does not replace the release. This is the default for testing quality safely.
 - **Prefer NVIDIA** — NVIDIA replaces only title/description/hashtags/tags/lyrics/intro/outro when the reviewer itself says its version is better with at least 78% confidence. The locked story/hook are never replaced.
+
+Ridge Studio 3.3 also keeps a small local, per-language A/B record. After at least eight rated comparisons, it recommends Prefer NVIDIA only if NVIDIA has at least six wins and at least 75% of decisive votes. Full lyrics are not stored in this experiment history.
 
 ## Deploy directly with Wrangler
 
@@ -41,7 +45,7 @@ When Wrangler asks for the NVIDIA secret, paste the key into that hidden termina
 
 ## Deploy with GitHub Actions
 
-The manual **Deploy Ridge Cloud** workflow also supports repository Actions secrets. Add these under **GitHub repository → Settings → Secrets and variables → Actions**:
+The **Deploy Ridge Cloud** workflow supports repository Actions secrets. Add these under **GitHub repository → Settings → Secrets and variables → Actions**:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
@@ -49,7 +53,9 @@ The manual **Deploy Ridge Cloud** workflow also supports repository Actions secr
 - `HF_TOKEN` (optional)
 - `NVIDIA_API_KEY` (optional)
 
-Then run **Actions → Deploy Ridge Cloud → Run workflow**. The workflow forwards `NVIDIA_API_KEY` into Cloudflare using `wrangler secret put`; it is never written to the repository.
+You can run it manually from Actions. It also deploys automatically when `cloud/**` or the deployment workflow changes on `main`.
+
+The workflow forwards provider secrets into Cloudflare using `wrangler secret put`; they are never written to the repository. After each deployment it runs a blocking live smoke test against the public Worker: health, one Pexels search, and one NVIDIA refinement. That smoke test deliberately does **not** call Hugging Face video generation.
 
 After deployment, paste only the public `https://...workers.dev` URL into **Settings → Ridge Cloud** in Studio.
 
