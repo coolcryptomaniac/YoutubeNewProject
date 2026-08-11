@@ -39,8 +39,8 @@ assert.match(evalJs,/ridge\.model-eval\.v1/);assert.match(evalJs,/MIN_RATED=8/);
 
 assert.match(cloud,/Math\.min\(10/);assert.match(cloud,/40\*1024\*1024/);assert.match(cloud,/nvidiaRefine/);
 assert.match(worker,/api\.pexels\.com\/v1\/videos\/search/);assert.match(worker,/FREE_VIDEO_ONLY/);assert.match(worker,/isVerifiedFree/);assert.match(worker,/paid fallback disabled/);assert.match(worker,/env\.NVIDIA_API_KEY/);assert.match(worker,/integrate\.api\.nvidia\.com\/v1\/chat\/completions/);assert.match(worker,/meta\/llama-3\.3-70b-instruct/);assert.match(worker,/LOCKED STORY/);
-assert.match(wrangler,/NVIDIA_TEXT_MODEL = "meta\/llama-3\.3-70b-instruct"/);assert.match(deploy,/secrets\.NVIDIA_API_KEY/);assert.match(deploy,/wrangler secret put NVIDIA_API_KEY/);
+assert.match(wrangler,/NVIDIA_TEXT_MODEL = "meta\/llama-3\.3-70b-instruct"/);assert.match(deploy,/secrets\.NVIDIA_API_KEY/);assert.match(deploy,/wrangler secret put NVIDIA_API_KEY/);assert.match(deploy,/push:\n\s+branches: \[main\]/);assert.match(deploy,/cloud\/\*\*/);assert.match(deploy,/Post-deploy live smoke/);assert.match(deploy,/ridge-cloud-media\.founder-f53\.workers\.dev/);assert.match(deploy,/node \.\.\/tests\/ridge-cloud-live-smoke\.mjs/);
 
 assert.match(publish,/navigator\.share/);assert.match(publish,/youtube\/v3\/videos/);assert.match(publish,/video_reels/);assert.match(css,/min-height:44px/);assert.match(css,/@media\(max-width:620px\)/);
 
-console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, Groq primary + live NVIDIA Llama shadow + local evidence tracker`);
+console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, Groq primary + live NVIDIA Llama shadow + local evidence tracker + auto cloud deploy`);
