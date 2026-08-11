@@ -17,11 +17,7 @@ const deploy=fs.readFileSync('.github/workflows/deploy-ridge-cloud.yml','utf8');
 const css=fs.readFileSync('studio-v3.css','utf8');
 
 assert.match(html,/Ridge Studio 3\.3/);
-assert.match(html,/CREATE VIDEO/);
-assert.match(html,/Create · Edit · Publish/);
-assert.match(html,/\.\/studio-v3\.js/);
-assert.match(html,/\.\/studio-v3-eval\.js/);
-assert.match(html,/\.\/studio-v3\.css/);
+assert.match(html,/CREATE VIDEO/);assert.match(html,/Create · Edit · Publish/);assert.match(html,/\.\/studio-v3\.js/);assert.match(html,/\.\/studio-v3-eval\.js/);assert.match(html,/\.\/studio-v3\.css/);
 for(const old of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-credentials.js','Daily Factory','Pexels API key'])assert.ok(!html.includes(old),`legacy runtime clutter remains: ${old}`);
 
 const ids=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(x=>x[1]));
@@ -30,25 +26,21 @@ const missing=[...refs].filter(x=>!ids.has(x));assert.deepEqual(missing,[],`V3 m
 for(const id of ['firstRun','songFile','createBtn','stage','shareBtn','settingsPanel','templateSelect','cloudUrl','freeVideoMinutes','testCloud','deepCloudTest','nvidiaMode','nvidiaState','applyNvidia','rateGroq','rateNvidia','rateTie','modelEvalState','useModelRecommendation','cloudDeepState'])assert.ok(ids.has(id),`missing core UI id ${id}`);
 assert.ok(!html.includes('NVIDIA_API_KEY'),'NVIDIA key must never appear in browser HTML');
 
-assert.equal(TEMPLATE_COUNT,72,'expected 72 compact genre/mood recipes');
-assert.equal(VIDEO_TEMPLATES.length,72);assert.equal(new Set(VIDEO_TEMPLATES.map(x=>x.id)).size,72,'template ids must be unique');
-assert.ok(VIDEO_TEMPLATES.every(x=>x.queries.length===4&&x.theme&&x.genre&&x.mood));
-assert.equal(pickTemplate({text:'dark phonk night drive bass'}).genre,'phonk');assert.equal(pickTemplate({text:'बारिश sad lonely memory'}).genre,'rain');
+assert.equal(TEMPLATE_COUNT,72,'expected 72 compact genre/mood recipes');assert.equal(VIDEO_TEMPLATES.length,72);assert.equal(new Set(VIDEO_TEMPLATES.map(x=>x.id)).size,72,'template ids must be unique');assert.ok(VIDEO_TEMPLATES.every(x=>x.queries.length===4&&x.theme&&x.genre&&x.mood));assert.equal(pickTemplate({text:'dark phonk night drive bass'}).genre,'phonk');assert.equal(pickTemplate({text:'बारिश sad lonely memory'}).genre,'rain');
 
 assert.match(storage,/showDirectoryPicker/);assert.match(storage,/mode:'read'/);assert.match(storage,/put\('media-root',root\)/);assert.ok(!/putAsset|put\([^\n]*blob/i.test(storage),'V3 media library should not copy media blobs to IndexedDB');assert.match(storage,/maxFiles=500/);assert.match(storage,/ridge\.credentials\.v1/);
 assert.match(render,/class SceneLease/);assert.match(render,/this\.current\?\.release/);assert.match(render,/bitmap\.close/);assert.match(render,/URL\.revokeObjectURL/);assert.ok(!render.includes('decodeAudioData'),'V3 final renderer must stream audio instead of decoding full PCM');assert.match(render,/280\*1024\*1024/);assert.match(render,/960,h:540,fps:24/);assert.match(render,/540,h:960,fps:24/);
 assert.equal((themes.match(/id:'naru-/g)||[]).length,5,'expected five Naru procedural packs');assert.ok(!/particles\.push|stars\.push/.test(themes),'V3 themes must not grow animation arrays');
 
 assert.match(groq,/lockMeaning/);assert.match(groq,/packageFromLock/);assert.match(groq,/Do not translate the song into another language/);assert.match(groq,/openai\/gpt-oss-20b/);assert.match(groq,/whisper-large-v3-turbo/);
-assert.match(app,/nvidiaMode:'shadow'/);assert.match(app,/maybeNvidiaRefine/);assert.match(app,/applyNvidiaCandidate/);assert.match(app,/\.78/);assert.match(app,/prepareCloudMedia/);
-assert.ok(!/suno.*password|password.*suno|suno.*cookie|cookie.*suno/i.test(app),'no Suno credential scraping');
+assert.match(app,/nvidiaMode:'shadow'/);assert.match(app,/maybeNvidiaRefine/);assert.match(app,/applyNvidiaCandidate/);assert.match(app,/\.78/);assert.match(app,/prepareCloudMedia/);assert.ok(!/suno.*password|password.*suno|suno.*cookie|cookie.*suno/i.test(app),'no Suno credential scraping');
 
 assert.match(evalJs,/ridge\.model-eval\.v1/);assert.match(evalJs,/MIN_RATED=8/);assert.match(evalJs,/NVIDIA_PROMOTE=\.75/);assert.match(evalJs,/n>=6/);assert.match(evalJs,/rateGroq/);assert.match(evalJs,/rateNvidia/);assert.match(evalJs,/useModelRecommendation/);assert.match(evalJs,/api\/pexels\/search/);assert.match(evalJs,/api\/nvidia\/refine/);assert.ok(!evalJs.includes('/api/video/generate'),'Deep diagnostics must never spend HF video credits');assert.ok(!evalJs.includes('NVIDIA_API_KEY'),'browser evaluation code must not know the NVIDIA secret name');
 
 assert.match(cloud,/Math\.min\(10/);assert.match(cloud,/40\*1024\*1024/);assert.match(cloud,/nvidiaRefine/);
-assert.match(worker,/api\.pexels\.com\/v1\/videos\/search/);assert.match(worker,/FREE_VIDEO_ONLY/);assert.match(worker,/isVerifiedFree/);assert.match(worker,/paid fallback disabled/);assert.match(worker,/env\.NVIDIA_API_KEY/);assert.match(worker,/integrate\.api\.nvidia\.com\/v1\/chat\/completions/);assert.match(worker,/sarvamai\/sarvam-m/);assert.match(worker,/LOCKED STORY/);
-assert.match(wrangler,/NVIDIA_TEXT_MODEL = "sarvamai\/sarvam-m"/);assert.match(deploy,/secrets\.NVIDIA_API_KEY/);assert.match(deploy,/wrangler secret put NVIDIA_API_KEY/);
+assert.match(worker,/api\.pexels\.com\/v1\/videos\/search/);assert.match(worker,/FREE_VIDEO_ONLY/);assert.match(worker,/isVerifiedFree/);assert.match(worker,/paid fallback disabled/);assert.match(worker,/env\.NVIDIA_API_KEY/);assert.match(worker,/integrate\.api\.nvidia\.com\/v1\/chat\/completions/);assert.match(worker,/meta\/llama-3\.3-70b-instruct/);assert.match(worker,/LOCKED STORY/);
+assert.match(wrangler,/NVIDIA_TEXT_MODEL = "meta\/llama-3\.3-70b-instruct"/);assert.match(deploy,/secrets\.NVIDIA_API_KEY/);assert.match(deploy,/wrangler secret put NVIDIA_API_KEY/);
 
 assert.match(publish,/navigator\.share/);assert.match(publish,/youtube\/v3\/videos/);assert.match(publish,/video_reels/);assert.match(css,/min-height:44px/);assert.match(css,/@media\(max-width:620px\)/);
 
-console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, local model experiment + crash-safe cloud pipeline`);
+console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} recipes, Groq primary + live NVIDIA Llama shadow + local evidence tracker`);
