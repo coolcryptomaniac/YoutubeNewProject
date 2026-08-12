@@ -1,0 +1,72 @@
+name: Provider scout
+
+on:
+  schedule:
+    # Mondays 03:17 UTC ~= 08:47 IST: quick free-model/tool scan.
+    - cron: '17 3 * * 1'
+    # First of each month 03:47 UTC ~= 09:17 IST: deeper process review.
+    - cron: '47 3 1 * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Scout depth
+        required: true
+        default: weekly
+        type: choice
+        options: [weekly, monthly]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: provider-scout
+  cancel-in-progress: false
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Choose scout mode
+        id: mode
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ inputs.mode }}"
+          elif [ "${{ github.event.schedule }}" = "47 3 1 * *" ]; then
+            MODE="monthly"
+          else
+            MODE="weekly"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Provider scout mode: $MODE"
+
+      - name: Scan official catalogs and recent models
+        env:
+          SCOUT_REPORT: provider-scout-report.md
+        run: node scripts/provider-scout.mjs --mode=${{ steps.mode.outputs.mode }}
+
+      - name: Publish Actions summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f provider-scout-report.md ]; then
+            cat provider-scout-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Provider scout did not produce a report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Open Ridge improvement issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TITLE="Ridge Provider Scout — ${{ steps.mode.outputs.mode }} — $(date -u +%Y-%m-%d)"
+          gh issue create --title "$TITLE" --body-file provider-scout-report.md
