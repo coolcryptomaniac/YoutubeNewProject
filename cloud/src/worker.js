@@ -1,4 +1,5 @@
 import {InferenceClient} from '@huggingface/inference';
+import {sunoProvider, SunoProviderError} from './providers/suno.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Range','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors,...extra}});
@@ -71,12 +72,40 @@ async function nvidiaRefine(request,env){
   }catch(e){return json({error:String(e?.message||e).slice(0,280),model},503)}
 }
 
+function sunoError(e){
+  if(e instanceof SunoProviderError)return json({error:e.message,code:e.code,detail:e.detail||undefined,retryable:e.retryable||false},e.status);
+  return json({error:String(e?.message||e).slice(0,300),code:'SUNO_INTERNAL'},503);
+}
+async function sunoGenerate(request,env){
+  const body=await request.json().catch(()=>({}));
+  const prompt=String(body.prompt||body.style||'').trim();
+  if(!prompt)return json({error:'prompt or style required',code:'SUNO_BAD_REQUEST'},400);
+  try{return json(await sunoProvider(env).generate(body),202)}catch(e){return sunoError(e)}
+}
+async function sunoStatus(request,env){
+  const u=new URL(request.url),id=u.searchParams.get('id');
+  if(!id)return json({error:'generation id required',code:'SUNO_BAD_REQUEST'},400);
+  try{return json(await sunoProvider(env).status(id))}catch(e){return sunoError(e)}
+}
+async function sunoCancel(request,env){
+  const body=await request.json().catch(()=>({})),id=String(body.id||'').trim();
+  if(!id)return json({error:'generation id required',code:'SUNO_BAD_REQUEST'},400);
+  try{return json(await sunoProvider(env).cancel(id))}catch(e){return sunoError(e)}
+}
+
 export default{async fetch(request,env){
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
-  if(u.pathname==='/api/health')return json({ok:true,pexels:!!env.PEXELS_API_KEY,freeVideo:!!env.HF_TOKEN,freeOnly:String(env.FREE_VIDEO_ONLY||'true')==='true',nvidia:!!env.NVIDIA_API_KEY,nvidiaModel:env.NVIDIA_TEXT_MODEL||'meta/llama-3.3-70b-instruct'});
+  if(u.pathname==='/api/health'){
+    const suno=sunoProvider(env).capabilities();
+    return json({ok:true,pexels:!!env.PEXELS_API_KEY,freeVideo:!!env.HF_TOKEN,freeOnly:String(env.FREE_VIDEO_ONLY||'true')==='true',nvidia:!!env.NVIDIA_API_KEY,nvidiaModel:env.NVIDIA_TEXT_MODEL||'meta/llama-3.3-70b-instruct',suno});
+  }
   if(u.pathname==='/api/pexels/search'&&request.method==='GET')return pexelsSearch(request,env);
   if(u.pathname==='/api/media'&&request.method==='GET')return proxyMedia(request);
   if(u.pathname==='/api/video/generate'&&request.method==='POST')return generateVideo(request,env);
   if(u.pathname==='/api/nvidia/refine'&&request.method==='POST')return nvidiaRefine(request,env);
+  if(u.pathname==='/api/suno/capabilities'&&request.method==='GET')return json(sunoProvider(env).capabilities());
+  if(u.pathname==='/api/suno/generate'&&request.method==='POST')return sunoGenerate(request,env);
+  if(u.pathname==='/api/suno/status'&&request.method==='GET')return sunoStatus(request,env);
+  if(u.pathname==='/api/suno/cancel'&&request.method==='POST')return sunoCancel(request,env);
   return json({error:'Not found'},404);
 }};
