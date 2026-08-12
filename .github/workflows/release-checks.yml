@@ -1,0 +1,62 @@
+name: Release checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: JavaScript syntax
+        run: |
+          node --check cloud/src/worker-v2.js
+          node --check cloud/src/providers/social.js
+          node --check cloud/src/providers/vusic.js
+          node --check scripts/provider-scout.mjs
+
+      - name: Release Hub contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('release.html').read_text()
+          vusic=Path('cloud/src/providers/vusic.js').read_text()
+          worker=Path('cloud/src/worker-v2.js').read_text()
+          scout=Path('scripts/provider-scout.mjs').read_text()
+          required=['3000 × 3000','Distribute + cross-post','primaryArtist','composer','lyricist','lyrics','confirmSubmit']
+          missing=[x for x in required if x not in html]
+          if missing: raise SystemExit('Release Hub missing: '+repr(missing))
+          if 'VUSIC_USERNAME' not in vusic or 'VUSIC_PASSWORD' not in vusic: raise SystemExit('Vusic secret contract missing')
+          if 'VUSIC_HUMAN_VERIFICATION_REQUIRED' not in vusic: raise SystemExit('Human verification guard missing')
+          if 'confirmSubmit' not in vusic: raise SystemExit('Final Vusic submit guard missing')
+          if 'RIDGE_ADMIN_TOKEN' not in worker: raise SystemExit('Release endpoints are not admin protected')
+          if "paid fallback disabled" not in Path('cloud/src/worker.js').read_text(): raise SystemExit('Free-only AI guard regressed')
+          if 'No AI endpoint is called by this scout' not in scout: raise SystemExit('Provider scout must remain rules-first')
+          print('Release, Vusic, social and provider-scout contracts OK.')
+          PY
+
+      - name: No committed credential values
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          names=['VUSIC_PASSWORD','VUSIC_USERNAME','LINKEDIN_ACCESS_TOKEN','FACEBOOK_PAGE_ACCESS_TOKEN','INSTAGRAM_ACCESS_TOKEN','RIDGE_ADMIN_TOKEN']
+          files=['release.html','cloud/src/providers/vusic.js','cloud/src/providers/social.js','cloud/src/worker-v2.js','cloud/RELEASE_AUTOMATION.md']
+          for f in files:
+            text=Path(f).read_text(errors='ignore')
+            for name in names:
+              # Variable names/documentation are fine; obvious assignment to a literal is not.
+              import re
+              if re.search(rf'{name}\s*[=:]\s*["\'][^"\']{{8,}}["\']',text):
+                raise SystemExit(f'Possible committed value for {name} in {f}')
+          print('No obvious release credential values committed.')
+          PY
