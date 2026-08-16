@@ -1,5 +1,7 @@
 'use strict';
 
+import {mediaMatchScore} from './studio-v3-story.js';
+
 const DB_NAME='ridge-v3-local';
 const DB_VERSION=1;
 const STORE='kv';
@@ -20,6 +22,7 @@ export function saveProject(project){try{localStorage.setItem(PROJECT_KEY,JSON.s
 async function permission(handle,request=false){if(!handle)return 'denied';if(!handle.queryPermission)return 'granted';try{let state=await handle.queryPermission({mode:'read'});if(state==='prompt'&&request&&handle.requestPermission)state=await handle.requestPermission({mode:'read'});return state}catch{return 'prompt'}}
 const mediaType=file=>file.type.startsWith('video/')?'video':file.type.startsWith('image/')?'image':'';
 const safeExt=name=>/\.(jpe?g|png|webp|gif|avif|mp4|mov|m4v|webm|mkv)$/i.test(name||'');
+const stableTie=(a,b,seed='ridge')=>{let h=2166136261;for(const c of `${seed}|${a.id}|${b.id}`)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return (h&1)?1:-1};
 
 export class MediaLibrary{
   constructor(){this.root=null;this.items=[];this.sessionFiles=new Map();this.permission='unknown';this.lastScan=0}
@@ -42,6 +45,11 @@ export class MediaLibrary{
     if(!this.root||!item.path?.length)throw new Error('Reconnect the selected media folder.');const state=await permission(this.root,false);if(state!=='granted')throw new Error('Folder permission expired. Tap “Reconnect folder”.');let dir=this.root;for(const part of item.path.slice(0,-1))dir=await dir.getDirectoryHandle(part);const h=await dir.getFileHandle(item.path.at(-1));return h.getFile()
   }
   chooseSequence(count=12,seed='ridge'){if(!this.items.length)return [];let x=2166136261;for(const c of String(seed))x=Math.imul(x^c.charCodeAt(0),16777619)>>>0;const arr=[...this.items];for(let i=arr.length-1;i>0;i--){x=(Math.imul(x,1664525)+1013904223)>>>0;const j=x%(i+1);[arr[i],arr[j]]=[arr[j],arr[i]]}return arr.slice(0,Math.min(count,arr.length))}
+  chooseForScene(scene,{excludeId='',seed='ridge'}={}){
+    if(!this.items.length)return null;const ranked=this.items.map(item=>({item,score:mediaMatchScore(item,scene)+(item.id===excludeId?-3:0)})).sort((a,b)=>b.score-a.score||stableTie(a.item,b.item,`${seed}|${scene?.id||''}`));
+    // If names/query metadata have no semantic match, still use a deterministic fallback instead of failing the render.
+    return ranked[0]?.item||null
+  }
   summary(){const videos=this.items.filter(x=>x.kind==='video').length,images=this.items.length-videos,remote=this.items.filter(x=>x.source==='remote').length;return {items:this.items.length,videos,images,remote,persistent:!!this.root,permission:this.permission,supportsPersistentFolder:this.supportsPersistentFolder}}
   async forgetFolder(){this.root=null;this.permission='none';this.items=this.items.filter(x=>x.source!=='folder');try{await del('media-root');await del('media-index')}catch{}return this.summary()}
 }
