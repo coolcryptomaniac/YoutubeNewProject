@@ -49,8 +49,12 @@ export class CloudMediaClient{
   }
 }
 
+function continuityText(project={}){
+  const b=project.visualBible||{},rules=Array.isArray(b.continuity_rules)?b.continuity_rules:[];
+  return [b.subject&&`Recurring subject: ${b.subject}`,b.setting&&`World: ${b.setting}`,b.palette&&`Palette/light: ${b.palette}`,b.camera_language&&`Camera language: ${b.camera_language}`,...rules.slice(0,5)].filter(Boolean).join('. ')
+}
 export function visualPrompts(project,template){
-  const story=project?.story||project?.idea||project?.title||'cinematic music story',planned=storyPromptScenes(project?.scenePlan,6);
-  if(planned.length)return planned.map((s,i)=>`${story}. Lyric meaning: ${s.meaning||s.lyric||story}. Visual: ${s.visual||s.query}. ${s.camera||'cinematic'} framing, ${s.motion||'natural'} motion. Shot ${i+1}: coherent music-video footage, same visual world, no text, no logo, ${project?.aspect==='vertical'?'vertical 9:16':'landscape 16:9'}`);
-  return (template?.queries||[]).slice(0,4).map((q,i)=>`${story}. ${q}. Shot ${i+1}: cinematic music-video footage, coherent subject, natural motion, no text, no logo, ${project?.aspect==='vertical'?'vertical 9:16':'landscape 16:9'}`);
+  const story=project?.story||project?.idea||project?.title||'cinematic music story',continuity=continuityText(project),planned=storyPromptScenes(project?.scenePlan,6),frame=project?.aspect==='vertical'?'vertical 9:16':'landscape 16:9';
+  if(planned.length)return planned.map((s,i)=>`${continuity?continuity+'. ':''}${story}. Lyric meaning: ${s.meaning||s.lyric||story}. Visual: ${s.visual||s.query}. ${s.camera||'cinematic'} framing, ${s.motion||'natural'} motion. Shot ${i+1}: coherent music-video footage, preserve the same recurring subject/world where applicable, no text, no logo, ${frame}`.slice(0,1500));
+  return (template?.queries||[]).slice(0,4).map((q,i)=>`${continuity?continuity+'. ':''}${story}. ${q}. Shot ${i+1}: cinematic music-video footage, coherent subject, natural motion, no text, no logo, ${frame}`.slice(0,1500));
 }
