@@ -22,7 +22,7 @@ export function buildLyricCues(text='',duration=120){
   const lines=String(text||'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(x=>x&&!/^\[[^\]]+\]$/.test(x));
   if(!lines.length||!duration)return [];
   const start=Math.min(4,duration*.04),end=Math.max(start+1,duration-Math.min(4,duration*.03)),span=Math.max(1,end-start),step=span/lines.length;
-  return lines.map((text,i)=>({text,start:start+i*step,end:Math.min(duration,start+(i+1)*step)}));
+  return lines.map((text,i)=>({text,start:start+i*step,end:Math.min(duration,start+(i+1)*step),section:'Song',source:'even'}));
 }
 export function lyricAt(time,cues=[]){const t=finite(time,0);for(let i=0;i<cues.length;i++)if(t>=cues[i].start&&t<cues[i].end)return {...cues[i],index:i,progress:unit((t-cues[i].start)/Math.max(.001,cues[i].end-cues[i].start))};return null}
 
@@ -50,7 +50,7 @@ function drawNoir(ctx,W,H,t,s){ctx.save();ctx.translate(W/2,H/2);for(let i=0;i<2
 function drawBloom(ctx,W,H,t,s){ctx.save();ctx.translate(W/2,H*.5);for(let i=0;i<16;i++){const a=i/16*TAU+t*.04,r=Math.min(W,H)*(.07+s.low*.035),len=Math.min(W,H)*(.16+s.mid*.05);ctx.fillStyle=rgba(i%2?s.A:s.B,.05+s.mid*.09);ctx.beginPath();ctx.ellipse(Math.cos(a)*len,Math.sin(a)*len,r*1.5,r,.5+a,0,TAU);ctx.fill()}ctx.restore()}
 
 export function drawVisualizer(ctx,W,H,time,bands,theme){
-  const low=unit(bands?.low),mid=unit(bands?.mid),high=unit(bands?.high),[A,B]=theme.palette,t=finite(time,0);ctx.save();ctx.globalAlpha=.48;
+  const low=unit(bands?.low),mid=unit(bands?.mid),high=unit(bands?.high),[A,B]=theme.palette,t=finite(time,0);ctx.save();ctx.globalAlpha=.42;
   if(theme.visual==='bars')bars(ctx,W,H,{low,mid,high,A,B,t});else if(theme.visual==='chakra')chakra(ctx,W,H,{low,mid,high,A,B,t});else if(theme.visual==='rain')rainViz(ctx,W,H,{low,mid,high,A,B,t});else if(theme.visual==='lotus')lotus(ctx,W,H,{low,mid,high,A,B,t});else wave(ctx,W,H,{low,mid,high,A,B,t});
   ctx.restore();
 }
@@ -61,6 +61,21 @@ function lotus(ctx,W,H,s){ctx.translate(W/2,H/2);for(let i=0;i<12;i++){ctx.rotat
 function wave(ctx,W,H,s){ctx.strokeStyle=rgba(s.A,.55);ctx.lineWidth=2+s.mid*3;ctx.beginPath();for(let x=0;x<=W;x+=8){const y=H*.82+Math.sin(x*.015+s.t*2.1)*H*(.015+s.low*.025);x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
 
 function fitText(ctx,text,maxW){let s=String(text||'');while(s.length>3&&ctx.measureText(s).width>maxW)s=s.slice(0,-2);return s}
-export function drawLyrics(ctx,W,H,time,cues,theme){const cur=lyricAt(time,cues);if(!cur)return;const p=cur.progress,[A,B]=theme.palette,style=theme.lyrics;ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.92)';ctx.shadowBlur=Math.max(14,W*.018);let y=H*.72,size=W*.042,scale=1,rot=0;if(style==='punch'){scale=.94+Math.sin(Math.min(1,p)*Math.PI)*.12;size=W*.052}else if(style==='slash'){scale=.96+Math.min(.08,p*.12);rot=Math.sin(time*13)*.008;size=W*.052}else if(style==='chakra'){scale=.96+Math.sin(p*Math.PI)*.06;size=W*.048}else if(style==='anime'){y=H*.78;size=W*.038}else if(style==='soft'){y=H*.76;size=W*.038}ctx.translate(W/2,y);ctx.rotate(rot);ctx.scale(scale,scale);ctx.font=`850 ${Math.round(size)}px system-ui`;ctx.fillStyle='#fff';const text=fitText(ctx,cur.text,W*.82);ctx.fillText(text,0,0);if(style==='slash'){ctx.strokeStyle=rgba(A,.75);ctx.lineWidth=Math.max(2,W*.003);ctx.beginPath();ctx.moveTo(-W*.28,size*.8);ctx.lineTo(-W*.28+W*.56*p,size*.8);ctx.stroke()}if(style==='chakra'){ctx.strokeStyle=rgba(B,.45);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,W*.21,-Math.PI/2,-Math.PI/2+TAU*p);ctx.stroke()}ctx.restore()}
+function roundedRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function lyricFont(ctx,text,W,preferred){let size=preferred;for(;size>W*.026;size-=2){ctx.font=`850 ${Math.round(size)}px system-ui`;if(ctx.measureText(text).width<=W*.78)break}return size}
+function nextLyric(cur,cues){const n=cues?.[cur.index+1];return n&&n.start-cur.end<1.15?n:null}
+export function drawLyrics(ctx,W,H,time,cues,theme){
+  const cur=lyricAt(time,cues);if(!cur)return;const p=cur.progress,[A,B]=theme.palette,style=theme.lyrics,next=nextLyric(cur,cues);ctx.save();ctx.textBaseline='middle';ctx.shadowColor='rgba(0,0,0,.78)';ctx.shadowBlur=Math.max(10,W*.011);let y=H*.73,size=W*.044,scale=1,rot=0;if(style==='punch'){scale=.96+Math.sin(Math.min(1,p)*Math.PI)*.08;size=W*.052}else if(style==='slash'){scale=.98+Math.min(.05,p*.08);rot=Math.sin(time*12)*.004;size=W*.05}else if(style==='chakra'){scale=.98+Math.sin(p*Math.PI)*.04;size=W*.048}else if(style==='anime'){y=H*.77;size=W*.041}else if(style==='soft'){y=H*.75;size=W*.041}
+  const raw=String(cur.text||''),section=String(cur.section||'').trim(),sectionVisible=section&&section.toLowerCase()!=='song',text=fitText(ctx,raw,W*.8);size=lyricFont(ctx,text,W,size);ctx.translate(W/2,y);ctx.rotate(rot);ctx.scale(scale,scale);ctx.font=`850 ${Math.round(size)}px system-ui`;const tw=ctx.measureText(text).width,padX=Math.max(24,W*.025),padY=Math.max(14,H*.018),boxW=Math.min(W*.88,tw+padX*2),boxH=size+padY*2;
+  // Glass caption plate keeps words legible over bright footage without covering the scene.
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(4,7,14,.46)';roundedRect(ctx,-boxW/2,-boxH/2,boxW,boxH,Math.max(14,boxH*.23));ctx.fill();ctx.strokeStyle='rgba(255,255,255,.10)';ctx.lineWidth=Math.max(1,W*.0012);ctx.stroke();
+  if(sectionVisible){ctx.textAlign='left';ctx.font=`750 ${Math.max(12,Math.round(W*.014))}px system-ui`;ctx.fillStyle=rgba(A,.92);ctx.fillText(section.toUpperCase(),-boxW/2+padX,-boxH/2-Math.max(13,H*.018))}
+  ctx.textAlign='center';ctx.font=`850 ${Math.round(size)}px system-ui`;ctx.shadowColor='rgba(0,0,0,.92)';ctx.shadowBlur=Math.max(8,W*.008);ctx.fillStyle='rgba(255,255,255,.68)';ctx.fillText(text,0,0);
+  // Karaoke progress is rendered with a clip instead of per-letter objects, keeping memory constant.
+  const left=-tw/2,progressW=tw*unit(p);ctx.save();ctx.beginPath();ctx.rect(left-size*.05,-size,progressW+size*.1,size*2);ctx.clip();const ink=ctx.createLinearGradient(left,0,left+Math.max(1,tw),0);ink.addColorStop(0,A);ink.addColorStop(1,B);ctx.fillStyle=ink;ctx.fillText(text,0,0);ctx.restore();
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,.16)';roundedRect(ctx,-tw/2,boxH*.5+Math.max(7,H*.009),tw,Math.max(3,H*.005),99);ctx.fill();ctx.fillStyle=A;roundedRect(ctx,-tw/2,boxH*.5+Math.max(7,H*.009),Math.max(2,tw*p),Math.max(3,H*.005),99);ctx.fill();
+  if(next){ctx.font=`650 ${Math.max(12,Math.round(size*.47))}px system-ui`;ctx.fillStyle='rgba(255,255,255,.38)';ctx.fillText(fitText(ctx,next.text,W*.7),0,boxH*.5+size*.86)}
+  if(style==='slash'){ctx.strokeStyle=rgba(A,.65);ctx.lineWidth=Math.max(2,W*.0024);ctx.beginPath();ctx.moveTo(-boxW*.32,boxH*.48);ctx.lineTo(-boxW*.32+boxW*.64*p,boxH*.48);ctx.stroke()}if(style==='chakra'){ctx.strokeStyle=rgba(B,.38);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,Math.min(boxW*.38,H*.16),-Math.PI/2,-Math.PI/2+TAU*p);ctx.stroke()}ctx.restore()
+}
 
 export function drawIntroOutro(ctx,W,H,time,duration,project,theme){const intro=time<2.8,outro=time>Math.max(0,duration-3.5);if(!intro&&!outro)return;const local=intro?unit(time/2.8):unit((duration-time)/3.5),text=intro?(project.intro||project.title):(project.outro||'Thanks for listening');ctx.save();ctx.globalAlpha=.92*Math.min(1,local*3);const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,rgba(theme.palette[2],.96));g.addColorStop(1,rgba(theme.palette[0],.24));ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,.85)';ctx.shadowBlur=25;ctx.font=`900 ${Math.round(W*.055)}px system-ui`;ctx.fillText(fitText(ctx,String(text||'').toUpperCase(),W*.82),W/2,H*.5);ctx.fillStyle=theme.palette[0];ctx.font=`700 ${Math.round(W*.015)}px system-ui`;ctx.fillText(intro?'ORIGINAL MUSIC VIDEO':'CREATE · EDIT · PUBLISH',W/2,H*.64);ctx.restore()}
