@@ -1,5 +1,5 @@
 name = "ridge-cloud-media"
-main = "src/worker-v2.js"
+main = "src/worker-v3.js"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat_v2"]
 
@@ -10,5 +10,6 @@ binding = "BROWSER"
 HF_VIDEO_MODEL = "Lightricks/LTX-Video-0.9.8-13B-distilled"
 FREE_VIDEO_ONLY = "true"
 NVIDIA_TEXT_MODEL = "meta/llama-3.3-70b-instruct"
+DIRECTOR_TEXT_MODEL = "meta/llama-3.3-70b-instruct"
 META_GRAPH_VERSION = "v25.0"
 LINKEDIN_VERSION = "202607"
