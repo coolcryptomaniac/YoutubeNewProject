@@ -14,14 +14,15 @@ function lyricLines(text=''){
   }
   return out;
 }
+function pct(x,rawKey,normKey,fallback){const raw=x?.[rawKey]??x?.[normKey]??fallback;const n=finite(raw,fallback);return clamp(x?.[rawKey]!=null||n>1?n*.01:n)}
 
 export function normalizeScenePlan(plan=[]){
   if(!Array.isArray(plan))return [];
   return plan.slice(0,24).map((x,i)=>({
     id:String(x?.id||`beat-${i+1}`),
     section:String(x?.section||'story').slice(0,40),
-    startPct:clamp(finite(x?.start_pct,x?.startPct??i/Math.max(1,plan.length))*0.01),
-    endPct:clamp(finite(x?.end_pct,x?.endPct??(i+1)/Math.max(1,plan.length))*0.01),
+    startPct:pct(x,'start_pct','startPct',i/Math.max(1,plan.length)),
+    endPct:pct(x,'end_pct','endPct',(i+1)/Math.max(1,plan.length)),
     lyricAnchor:String(x?.lyric_anchor||x?.lyricAnchor||'').slice(0,240),
     meaning:String(x?.meaning||'').slice(0,420),
     visual:String(x?.visual_prompt||x?.visual||'').slice(0,700),
@@ -37,7 +38,7 @@ export function normalizeScenePlan(plan=[]){
 function fallbackPlan(project={},target=12){
   const lines=lyricLines(project.lyrics||'');
   const n=Math.max(4,Math.min(18,lines.length?Math.ceil(lines.length/2):target));
-  const chunks=Array.from({length:n},(_,i)=>[]);
+  const chunks=Array.from({length:n},()=>[]);
   lines.forEach((line,i)=>chunks[Math.min(n-1,Math.floor(i*n/Math.max(1,lines.length)))].push(line));
   const story=project.story||project.idea||project.title||'the song story';
   const hook=project.hookMeaning||'';
