@@ -80,6 +80,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
           app=Path('studio-v3.js').read_text()
           story=Path('studio-v3-story.js').read_text()
           director=Path('studio-v3-director.js').read_text()
@@ -97,8 +98,12 @@ jobs:
           if 'stopPreview(true)' not in render: raise SystemExit('Preview audio graph must stop before CREATE/render')
           if '280*1024*1024' not in render: raise SystemExit('Memory fallback safety limit missing')
           if '32*1024*1024' not in render: raise SystemExit('OPFS write-backpressure guard missing')
-          if "video/webm;codecs=vp8,opus" not in render: raise SystemExit('Stable Android WebM recorder path missing')
-          if render.find("video/webm;codecs=vp8,opus") > render.find("video/mp4;codecs=avc1.42E01E,mp4a.40.2"): raise SystemExit('Chrome/Android must prefer VP8 WebM before MP4')
+          mime=re.search(r"const stable=safari\?\[[^\]]+\]:\[([^\]]+)\]",render)
+          if not mime: raise SystemExit('Browser-specific recorder MIME lists missing')
+          chrome=mime.group(1)
+          vp8=chrome.find('video/webm;codecs=vp8,opus')
+          mp4=chrome.find('video/mp4;codecs=avc1.42E01E,mp4a.40.2')
+          if vp8 < 0 or mp4 < 0 or vp8 > mp4: raise SystemExit('Chrome/Android must prefer VP8 WebM before MP4')
           if 'sceneAtTime' not in render or 'chooseForScene' not in render: raise SystemExit('Semantic scene renderer missing')
           if "mode:'read'" not in storage or 'showDirectoryPicker' not in storage: raise SystemExit('Read-only folder flow missing')
           if 'putAsset' in storage: raise SystemExit('Media blobs must not be copied into V3 IndexedDB')
