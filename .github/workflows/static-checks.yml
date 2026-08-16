@@ -20,6 +20,7 @@ jobs:
       - name: V3 JavaScript syntax
         run: |
           node --check studio-v3.js
+          node --check studio-v3-story.js
           node --check studio-v3-eval.js
           node --check studio-v3-storage.js
           node --check studio-v3-groq.js
@@ -30,6 +31,7 @@ jobs:
           node --check studio-v3-cloud.js
           node --check cloud/src/worker.js
           node --check tests/ridge-cloud-live-smoke.mjs
+          node --check tests/studio-v3-selftest.mjs
 
       - name: V3 architecture regression tests
         run: node --experimental-default-type=module tests/studio-v3-selftest.mjs
@@ -39,6 +41,7 @@ jobs:
           test -f studio-v2.html
           test -f studio-v3.css
           test -f studio-v3.js
+          test -f studio-v3-story.js
           test -f studio-v3-eval.js
           test -f studio-v3-storage.js
           test -f studio-v3-groq.js
@@ -65,33 +68,46 @@ jobs:
           for(const legacy of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-credentials.js'])if(html.includes(legacy))throw new Error('Legacy runtime still loaded: '+legacy);
           const moduleScripts=[...html.matchAll(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)/g)].map(x=>x[1]);
           if(moduleScripts.length!==1||moduleScripts[0]!=='./studio-v3.js')throw new Error('V3 should keep exactly one local module entrypoint');
-          console.log(`V3 DOM OK: ${refs.size} references · one local module entrypoint + isolated evaluation helper`);
+          console.log(`V3.4 DOM OK: ${refs.size} references · semantic story module imported by runtime`);
           NODE
 
-      - name: V3 crash-risk and free-tier guardrails
+      - name: V3 crash-risk and semantic-story guardrails
         run: |
           python - <<'PY'
           from pathlib import Path
+          app=Path('studio-v3.js').read_text()
+          story=Path('studio-v3-story.js').read_text()
           render=Path('studio-v3-render.js').read_text()
           storage=Path('studio-v3-storage.js').read_text()
           themes=Path('studio-v3-themes.js').read_text()
           templates=Path('studio-v3-templates.js').read_text()
           cloud=Path('studio-v3-cloud.js').read_text()
+          groq=Path('studio-v3-groq.js').read_text()
           evaljs=Path('studio-v3-eval.js').read_text()
           worker=Path('cloud/src/worker.js').read_text()
           if 'decodeAudioData' in render: raise SystemExit('V3 must not full-decode song PCM during final render')
           if 'class SceneLease' not in render or 'bitmap.close' not in render: raise SystemExit('Single-scene lease cleanup missing')
           if '280*1024*1024' not in render: raise SystemExit('Memory fallback safety limit missing')
+          if '32*1024*1024' not in render: raise SystemExit('OPFS write-backpressure guard missing')
+          if "video/webm;codecs=vp8,opus" not in render: raise SystemExit('Stable Android WebM recorder path missing')
+          if render.find("video/webm;codecs=vp8,opus") > render.find("video/mp4;codecs=avc1.42E01E,mp4a.40.2"): raise SystemExit('Chrome/Android must prefer VP8 WebM before MP4')
+          if 'sceneAtTime' not in render or 'chooseForScene' not in render: raise SystemExit('Semantic scene renderer missing')
           if "mode:'read'" not in storage or 'showDirectoryPicker' not in storage: raise SystemExit('Read-only folder flow missing')
           if 'putAsset' in storage: raise SystemExit('Media blobs must not be copied into V3 IndexedDB')
+          if 'chooseForScene' not in storage or 'mediaMatchScore' not in storage: raise SystemExit('Meaning-based media selection missing')
+          if 'alignLyricsToSegments' not in story or 'buildStoryPlan' not in story: raise SystemExit('Lyric/story timeline engine missing')
+          if 'story_beats' not in groq or 'chronological' not in groq: raise SystemExit('Groq semantic story director contract missing')
+          if 'rebuildSemanticTimeline' not in app or 'searchStoryboard' not in app: raise SystemExit('CREATE is not wired to semantic timeline')
+          if 'Karaoke progress' not in themes or 'cur.section' not in themes: raise SystemExit('Timed cinematic lyric rendering missing')
           if 'particles.push' in themes or 'stars.push' in themes: raise SystemExit('Unbounded animation state detected')
           if "TEMPLATE_COUNT=VIDEO_TEMPLATES.length" not in templates: raise SystemExit('Template catalog missing')
           if 'Math.min(10' not in cloud: raise SystemExit('Free video retry window must be capped at 10 minutes')
+          if '16*1024*1024' not in cloud or 'mobile?1' not in cloud: raise SystemExit('Mobile generated-video memory cap missing')
           if 'FREE_VIDEO_ONLY' not in worker or 'isVerifiedFree' not in worker: raise SystemExit('Cloud AI-video free-only gate missing')
           if 'paid fallback disabled' not in worker: raise SystemExit('Paid fallback refusal missing')
           if '/api/video/generate' in evaljs: raise SystemExit('Diagnostics must never spend HF video credits')
           if 'MIN_RATED=8' not in evaljs or 'NVIDIA_PROMOTE=.75' not in evaljs: raise SystemExit('Model evidence thresholds missing')
-          print('V3.3 crash-risk + cloud + model-evaluation guardrails OK.')
+          print('V3.4 crash-risk + semantic story + cloud guardrails OK.')
           PY
 
       - name: Reject committed secret-like tokens
@@ -101,14 +117,14 @@ jobs:
           from pathlib import Path
           bad=[]
           needles=['g'+'sk'+'_','sk'+'-ant'+'-','sk'+'-proj'+'-']
-          files=('studio-v2.html','studio-v3.js','studio-v3-eval.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js','studio-v3-templates.js','studio-v3-cloud.js','cloud/src/worker.js')
+          files=('studio-v2.html','studio-v3.js','studio-v3-story.js','studio-v3-eval.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js','studio-v3-templates.js','studio-v3-cloud.js','cloud/src/worker.js')
           for name in files:
             text=Path(name).read_text(errors='ignore')
             for n in needles:
               pos=text.find(n)
               if pos>=0 and 'placeholder' not in text[max(0,pos-60):pos+120].lower(): bad.append((name,n))
           if bad: raise SystemExit('Potential committed secret prefix found: '+repr(bad))
-          print('No obvious committed secret prefixes found in V3.3 runtime.')
+          print('No obvious committed secret prefixes found in V3.4 runtime.')
           PY
 
       - name: Live Ridge Cloud smoke (non-spending)
