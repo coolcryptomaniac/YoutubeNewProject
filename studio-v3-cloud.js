@@ -1,5 +1,7 @@
 'use strict';
 
+import {representativeQueries,storyPromptScenes} from './studio-v3-story.js';
+
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const cleanBase=s=>String(s||'').trim().replace(/\/+$/,'');
 
@@ -8,27 +10,32 @@ export class CloudMediaClient{
   get enabled(){return /^https:\/\//.test(this.base)}
   url(path){if(!this.enabled)throw new Error('Ridge Cloud is not configured.');return this.base+path}
   async health(){if(!this.enabled)return {ok:false,configured:false};const r=await fetch(this.url('/api/health'),{cache:'no-store'});if(!r.ok)throw new Error(`Ridge Cloud ${r.status}`);return r.json()}
-  async searchTemplate(template,{aspect='landscape',perQuery=4,signal}={}){
+  async searchQueries(queries,{aspect='landscape',perQuery=4,signal,maxQueries=4}={}){
     if(!this.enabled)return [];
     const orientation=aspect==='vertical'?'portrait':'landscape',out=[],seen=new Set();
-    for(const q of (template?.queries||[]).slice(0,4)){
+    for(const q of [...new Set((queries||[]).map(x=>String(x||'').trim()).filter(Boolean))].slice(0,Math.max(1,Math.min(6,maxQueries)))){
       const u=this.url(`/api/pexels/search?q=${encodeURIComponent(q)}&orientation=${orientation}&per_page=${Math.max(1,Math.min(8,perQuery))}`);
       const r=await fetch(u,{signal});if(!r.ok){if(r.status===503)break;continue}const j=await r.json();
       for(const v of j.videos||[]){if(!v?.mediaUrl||seen.has(v.id))continue;seen.add(v.id);out.push({id:`cloud:${v.id}`,name:v.title||`Pexels ${v.id}`,kind:'video',type:v.type||'video/mp4',size:0,lastModified:0,source:'remote',remoteUrl:v.mediaUrl,thumbUrl:v.thumbnail||'',pageUrl:v.pageUrl||'',creator:v.creator||'Pexels',duration:Number(v.duration)||0,width:Number(v.width)||0,height:Number(v.height)||0,query:q})}
     }
-    return out.slice(0,16);
+    return out.slice(0,18);
+  }
+  async searchTemplate(template,{aspect='landscape',perQuery=4,signal}={}){return this.searchQueries(template?.queries||[],{aspect,perQuery,signal,maxQueries:4})}
+  async searchStoryboard(project,template,{aspect='landscape',perQuery=4,signal}={}){
+    const semantic=representativeQueries(project?.scenePlan,4),queries=semantic.length?semantic:(template?.queries||[]);return this.searchQueries(queries,{aspect,perQuery,signal,maxQueries:4})
   }
   async generateFreeClips(prompts,{aspect='landscape',windowMinutes=3,maxClips=3,onState=()=>{}}={}){
     if(!this.enabled)return [];
+    const mobile=typeof navigator!=='undefined'&&(/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent||'')||(Number(navigator.deviceMemory)||8)<=4),clipCap=mobile?1:Math.max(1,Math.min(4,maxClips)),sizeCap=mobile?16*1024*1024:40*1024*1024;
     const deadline=Date.now()+Math.max(1,Math.min(10,Number(windowMinutes)||3))*60_000,out=[];
     for(const prompt of (prompts||[]).filter(Boolean)){
-      if(Date.now()>deadline||out.length>=Math.max(1,Math.min(6,maxClips)))break;
+      if(Date.now()>deadline||out.length>=clipCap)break;
       try{
         onState(`Trying a verified-free video model for clip ${out.length+1}…`);
         const r=await fetch(this.url('/api/video/generate'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,aspect}),signal:AbortSignal.timeout(Math.max(15_000,deadline-Date.now()))});
         if(r.status===402||r.status===404||r.status===503){onState('No verified-free video model is available right now; continuing with stock/local/procedural media.');break}
         if(!r.ok)throw new Error(`video provider ${r.status}`);
-        const blob=await r.blob();if(!blob.size||blob.size>40*1024*1024)throw new Error('generated clip exceeded the safe size limit');
+        const blob=await r.blob();if(!blob.size||blob.size>sizeCap)throw new Error('generated clip exceeded the safe in-memory size limit for this device');
         out.push(new File([blob],`ridge-ai-clip-${out.length+1}.${blob.type.includes('mp4')?'mp4':'webm'}`,{type:blob.type||'video/mp4',lastModified:Date.now()}));
       }catch(e){onState(`Free-video attempt skipped: ${e.message}`);await sleep(500)}
     }
@@ -42,7 +49,12 @@ export class CloudMediaClient{
   }
 }
 
+function continuityText(project={}){
+  const b=project.visualBible||{},rules=Array.isArray(b.continuity_rules)?b.continuity_rules:[];
+  return [b.subject&&`Recurring subject: ${b.subject}`,b.setting&&`World: ${b.setting}`,b.palette&&`Palette/light: ${b.palette}`,b.camera_language&&`Camera language: ${b.camera_language}`,...rules.slice(0,5)].filter(Boolean).join('. ')
+}
 export function visualPrompts(project,template){
-  const story=project?.story||project?.idea||project?.title||'cinematic music story';
-  return (template?.queries||[]).slice(0,4).map((q,i)=>`${story}. ${q}. Shot ${i+1}: cinematic music-video footage, coherent subject, natural motion, no text, no logo, ${project?.aspect==='vertical'?'vertical 9:16':'landscape 16:9'}`);
+  const story=project?.story||project?.idea||project?.title||'cinematic music story',continuity=continuityText(project),planned=storyPromptScenes(project?.scenePlan,6),frame=project?.aspect==='vertical'?'vertical 9:16':'landscape 16:9';
+  if(planned.length)return planned.map((s,i)=>`${continuity?continuity+'. ':''}${story}. Lyric meaning: ${s.meaning||s.lyric||story}. Visual: ${s.visual||s.query}. ${s.camera||'cinematic'} framing, ${s.motion||'natural'} motion. Shot ${i+1}: coherent music-video footage, preserve the same recurring subject/world where applicable, no text, no logo, ${frame}`.slice(0,1500));
+  return (template?.queries||[]).slice(0,4).map((q,i)=>`${continuity?continuity+'. ':''}${story}. ${q}. Shot ${i+1}: cinematic music-video footage, coherent subject, natural motion, no text, no logo, ${frame}`.slice(0,1500));
 }

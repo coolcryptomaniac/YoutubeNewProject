@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>Ridge Studio 3.3 — Create · Edit · Publish</title>
+<title>Ridge Studio 3.4 — Lyrics · Story · Music Video</title>
 <link rel="stylesheet" href="./studio-v3.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -19,30 +19,30 @@
   </div>
 </div>
 <header class="topbar">
-  <div class="brand"><span>RIDGE STUDIO 3.3</span><strong>Create · Edit · Publish</strong></div>
+  <div class="brand"><span>RIDGE STUDIO 3.4</span><strong>Lyrics · Story · Music Video</strong></div>
   <div class="top-actions"><span class="health" id="storageState">Storage…</span><button id="settingsToggle">Settings</button></div>
 </header>
 <main>
   <section class="hero card">
-    <div class="hero-copy"><span class="eyebrow">ONE CLICK MUSIC VIDEO</span><h1>Add a song. <em>Release a video.</em></h1><p>Choose Auto or one of 72 genre/mood templates. Ridge can mix your local media, cloud Pexels clips, free-credit AI snippets when available and procedural visuals across the full song.</p></div>
+    <div class="hero-copy"><span class="eyebrow">LYRIC-AWARE MUSIC VIDEO DIRECTOR</span><h1>Add a song. <em>Turn its meaning into film.</em></h1><p>Ridge listens to the music, understands the lyrics and emotional arc, builds a chronological storyboard, finds visuals for each meaning beat, cuts on story boundaries and uses the beat for cinematic accents. Your lyrics stay timed to the voice.</p></div>
     <div class="create-controls">
       <label class="song-pick"><input id="songFile" type="file" accept="audio/*" hidden><span>Song</span><b id="songName">Choose MP3 / WAV / M4A</b></label>
-      <label>Video template<select id="templateSelect"></select><small id="templateState">72 template recipes</small></label>
+      <label>Video world<select id="templateSelect"></select><small id="templateState">72 visual worlds · story chooses the scenes</small></label>
       <label>Format<select id="aspect"><option value="landscape">YouTube · 16:9</option><option value="vertical">Reels / Shorts · 9:16</option></select></label>
-      <button class="primary create" id="createBtn">CREATE VIDEO</button>
+      <button class="primary create" id="createBtn">DIRECT + CREATE VIDEO</button>
     </div>
   </section>
   <section class="workspace">
     <article class="card preview-card">
-      <div class="section-head"><div><span class="eyebrow">PREVIEW</span><h2>Automatic edit</h2></div><span class="health" id="qualityState">Safe quality</span></div>
+      <div class="section-head"><div><span class="eyebrow">PREVIEW</span><h2>Meaning-first automatic edit</h2></div><span class="health" id="qualityState">Safe quality</span></div>
       <div class="stage"><canvas id="stage" width="960" height="540"></canvas></div>
       <audio id="audio" controls preload="metadata"></audio>
-      <div class="actions"><button id="previewBtn">Play preview</button><button id="stopBtn">Stop</button><button id="editToggle">Edit release</button></div>
+      <div class="actions"><button id="previewBtn">Play preview</button><button id="stopBtn">Stop</button><button id="editToggle">Edit lyrics & release</button></div>
       <div class="progress"><i id="progressBar"></i></div>
       <p class="status" id="status">Starting…</p>
     </article>
     <aside class="card publish-card">
-      <span class="eyebrow">PUBLISH</span><h2>Release when it looks right</h2>
+      <span class="eyebrow">PUBLISH</span><h2>Release when the story feels right</h2>
       <div class="thumb-wrap"><img id="thumb" hidden alt="Generated thumbnail"><span>Thumbnail appears after create</span></div>
       <div class="actions"><button id="makeThumb">Refresh thumbnail</button><button id="downloadThumb" disabled>Download JPG</button></div>
       <button class="wide" id="downloadBtn" disabled>Download video</button>
@@ -52,27 +52,27 @@
     </aside>
   </section>
   <section class="card edit-panel" id="editPanel" hidden>
-    <div class="section-head"><div><span class="eyebrow">EDIT</span><h2>Only the things that matter</h2></div><span class="health" id="storyLock">Song meaning not analyzed.</span></div>
-    <div class="grid two"><label>Song idea <small>optional</small><textarea id="idea" rows="2" placeholder="What is this song really about?"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>Hinglish</option><option>English</option><option>Kumaoni</option></select></label></div>
+    <div class="section-head"><div><span class="eyebrow">STORY + LYRICS</span><h2>One meaning from first line to final frame</h2></div><span class="health" id="storyLock">Song meaning not analyzed.</span></div>
+    <div class="grid two"><label>Song idea <small>optional — helps resolve ambiguity</small><textarea id="idea" rows="2" placeholder="What is this song really about?"></textarea></label><label>Language<select id="language"><option>Hindi</option><option>Hinglish</option><option>English</option><option>Kumaoni</option></select></label></div>
     <label>Title<input id="title" type="text"></label>
     <label>Description<textarea id="description" rows="4"></textarea></label>
     <label>Hashtags<input id="hashtags" type="text" placeholder="#music #musicvideo"></label>
-    <label>Lyrics<textarea id="lyrics" rows="9" placeholder="Paste/edit lyrics here. If you change lyrics, Ridge refreshes the release package next time you create."></textarea></label>
+    <label>Lyrics<textarea id="lyrics" rows="12" placeholder="Paste the final lyrics here. Keep [Verse], [Chorus], [Bridge] section tags if you have them — Ridge uses them to direct and display the video."></textarea></label>
     <div class="grid two"><label>Intro<input id="intro" type="text"></label><label>Outro<input id="outro" type="text"></label></div>
   </section>
   <section class="card settings" id="settingsPanel" hidden>
     <div class="section-head"><div><span class="eyebrow">SETTINGS</span><h2>Set once</h2></div><span class="health" id="mediaState">Media…</span></div>
     <div class="settings-grid">
-      <div class="setting-group"><h3>Local media folder</h3><p>Files stay in your selected folder. Ridge stores only a handle/index where the browser allows it.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
-      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Provider keys stay in the Worker, not this page. Pexels search, NVIDIA review and optional Hugging Face video calls remain isolated from rendering.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Use cloud Pexels stock in CREATE</label><label>Free-credit AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><label>NVIDIA secret sauce<select id="nvidiaMode"><option value="off">Off · current Groq only</option><option value="shadow">Shadow · compare, do not replace</option><option value="prefer">Prefer NVIDIA when confident</option></select></label><div class="actions"><button id="testCloud">Quick test</button><button id="deepCloudTest">Deep live test</button><button id="applyNvidia" disabled>Use latest NVIDIA version</button><span class="health" id="cloudState">Not configured</span></div><span class="hint" id="cloudDeepState">Deep test checks Pexels + NVIDIA but deliberately does not generate an HF video.</span><span class="hint" id="nvidiaState">NVIDIA key stays in Ridge Cloud, never in this page.</span><details><summary>Model experiment · hidden learning</summary><p class="hint" id="modelEvalState">Shadow mode is collecting evidence.</p><div class="actions"><button id="rateGroq" disabled>Groq better</button><button id="rateNvidia" disabled>NVIDIA better</button><button id="rateTie" disabled>Tie</button><button id="useModelRecommendation" disabled>Use recommendation</button></div><p class="hint">Rate only after a NVIDIA candidate appears. Ridge stores only the winner, language, title and status summary locally — not the full lyrics. After at least 8 ratings in one language, NVIDIA is recommended only if it wins at least 75% of decisive comparisons and at least 6 songs.</p></details><p class="hint">Shadow remains the safe default. Hugging Face free users currently receive a small monthly inference credit; Ridge never calls HF during diagnostics.</p></div>
+      <div class="setting-group"><h3>Local media folder</h3><p>Files stay in your selected folder. Ridge stores only a handle/index where the browser allows it, then loads one matching scene at a time.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
+      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Provider keys stay in the Worker, not this page. Pexels searches use the lyric storyboard; NVIDIA review and optional Hugging Face video calls remain isolated from rendering.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Find meaning-matched Pexels footage in CREATE</label><label>Free-credit AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><label>NVIDIA secret sauce<select id="nvidiaMode"><option value="off">Off · current Groq only</option><option value="shadow">Shadow · compare, do not replace</option><option value="prefer">Prefer NVIDIA when confident</option></select></label><div class="actions"><button id="testCloud">Quick test</button><button id="deepCloudTest">Deep live test</button><button id="applyNvidia" disabled>Use latest NVIDIA version</button><span class="health" id="cloudState">Not configured</span></div><span class="hint" id="cloudDeepState">Deep test checks Pexels + NVIDIA but deliberately does not generate an HF video.</span><span class="hint" id="nvidiaState">NVIDIA key stays in Ridge Cloud, never in this page.</span><details><summary>Model experiment · hidden learning</summary><p class="hint" id="modelEvalState">Shadow mode is collecting evidence.</p><div class="actions"><button id="rateGroq" disabled>Groq better</button><button id="rateNvidia" disabled>NVIDIA better</button><button id="rateTie" disabled>Tie</button><button id="useModelRecommendation" disabled>Use recommendation</button></div><p class="hint">Rate only after a NVIDIA candidate appears. Ridge stores only the winner, language, title and status summary locally — not the full lyrics. After at least 8 ratings in one language, NVIDIA is recommended only if it wins at least 75% of decisive comparisons and at least 6 songs.</p></details><p class="hint">Shadow remains the safe default. Hugging Face free users currently receive a small monthly inference credit; Ridge never calls HF during diagnostics.</p></div>
       <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
-      <div class="setting-group"><h3>Suno</h3><p>Suno developer API access is currently restricted. Ridge keeps it as an optional provider so your editor does not depend on approval.</p><button id="openSuno">Open Suno ↗</button><span class="hint">If your developer application is approved, the API adapter can be added without changing the editor core. Until then, generate/download in Suno and choose the song here.</span></div>
+      <div class="setting-group"><h3>Suno</h3><p>Suno stays isolated from editing, so music-generation availability can never crash the video renderer.</p><button id="openSuno">Open Suno ↗</button><span class="hint">Generate/download in Suno or use the official Ridge adapter when your account is approved, then choose the finished song here.</span></div>
       <div class="setting-group"><h3>Social publishing</h3><p>On phones, native Share sends the rendered file to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details></div>
     </div>
   </section>
   <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio 3.3 · local-first · Groq primary · NVIDIA shadow learning · 72 template recipes</footer>
+<footer>Ridge Studio 3.4 · semantic lyric storyboard · voice-timed karaoke · memory-safe render · 72 visual worlds</footer>
 <script defer src="./studio-v3-eval.js"></script>
 <script type="module" src="./studio-v3.js"></script>
 </body>
