@@ -25,14 +25,18 @@ jobs:
           node --check studio-v3-groq.js
           node --check studio-v3-themes.js
           node --check studio-v3-render.js
+          node --check studio-v3-director.js
           node --check studio-v3-publish.js
           node --check studio-v3-templates.js
           node --check studio-v3-cloud.js
           node --check cloud/src/worker.js
           node --check tests/ridge-cloud-live-smoke.mjs
+          node --check tests/studio-v3-director-selftest.mjs
 
       - name: V3 architecture regression tests
-        run: node --experimental-default-type=module tests/studio-v3-selftest.mjs
+        run: |
+          node --experimental-default-type=module tests/studio-v3-selftest.mjs
+          node --experimental-default-type=module tests/studio-v3-director-selftest.mjs
 
       - name: Required V3 runtime files
         run: |
@@ -44,6 +48,7 @@ jobs:
           test -f studio-v3-groq.js
           test -f studio-v3-themes.js
           test -f studio-v3-render.js
+          test -f studio-v3-director.js
           test -f studio-v3-publish.js
           test -f studio-v3-templates.js
           test -f studio-v3-cloud.js
@@ -73,6 +78,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           render=Path('studio-v3-render.js').read_text()
+          director=Path('studio-v3-director.js').read_text()
+          groq=Path('studio-v3-groq.js').read_text()
           storage=Path('studio-v3-storage.js').read_text()
           themes=Path('studio-v3-themes.js').read_text()
           templates=Path('studio-v3-templates.js').read_text()
@@ -81,7 +88,12 @@ jobs:
           worker=Path('cloud/src/worker.js').read_text()
           if 'decodeAudioData' in render: raise SystemExit('V3 must not full-decode song PCM during final render')
           if 'class SceneLease' not in render or 'bitmap.close' not in render: raise SystemExit('Single-scene lease cleanup missing')
+          if 'async _pump()' not in render or 'this.desired' not in render: raise SystemExit('Serialized scene decode lane missing')
+          if 'stopPreview(true)' not in render: raise SystemExit('Preview audio graph must stop before CREATE/render')
           if '280*1024*1024' not in render: raise SystemExit('Memory fallback safety limit missing')
+          if 'buildMeaningTimeline' not in render or 'buildDirectedSequence' not in render: raise SystemExit('Meaning-aware render director missing')
+          if 'scene_beats' not in groq or 'visual_bible' not in groq: raise SystemExit('Semantic scene planning prompt missing')
+          if 'timedLyricCues' not in director: raise SystemExit('Timed lyric cue director missing')
           if "mode:'read'" not in storage or 'showDirectoryPicker' not in storage: raise SystemExit('Read-only folder flow missing')
           if 'putAsset' in storage: raise SystemExit('Media blobs must not be copied into V3 IndexedDB')
           if 'particles.push' in themes or 'stars.push' in themes: raise SystemExit('Unbounded animation state detected')
@@ -91,7 +103,7 @@ jobs:
           if 'paid fallback disabled' not in worker: raise SystemExit('Paid fallback refusal missing')
           if '/api/video/generate' in evaljs: raise SystemExit('Diagnostics must never spend HF video credits')
           if 'MIN_RATED=8' not in evaljs or 'NVIDIA_PROMOTE=.75' not in evaljs: raise SystemExit('Model evidence thresholds missing')
-          print('V3.3 crash-risk + cloud + model-evaluation guardrails OK.')
+          print('V3 crash + semantic-director + free-tier guardrails OK.')
           PY
 
       - name: Reject committed secret-like tokens
@@ -101,14 +113,14 @@ jobs:
           from pathlib import Path
           bad=[]
           needles=['g'+'sk'+'_','sk'+'-ant'+'-','sk'+'-proj'+'-']
-          files=('studio-v2.html','studio-v3.js','studio-v3-eval.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-publish.js','studio-v3-templates.js','studio-v3-cloud.js','cloud/src/worker.js')
+          files=('studio-v2.html','studio-v3.js','studio-v3-eval.js','studio-v3-storage.js','studio-v3-groq.js','studio-v3-themes.js','studio-v3-render.js','studio-v3-director.js','studio-v3-publish.js','studio-v3-templates.js','studio-v3-cloud.js','cloud/src/worker.js')
           for name in files:
             text=Path(name).read_text(errors='ignore')
             for n in needles:
               pos=text.find(n)
               if pos>=0 and 'placeholder' not in text[max(0,pos-60):pos+120].lower(): bad.append((name,n))
           if bad: raise SystemExit('Potential committed secret prefix found: '+repr(bad))
-          print('No obvious committed secret prefixes found in V3.3 runtime.')
+          print('No obvious committed secret prefixes found in V3 runtime.')
           PY
 
       - name: Live Ridge Cloud smoke (non-spending)
