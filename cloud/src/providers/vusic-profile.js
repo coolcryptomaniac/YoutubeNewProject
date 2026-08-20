@@ -1,6 +1,7 @@
 'use strict';
 
 export const VUSIC_PROFILE=Object.freeze({
+  email:'coolinfatuation@gmail.com',
   primaryArtist:'Mohit Pandey',composer:'Mohit Pandey',lyricist:'Mohit Pandey',label:'Vusic Records',copyrightOwner:'Vusic Records',signatory:'Mohit Pandey',
   releasedPreviously:false,platforms:'all',explicitContent:false,releaseDateRule:'earliest-allowed',genre:'auto',language:'auto',finalSubmit:true,
   choices:{
@@ -17,6 +18,7 @@ export const VUSIC_PROFILE=Object.freeze({
 
 export function normalizeVusicRelease(release={}){
   const r={...release};
+  r.email=r.email||VUSIC_PROFILE.email;
   r.artist=r.artist||r.primaryArtist||VUSIC_PROFILE.primaryArtist;
   r.primaryArtist=r.primaryArtist||r.artist||VUSIC_PROFILE.primaryArtist;
   r.composer=r.composer||VUSIC_PROFILE.composer;
