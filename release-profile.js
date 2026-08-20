@@ -4,6 +4,7 @@ export const RIDGE_RELEASE_PROFILE=Object.freeze({
   version:1,
   youtubeClientId:'1061806252746-tg3g74uovrt9e72osbloiq0poe9lllgh.apps.googleusercontent.com',
   ridgeCloudUrl:'https://ridge-cloud-media.founder-f53.workers.dev',
+  vusic:{email:'coolinfatuation@gmail.com'},
   artist:{primary:'Mohit Pandey',composer:'Mohit Pandey',lyricist:'Mohit Pandey',label:'Vusic Records',copyrightOwner:'Vusic Records',signatory:'Mohit Pandey'},
   defaults:{releasedPreviously:false,platforms:'all',explicitContent:false,releaseDateRule:'earliest-allowed',genre:'auto',language:'auto',finalSubmit:true},
   fallbacks:{
