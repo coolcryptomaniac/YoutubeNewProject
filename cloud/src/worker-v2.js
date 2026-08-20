@@ -2,6 +2,7 @@ import base from './worker.js';
 import {socialCapabilities,crossPost,SocialPublishError} from './providers/social.js';
 import {vusicCapabilities,distributeVusic,VusicProviderError} from './providers/vusic.js';
 import {normalizeVusicRelease,VUSIC_PROFILE} from './providers/vusic-profile.js';
+import {vusicBindingStatus,smokeVusicLogin} from './providers/vusic-smoke.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range','Access-Control-Allow-Methods':'GET,POST,DELETE,OPTIONS'};
 const json=(data,status=200,extra={})=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors,...extra}});
@@ -27,6 +28,8 @@ async function stageDelete(request,env){if(!env.RELEASE_MEDIA)return json({error
 
 export default{async fetch(request,env,ctx){
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
+  if(u.pathname==='/api/release/vusic-status'&&request.method==='GET')return json({ok:true,...vusicBindingStatus(env)});
+  if(u.pathname==='/api/release/vusic-login-smoke'&&request.method==='POST'){const denied=requireAdmin(request,env);if(denied)return denied;try{return json(await smokeVusicLogin(env),200)}catch(e){return providerError(e)}}
   if(u.pathname==='/api/release/capabilities'&&request.method==='GET'){const denied=requireAdmin(request,env);if(denied)return denied;return json({ok:true,social:socialCapabilities(env),vusic:vusicCapabilities(env),vusicProfile:{primaryArtist:VUSIC_PROFILE.primaryArtist,label:VUSIC_PROFILE.label,releasedPreviously:VUSIC_PROFILE.releasedPreviously,platforms:VUSIC_PROFILE.platforms,explicitContent:VUSIC_PROFILE.explicitContent,releaseDateRule:VUSIC_PROFILE.releaseDateRule},staging:!!env.RELEASE_MEDIA});}
   if(u.pathname==='/api/release/stage'&&request.method==='POST'){const denied=requireAdmin(request,env);if(denied)return denied;return stageUpload(request,env);}
   if(u.pathname.startsWith('/api/release/stage/')&&request.method==='GET')return stageGet(request,env);
