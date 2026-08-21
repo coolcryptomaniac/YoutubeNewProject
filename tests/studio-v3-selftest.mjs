@@ -18,7 +18,7 @@ const wrangler=fs.readFileSync('cloud/wrangler.toml','utf8');
 const deploy=fs.readFileSync('.github/workflows/deploy-ridge-cloud.yml','utf8');
 const css=fs.readFileSync('studio-v3.css','utf8');
 
-assert.match(html,/Ridge Studio 3\.4/);
+assert.match(html,/Ridge Studio 3\.(?:8|9)/);
 assert.match(html,/DIRECT \+ CREATE VIDEO/);assert.match(html,/Lyrics · Story · Music Video/);assert.match(html,/\.\/studio-v3\.js/);assert.match(html,/\.\/studio-v3-eval\.js/);assert.match(html,/\.\/studio-v3\.css/);
 for(const old of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-credentials.js','Daily Factory','Pexels API key'])assert.ok(!html.includes(old),`legacy runtime clutter remains: ${old}`);
 
@@ -38,7 +38,7 @@ const plan=buildStoryPlan({title:'घर वापसी',story:'A traveller mis
 assert.ok(plan.scenes.length>=16&&plan.scenes.length<=48,`unexpected scene count ${plan.scenes.length}`);assert.equal(plan.scenes[0].start,0);assert.equal(plan.scenes.at(-1).end,120);assert.ok(plan.scenes.every((x,i)=>x.end>x.start&&(!i||x.start>=plan.scenes[i-1].end-.001)),'story scenes must be chronological');assert.ok(sceneAtTime(90,plan)?.meaning,'scene lookup must preserve lyric meaning');assert.match(storyPlanSummary(plan),/meaning-matched scenes/);assert.ok(mediaMatchScore({id:'1',name:'rain bus window.mp4',kind:'video'},plan.scenes[0])>mediaMatchScore({id:'2',name:'laser club.mp4',kind:'video'},plan.scenes[0]),'semantic media match must prefer story-relevant footage');
 
 assert.match(storage,/showDirectoryPicker/);assert.match(storage,/mode:'read'/);assert.match(storage,/put\('media-root',root\)/);assert.ok(!/putAsset|put\([^\n]*blob/i.test(storage),'V3 media library should not copy media blobs to IndexedDB');assert.match(storage,/maxFiles=500/);assert.match(storage,/ridge\.credentials\.v1/);assert.match(storage,/chooseForScene/);assert.match(storage,/mediaMatchScore/);
-assert.match(render,/class SceneLease/);assert.match(render,/this\.current\?\.release/);assert.match(render,/bitmap\.close/);assert.match(render,/URL\.revokeObjectURL/);assert.ok(!render.includes('decodeAudioData'),'V3 final renderer must stream audio instead of decoding full PCM');assert.match(render,/280\*1024\*1024/);assert.match(render,/32\*1024\*1024/);assert.match(render,/960,h:540,fps:24/);assert.match(render,/540,h:960,fps:24/);assert.match(render,/854,h:480,fps:24/);assert.match(render,/sceneAtTime/);assert.match(render,/chooseForScene/);assert.match(render,/project\.scenePlan/);
+assert.match(render,/class SceneLease/);assert.match(render,/this\.current\?\.release/);assert.match(render,/bitmap\.close/);assert.match(render,/URL\.revokeObjectURL/);assert.ok(!render.includes('decodeAudioData'),'V3 final renderer must stream audio instead of decoding full PCM');assert.match(render,/280\*1024\*1024/);assert.match(render,/pendingLimit=\(mobile\?8:24\)\*MB/);assert.match(render,/w:640,h:360,fps:20/);assert.match(render,/w:360,h:640,fps:20/);assert.match(render,/snapshotVideo/);assert.match(render,/cleanupRidgeStorage/);assert.match(render,/transferToImageBitmap/);assert.match(render,/sceneAtTime/);assert.match(render,/chooseForScene/);assert.match(render,/project\.scenePlan/);
 const chromeMimeList=render.match(/const stable=safari\?\[[^\]]+\]:\[([^\]]+)\]/)?.[1]||'';const vp8=chromeMimeList.indexOf("video/webm;codecs=vp8,opus"),mp4=chromeMimeList.indexOf("video/mp4;codecs=avc1.42E01E,mp4a.40.2");assert.ok(vp8>=0&&mp4>=0&&vp8<mp4,'non-Safari recorder preference must put VP8/WebM before MP4/H.264');
 assert.equal((themes.match(/id:'naru-/g)||[]).length,5,'expected five Naru procedural packs');assert.ok(!/particles\.push|stars\.push/.test(themes),'V3 themes must not grow animation arrays');assert.match(themes,/Karaoke progress/);assert.match(themes,/cur\.section/);assert.match(themes,/createLinearGradient/);
 
@@ -53,4 +53,4 @@ assert.match(wrangler,/NVIDIA_TEXT_MODEL = "meta\/llama-3\.3-70b-instruct"/);ass
 
 assert.match(publish,/navigator\.share/);assert.match(publish,/youtube\/v3\/videos/);assert.match(publish,/video_reels/);assert.match(css,/min-height:44px/);assert.match(css,/@media\(max-width:620px\)/);
 
-console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} worlds, ${plan.scenes.length} semantic scenes, voice-aligned lyrics, bounded mobile renderer`);
+console.log(`studio-v3-selftest: PASS — ${ids.size} UI ids, ${TEMPLATE_COUNT} worlds, ${plan.scenes.length} semantic scenes, voice-aligned lyrics, crashproof mobile renderer`);
