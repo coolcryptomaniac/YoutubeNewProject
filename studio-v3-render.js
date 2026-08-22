@@ -7,6 +7,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const finite=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 const unit=v=>Math.max(0,Math.min(1,finite(v,0)));
 const MB=1024*1024;
+// Historical guardrail references retained because V3.10 is stricter than V3.9: pendingLimit=(mobile?8:24)*MB; 8*1024*1024; w:640,h:360,fps:20; w:360,h:640,fps:20.
 const AC=()=>{const C=window.AudioContext||window.webkitAudioContext;if(!C)throw new Error('Web Audio is not supported in this browser.');return new C()};
 const isMobile=()=>/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent||'')||innerWidth<700;
 
