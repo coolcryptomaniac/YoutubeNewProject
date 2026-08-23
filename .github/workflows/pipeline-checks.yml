@@ -1,0 +1,52 @@
+name: Cloud pipeline checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline.html'
+      - 'pipeline.js'
+      - 'cloud/src/worker-v4.js'
+      - 'cloud/src/worker-v5.js'
+      - '.github/workflows/ridge-cloud-render.yml'
+      - 'cloud/wrangler.toml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check pipeline.js
+          node --check cloud/src/worker-v4.js
+          node --check cloud/src/worker-v5.js
+      - name: Cloud-first contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('pipeline.html').read_text()
+          js=Path('pipeline.js').read_text()
+          w4=Path('cloud/src/worker-v4.js').read_text()
+          w5=Path('cloud/src/worker-v5.js').read_text()
+          wr=Path('cloud/wrangler.toml').read_text()
+          wf=Path('.github/workflows/ridge-cloud-render.yml').read_text()
+          for text in ['Lyrics video','Music visualizer','Photo music video','Pexels cinematic stock edit']:
+              assert text in html,text
+          assert 'RIDGE_ADMIN_TOKEN' not in html
+          assert 'MediaRecorder' not in js and 'captureStream' not in js
+          assert 'GROQ_API_KEY' in w4 and 'RIDGE_GITHUB_TOKEN' in w4
+          assert "paidFallback:false" in w4
+          assert 'sessionValid' in w5
+          assert 'src/worker-v5.js' in wr
+          assert 'ffmpeg' in wf and 'showwaves' in wf and 'subtitles=lyrics.srt' in wf
+          assert 'Pexels' in html and '/api/pexels/search' in wf
+          print('Ridge cloud pipeline contracts OK')
+          PY
