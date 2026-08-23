@@ -1,0 +1,117 @@
+name: Ridge Cloud Render
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id: {required: true, type: string}
+      audio_url: {required: true, type: string}
+      cover_url: {required: false, type: string}
+      mode: {required: true, type: choice, options: [auto, lyrics, visualizer, photo, pexels]}
+      title_b64: {required: true, type: string}
+      lyrics_b64: {required: false, type: string}
+      queries_b64: {required: false, type: string}
+      cloud_url: {required: true, type: string}
+      callback_url: {required: true, type: string}
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install media tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg jq fonts-dejavu-core
+      - name: Download staged media
+        env:
+          AUDIO_URL: ${{ inputs.audio_url }}
+          COVER_URL: ${{ inputs.cover_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 "$AUDIO_URL" -o song.bin
+          if [ -n "$COVER_URL" ]; then curl --fail --location --retry 3 "$COVER_URL" -o cover.jpg || true; fi
+          ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 song.bin > duration.txt
+      - name: Decode metadata and prepare subtitles
+        env:
+          TITLE_B64: ${{ inputs.title_b64 }}
+          LYRICS_B64: ${{ inputs.lyrics_b64 }}
+          QUERIES_B64: ${{ inputs.queries_b64 }}
+        run: |
+          python - <<'PY'
+          import base64,json,os,math
+          def dec(s):
+              if not s:return ''
+              s=s+'='*((4-len(s)%4)%4)
+              return base64.urlsafe_b64decode(s.encode()).decode('utf-8','replace')
+          title=dec(os.environ.get('TITLE_B64','')) or 'Ridge Music Video'
+          lyrics=dec(os.environ.get('LYRICS_B64',''))
+          try: queries=json.loads(dec(os.environ.get('QUERIES_B64','')) or '[]')
+          except: queries=[]
+          open('title.txt','w').write(title)
+          open('queries.json','w').write(json.dumps(queries[:6]))
+          dur=float(open('duration.txt').read().strip() or 180)
+          lines=[x.strip() for x in lyrics.splitlines() if x.strip() and not x.strip().startswith('[')]
+          def ts(sec):
+              ms=max(0,int(sec*1000));h=ms//3600000;ms%=3600000;m=ms//60000;ms%=60000;s=ms//1000;ms%=1000
+              return f'{h:02}:{m:02}:{s:02},{ms:03}'
+          if lines:
+              step=max(1.8,dur/len(lines))
+              with open('lyrics.srt','w') as f:
+                  for i,line in enumerate(lines):
+                      st=i*step;en=min(dur,(i+1)*step-.12)
+                      f.write(f'{i+1}\n{ts(st)} --> {ts(en)}\n{line[:180]}\n\n')
+          PY
+      - name: Prepare Pexels clips in cloud runner
+        if: ${{ inputs.mode == 'pexels' || inputs.mode == 'auto' }}
+        env:
+          CLOUD_URL: ${{ inputs.cloud_url }}
+        run: |
+          set +e
+          mkdir -p clips norm
+          python - <<'PY' > queries.txt
+          import json
+          for q in json.load(open('queries.json')): print(q)
+          PY
+          n=0
+          while IFS= read -r q; do
+            [ -z "$q" ] && continue
+            enc=$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$q")
+            url=$(curl -fsSL "$CLOUD_URL/api/pexels/search?q=$enc&orientation=landscape&per_page=1" | jq -r '.videos[0].mediaUrl // empty')
+            if [ -n "$url" ]; then
+              n=$((n+1)); curl -fsSL --retry 2 "$url" -o "clips/$n.mp4" || true
+              ffmpeg -y -v error -i "clips/$n.mp4" -t 12 -an -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,fps=30" -c:v libx264 -preset veryfast -b:v 1300k -pix_fmt yuv420p "norm/$n.mp4" || true
+            fi
+            [ $n -ge 5 ] && break
+          done < queries.txt
+          : > concat.txt
+          for f in norm/*.mp4; do [ -f "$f" ] && echo "file '$PWD/$f'" >> concat.txt; done
+          exit 0
+      - name: Render final video
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          DURATION=$(cat duration.txt)
+          MODE="$MODE"
+          [ "$MODE" = auto ] && { if [ -s concat.txt ]; then MODE=pexels; elif [ -s cover.jpg ]; then MODE=photo; elif [ -s lyrics.srt ]; then MODE=lyrics; else MODE=visualizer; fi; }
+          COMMON="-map 0:a? -c:a aac -b:a 128k -c:v libx264 -preset veryfast -b:v 1350k -maxrate 1600k -bufsize 3200k -pix_fmt yuv420p -movflags +faststart -t $DURATION"
+          if [ "$MODE" = pexels ] && [ -s concat.txt ]; then
+            ffmpeg -y -stream_loop -1 -f concat -safe 0 -i concat.txt -i song.bin -filter_complex "[0:v]scale=1280:720,fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1350k -maxrate 1600k -bufsize 3200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
+          elif [ "$MODE" = photo ] && [ -s cover.jpg ]; then
+            ffmpeg -y -loop 1 -framerate 30 -i cover.jpg -i song.bin -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,zoompan=z='min(zoom+0.00035,1.08)':d=1:s=1280x720:fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
+          elif [ "$MODE" = lyrics ] && [ -s lyrics.srt ]; then
+            ffmpeg -y -f lavfi -i "color=c=0x0c1020:s=1280x720:r=30:d=$DURATION" -i song.bin -vf "subtitles=lyrics.srt:force_style='FontName=DejaVu Sans,FontSize=28,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=58'" -map 0:v -map 1:a:0 -c:v libx264 -preset veryfast -b:v 950k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
+          else
+            ffmpeg -y -f lavfi -i "color=c=0x090d18:s=1280x720:r=30:d=$DURATION" -i song.bin -filter_complex "[1:a]showwaves=s=1280x260:mode=p2p:rate=30:colors=white[wave];[0:v][wave]overlay=0:230[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 900k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
+          fi
+          test -s out.mp4
+          ls -lh out.mp4
+      - name: Return result to Ridge Cloud
+        env:
+          CALLBACK_URL: ${{ inputs.callback_url }}
+        run: |
+          curl --fail --location --retry 3 -X PUT -H 'Content-Type: video/mp4' --data-binary @out.mp4 "$CALLBACK_URL"
