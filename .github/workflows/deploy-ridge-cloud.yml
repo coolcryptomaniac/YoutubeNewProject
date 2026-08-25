@@ -37,14 +37,8 @@ jobs:
             found=$?
           fi
           if [ "$found" -eq 0 ]; then
-            cat >> wrangler.toml <<'EOF'
-
-          [[r2_buckets]]
-          binding = "RELEASE_MEDIA"
-          bucket_name = "ridge-release-media"
-          EOF
             echo "RIDGE_R2_READY=1" >> "$GITHUB_ENV"
-            echo "Global R2 release staging enabled."
+            echo "Global R2 release staging bucket is ready."
           else
             echo "RIDGE_R2_READY=0" >> "$GITHUB_ENV"
             echo "::warning::R2 could not be provisioned. Ridge Cloud will deploy, but Vusic automatic media ingestion will stay disabled until the Cloudflare token has Workers R2 Storage Write permission."
@@ -74,6 +68,15 @@ jobs:
           if [ -n "$VUSIC_USERNAME" ]; then printf '%s' "$VUSIC_USERNAME" | npx wrangler secret put VUSIC_USERNAME; fi
           if [ -n "$VUSIC_PASSWORD" ]; then printf '%s' "$VUSIC_PASSWORD" | npx wrangler secret put VUSIC_PASSWORD; fi
           if [ -n "$RIDGE_ADMIN_TOKEN" ]; then printf '%s' "$RIDGE_ADMIN_TOKEN" | npx wrangler secret put RIDGE_ADMIN_TOKEN; fi
+      - name: Enable global release binding
+        if: env.RIDGE_R2_READY == '1'
+        run: |
+          cat >> wrangler.toml <<'EOF'
+
+          [[r2_buckets]]
+          binding = "RELEASE_MEDIA"
+          bucket_name = "ridge-release-media"
+          EOF
       - name: Deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
