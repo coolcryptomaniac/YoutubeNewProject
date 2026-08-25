@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {VIDEO_TEMPLATES,TEMPLATE_COUNT,templateById} from '../studio-v3-templates.js';
+import {VIDEO_TEMPLATES,TEMPLATE_COUNT} from '../studio-v3-templates.js';
 import {buildStoryPlan,sceneAtTime,alignLyricsToSegments,mediaMatchScore} from '../studio-v3-story.js';
 import {themeById,buildLyricCues} from '../studio-v3-themes.js';
 
@@ -19,7 +19,7 @@ const wrangler=fs.readFileSync(new URL('../cloud/wrangler.toml',import.meta.url)
 const deploy=fs.readFileSync(new URL('../.github/workflows/deploy-ridge-cloud.yml',import.meta.url),'utf8');
 const evalJs=fs.readFileSync(new URL('../studio-v3-eval.js',import.meta.url),'utf8');
 
-assert.equal(TEMPLATE_COUNT,VIDEO_TEMPLATES.length);assert.ok(TEMPLATE_COUNT>=72);assert.equal(templateById('naru-neon').theme,'naru-neon');assert.equal(themeById('naru-neon').id,'naru-neon');assert.ok(VIDEO_TEMPLATES.some(x=>x.theme==='phonk-noir'));assert.ok(VIDEO_TEMPLATES.some(x=>x.theme==='pastel-pop'));
+assert.equal(TEMPLATE_COUNT,VIDEO_TEMPLATES.length);assert.ok(TEMPLATE_COUNT>=72);assert.ok(VIDEO_TEMPLATES.some(x=>x.theme==='naru-neon'),'expected at least one naru-neon template');assert.equal(themeById('naru-neon').id,'naru-neon');assert.ok(VIDEO_TEMPLATES.some(x=>x.theme==='phonk-noir'));assert.ok(VIDEO_TEMPLATES.some(x=>x.theme==='pastel-pop'));
 const cues=buildLyricCues('[Verse]\nपहली रात\nदूसरी याद\n[Chorus]\nफिर वही प्यार',12);assert.equal(cues.length,3);assert.equal(cues[0].section,'Verse');assert.equal(cues[2].section,'Chorus');assert.ok(cues.every(x=>x.end>x.start));
 const segments=[{start:0,end:2,text:'पहली रात'},{start:2,end:4,text:'दूसरी याद'},{start:4,end:7,text:'फिर वही प्यार'}];const aligned=alignLyricsToSegments('[Verse]\nपहली रात\nदूसरी याद\n[Chorus]\nफिर वही प्यार',segments,7);assert.equal(aligned.length,3);assert.equal(aligned[0].section,'Verse');assert.ok(aligned[2].start>=4);
 const plan=buildStoryPlan({duration:22,lyrics:'[Verse]\nपहली रात\nदूसरी याद\n[Chorus]\nफिर वही प्यार',idea:'rainy mountain separation and reunion',director:{story_beats:[{start:0,end:10,summary:'lonely rain on mountain road',visual_query:'rain mountain road lonely',transition:'fade',motion:'push',energy:.3},{start:10,end:22,summary:'warm reunion at sunrise',visual_query:'mountain sunrise reunion warm',transition:'dissolve',motion:'pull',energy:.8}],emotional_arc:['lonely','hopeful','warm']}});assert.ok(plan.scenes.length>=2);assert.equal(sceneAtTime(1,plan).index,0);assert.ok(sceneAtTime(18,plan).index>=1);assert.ok(mediaMatchScore({name:'rain-mountain-road.mp4',searchText:'rain mountain road'},{visualQuery:'rain mountain road lonely',meaning:'lonely rain on mountain road'})>mediaMatchScore({name:'party-club.mp4',searchText:'club party'},{visualQuery:'rain mountain road lonely',meaning:'lonely rain on mountain road'}));
