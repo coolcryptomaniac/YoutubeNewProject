@@ -23,6 +23,33 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
+      - name: Ensure global release staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set +e
+          npx wrangler r2 bucket info ridge-release-media >/dev/null 2>&1
+          found=$?
+          if [ "$found" -ne 0 ]; then
+            echo "Creating free-tier R2 bucket ridge-release-media for cross-PoP Vusic uploads..."
+            npx wrangler r2 bucket create ridge-release-media --location apac
+            found=$?
+          fi
+          if [ "$found" -eq 0 ]; then
+            cat >> wrangler.toml <<'EOF'
+
+          [[r2_buckets]]
+          binding = "RELEASE_MEDIA"
+          bucket_name = "ridge-release-media"
+          EOF
+            echo "RIDGE_R2_READY=1" >> "$GITHUB_ENV"
+            echo "Global R2 release staging enabled."
+          else
+            echo "RIDGE_R2_READY=0" >> "$GITHUB_ENV"
+            echo "::warning::R2 could not be provisioned. Ridge Cloud will deploy, but Vusic automatic media ingestion will stay disabled until the Cloudflare token has Workers R2 Storage Write permission."
+          fi
+          set -e
       - name: Configure Worker secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -56,3 +83,32 @@ jobs:
         env:
           RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
         run: node ../tests/ridge-cloud-live-smoke.mjs
+      - name: Vusic automation smoke
+        env:
+          RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
+          RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
+          VUSIC_USERNAME: ${{ secrets.VUSIC_USERNAME }}
+          VUSIC_PASSWORD: ${{ secrets.VUSIC_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base=process.env.RIDGE_CLOUD_URL.replace(/\/$/,'');
+          const status=await fetch(base+'/api/release/vusic-status').then(async r=>({status:r.status,body:await r.json()}));
+          assert.equal(status.status,200,'Vusic status endpoint');
+          assert.equal(status.body.browserBound,true,'Browser Run binding missing');
+          if(process.env.VUSIC_USERNAME)assert.equal(status.body.usernamePresent,true,'Vusic username secret missing from deployed Worker');
+          if(process.env.VUSIC_PASSWORD)assert.equal(status.body.passwordPresent,true,'Vusic password secret missing from deployed Worker');
+          if(process.env.RIDGE_ADMIN_TOKEN){
+            const caps=await fetch(base+'/api/release/capabilities',{headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
+            assert.equal(caps.status,200,'Release capabilities authorization failed');
+            const c=await caps.json();
+            if(process.env.RIDGE_R2_READY==='1')assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
+            console.log('Vusic capabilities:',JSON.stringify({configured:c.vusic?.configured,browserBound:c.vusic?.browserBound,mediaStaging:c.vusic?.mediaStaging,stagingMode:c.stagingMode}));
+          }
+          if(process.env.VUSIC_USERNAME&&process.env.VUSIC_PASSWORD&&process.env.RIDGE_ADMIN_TOKEN){
+            const r=await fetch(base+'/api/release/vusic-login-smoke',{method:'POST',headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
+            const body=await r.json().catch(()=>({}));
+            if(r.status!==200||body.ok!==true)throw new Error('Vusic login smoke failed: '+r.status+' '+JSON.stringify(body));
+            console.log('Vusic login smoke: PASS',JSON.stringify({authenticated:body.authenticated,releaseAccessible:body.releaseAccessible,browserBinding:body.browserBinding}));
+          }
+          NODE
