@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
+<meta name="ridge-build" content="3.8.2">
 <title>Ridge Studio 3.8 — Lyrics · Story · Music Video</title>
-<link rel="stylesheet" href="./studio-v3.css">
+<link rel="stylesheet" href="./studio-v3.css?v=3.8.2">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script type="importmap">{"imports":{"./studio-v3-render.js":"./studio-v3-render-resilient.js?v=3.8.2"}}</script>
 </head>
 <body>
 <div class="modal" id="firstRun" hidden>
@@ -72,9 +74,10 @@
   </section>
   <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio 3.8 · semantic lyric storyboard · voice-timed karaoke · mobile safe mode · one-click Vusic handoff</footer>
-<script defer src="./studio-v3-eval.js"></script>
-<script defer src="./studio-v3-release-bridge.js"></script>
+<footer>Ridge Studio 3.8.2 · semantic lyric storyboard · persistent crash recovery · mobile safe mode · one-click Vusic handoff</footer>
+<script defer src="./studio-v3-resilience.js?v=3.8.2"></script>
+<script defer src="./studio-v3-eval.js?v=3.8.2"></script>
+<script defer src="./studio-v3-release-bridge.js?v=3.8.2"></script>
 <script type="module" src="./studio-v3.js"></script>
 </body>
 </html>
