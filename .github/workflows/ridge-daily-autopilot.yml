@@ -1,0 +1,80 @@
+name: Ridge Daily Autopilot
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+    inputs:
+      count:
+        description: Videos to prepare/upload
+        required: false
+        default: '10'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ridge-daily-autopilot
+  cancel-in-progress: false
+
+jobs:
+  create-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      RIDGE_DAILY_COUNT: ${{ github.event.inputs.count || vars.RIDGE_DAILY_COUNT || '10' }}
+      RIDGE_ORIGINALS_PER_DAY: ${{ vars.RIDGE_ORIGINALS_PER_DAY || '2' }}
+      RIDGE_ARTIST: ${{ vars.RIDGE_ARTIST || 'Mohit Pandey' }}
+      YOUTUBE_PRIVACY: ${{ vars.YOUTUBE_PRIVACY || 'public' }}
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      RIDGE_CLOUD_URL: ${{ secrets.RIDGE_CLOUD_URL }}
+      RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg curl
+
+      - name: Validate autopilot
+        run: |
+          node --check scripts/ridge-daily-autopilot.mjs
+          # ffmpeg names this palette "nebulae"; keep compatibility if an older script copy says nebula.
+          sed -i "s/'nebula'/'nebulae'/g" scripts/ridge-daily-autopilot.mjs
+
+      - name: Create rights-safe music videos and publish
+        run: node scripts/ridge-daily-autopilot.mjs
+
+      - name: Save daily manifest and emergency video artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ridge-autopilot-${{ github.run_id }}
+          path: |
+            autopilot-work/manifest.json
+            autopilot-work/item-*/video.mp4
+            autopilot-work/item-*/cover.jpg
+          if-no-files-found: warn
+          retention-days: 2
+          compression-level: 0
+
+      - name: Persist dedupe/upload history
+        if: always()
+        run: |
+          test -f data/autopilot-history.json || exit 0
+          git config user.name 'ridge-autopilot[bot]'
+          git config user.email 'ridge-autopilot@users.noreply.github.com'
+          git add data/autopilot-history.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update Ridge autopilot history"
+          git pull --rebase origin main
+          git push origin HEAD:main
