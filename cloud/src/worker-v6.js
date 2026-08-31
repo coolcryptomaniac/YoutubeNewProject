@@ -1,6 +1,7 @@
 'use strict';
 
 import base from './worker-v5.js';
+import {freePolicyCapabilities} from './providers/free-policy.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range,X-Ridge-Session','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors}});
@@ -49,7 +50,8 @@ async function renderDownload(request,env){
 
 export default{async fetch(request,env,ctx){
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
-  if(u.pathname==='/api/mobile/capabilities'&&request.method==='GET')return json({ok:true,cloudRender:!!env.RIDGE_GITHUB_TOKEN,r2:!!env.RELEASE_MEDIA,phoneEncoding:false,crashProof:!!(env.RIDGE_GITHUB_TOKEN&&env.RELEASE_MEDIA)});
+  if(u.pathname==='/api/providers/free-policy'&&request.method==='GET')return json({ok:true,...freePolicyCapabilities(env)});
+  if(u.pathname==='/api/mobile/capabilities'&&request.method==='GET')return json({ok:true,cloudRender:!!env.RIDGE_GITHUB_TOKEN,r2:!!env.RELEASE_MEDIA,phoneEncoding:false,crashProof:!!(env.RIDGE_GITHUB_TOKEN&&env.RELEASE_MEDIA),paidFallback:false});
   if(u.pathname==='/api/mobile/render'&&request.method==='POST')return dispatchRender(request,env);
   if(u.pathname.startsWith('/api/mobile/render-result/'))return renderResult(request,env);
   if(u.pathname.startsWith('/api/mobile/render-status/')&&request.method==='GET')return renderStatus(request,env);

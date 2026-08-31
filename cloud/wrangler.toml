@@ -6,11 +6,15 @@ compatibility_flags = ["nodejs_compat"]
 [browser]
 binding = "BROWSER"
 
+[ai]
+binding = "AI"
+
 [vars]
 HF_VIDEO_MODEL = "Lightricks/LTX-Video-0.9.8-13B-distilled"
 FREE_VIDEO_ONLY = "true"
-NVIDIA_TEXT_MODEL = "meta/llama-3.3-70b-instruct"
-DIRECTOR_TEXT_MODEL = "meta/llama-3.3-70b-instruct"
+RIDGE_PAID_FALLBACK = "false"
+DIRECTOR_TEXT_MODEL = "@cf/zai-org/glm-4.7-flash"
 GROQ_TEXT_MODEL = "openai/gpt-oss-20b"
+GROQ_TRANSCRIBE_MODEL = "whisper-large-v3-turbo"
 META_GRAPH_VERSION = "v25.0"
 LINKEDIN_VERSION = "202607"
