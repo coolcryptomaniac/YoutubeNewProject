@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="ridge-build" content="3.8.3">
-<title>Ridge Studio 3.8 — Lyrics · Story · Music Video</title>
-<link rel="stylesheet" href="./studio-v3.css?v=3.8.3">
+<meta name="ridge-build" content="3.9.0">
+<title>Ridge Studio 3.9 — Winning DNA · Lyrics · Story · Release</title>
+<link rel="stylesheet" href="./studio-v3.css?v=3.9.0">
+<link rel="stylesheet" href="./studio-winning-dna.css?v=3.9.0">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script type="importmap">{"imports":{"./studio-v3-render.js":"./studio-v3-render-resilient.js?v=3.8.3"}}</script>
+<script type="importmap">{"imports":{"./studio-v3-render.js":"./studio-v3-render-resilient.js?v=3.9.0"}}</script>
 </head>
 <body>
 <div class="modal" id="firstRun" hidden>
@@ -21,7 +22,7 @@
   </div>
 </div>
 <header class="topbar">
-  <div class="brand"><span>RIDGE STUDIO 3.8</span><strong>Lyrics · Story · Music Video</strong></div>
+  <div class="brand"><span>RIDGE STUDIO 3.9</span><strong>Winning DNA · Lyrics · Story · Release</strong></div>
   <div class="top-actions"><span class="health" id="storageState">Storage…</span><button id="settingsToggle">Settings</button></div>
 </header>
 <main>
@@ -66,19 +67,20 @@
     <div class="section-head"><div><span class="eyebrow">SETTINGS</span><h2>Set once</h2></div><span class="health" id="mediaState">Media…</span></div>
     <div class="settings-grid">
       <div class="setting-group"><h3>Local media folder</h3><p>Files stay in your selected folder. Ridge stores only a handle/index where the browser allows it, then loads one matching scene at a time.</p><div class="actions"><button id="chooseFolder">Choose folder</button><button id="reconnectFolder">Reconnect</button><button id="rescanFolder">Rescan</button><button id="forgetFolder">Forget folder</button></div><span class="hint" id="folderState">No folder.</span><label class="file-fallback">Choose files/folder fallback<input id="folderFiles" type="file" accept="image/*,video/*" multiple webkitdirectory></label></div>
-      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Provider keys stay in the Worker, not this page. Pexels searches use the lyric storyboard; NVIDIA review and optional Hugging Face video calls remain isolated from rendering. On Android, final video encoding is cloud-only so Chrome cannot kill the tab during MediaRecorder export.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Find meaning-matched Pexels footage in CREATE</label><label>Free-credit AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><label>NVIDIA secret sauce<select id="nvidiaMode"><option value="off">Off · current Groq only</option><option value="shadow">Shadow · compare, do not replace</option><option value="prefer">Prefer NVIDIA when confident</option></select></label><div class="actions"><button id="testCloud">Quick test</button><button id="deepCloudTest">Deep live test</button><button id="applyNvidia" disabled>Use latest NVIDIA version</button><span class="health" id="cloudState">Not configured</span></div><span class="hint" id="cloudDeepState">Deep test checks Pexels + NVIDIA but deliberately does not generate an HF video.</span><span class="hint" id="nvidiaState">NVIDIA key stays in Ridge Cloud, never in this page.</span><details><summary>Model experiment · hidden learning</summary><p class="hint" id="modelEvalState">Shadow mode is collecting evidence.</p><div class="actions"><button id="rateGroq" disabled>Groq better</button><button id="rateNvidia" disabled>NVIDIA better</button><button id="rateTie" disabled>Tie</button><button id="useModelRecommendation" disabled>Use recommendation</button></div><p class="hint">Rate only after a NVIDIA candidate appears. Ridge stores only the winner, language, title and status summary locally — not the full lyrics.</p></details></div>
+      <div class="setting-group"><h3>Ridge Cloud <small>optional</small></h3><p>Provider keys stay in the Worker, not this page. Pexels searches use the lyric storyboard. On Android, final video encoding is cloud-only so Chrome cannot kill the tab during MediaRecorder export.</p><label>Cloud endpoint<input id="cloudUrl" type="url" placeholder="https://ridge-cloud-media.your-subdomain.workers.dev"></label><label class="check"><input id="cloudStock" type="checkbox" checked> Find meaning-matched Pexels footage in CREATE</label><label>Free-credit AI video retry window<select id="freeVideoMinutes"><option value="0">Off</option><option value="3">Up to 3 minutes</option><option value="5">Up to 5 minutes</option><option value="10">Up to 10 minutes</option></select></label><label>NVIDIA secret sauce<select id="nvidiaMode"><option value="off">Off · current Groq only</option><option value="shadow">Shadow · compare, do not replace</option><option value="prefer">Prefer NVIDIA when confident</option></select></label><div class="actions"><button id="testCloud">Quick test</button><button id="deepCloudTest">Deep live test</button><button id="applyNvidia" disabled>Use latest NVIDIA version</button><span class="health" id="cloudState">Not configured</span></div><span class="hint" id="cloudDeepState">Deep test checks connected services without spending on automatic paid media generation.</span><span class="hint" id="nvidiaState">Provider secrets stay in Ridge Cloud, never in this page.</span><details><summary>Model experiment · hidden learning</summary><p class="hint" id="modelEvalState">Shadow mode is collecting evidence.</p><div class="actions"><button id="rateGroq" disabled>Groq better</button><button id="rateNvidia" disabled>NVIDIA better</button><button id="rateTie" disabled>Tie</button><button id="useModelRecommendation" disabled>Use recommendation</button></div><p class="hint">Ridge stores only the winner, language, title and status summary locally — not the full lyrics.</p></details></div>
       <div class="setting-group"><h3>AI + YouTube</h3><label>Groq key<input id="groqKey" type="password" autocomplete="off" placeholder="Saved in your Ridge local credential vault"></label><div class="actions"><button id="testGroq">Test Groq</button></div><label>YouTube OAuth Web Client ID<input id="youtubeClient" type="text" placeholder="…apps.googleusercontent.com"></label><label>Upload privacy<select id="privacy"><option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option></select></label></div>
-      <div class="setting-group"><h3>Suno</h3><p>Suno stays isolated from editing, so music-generation availability can never crash the video renderer.</p><button id="openSuno">Open Suno ↗</button><span class="hint">Generate/download in Suno or use the official Ridge adapter when your account is approved, then choose the finished song here.</span></div>
+      <div class="setting-group"><h3>Suno</h3><p>Use Winning Song DNA above to create ready-to-paste Suno style prompts, instrumental concepts and full-song lyrics. Suno stays isolated from editing so provider availability can never crash the renderer.</p><button id="openSuno">Open Suno ↗</button><span class="hint">Generate/download in Suno or use the official Ridge adapter when your account is approved, then choose the finished song here.</span></div>
       <div class="setting-group"><h3>Social publishing</h3><p>On phones, native Share sends the rendered file to Instagram, Facebook or LinkedIn without storing social passwords.</p><details><summary>Facebook Page direct API</summary><label>Page access token <small>session use recommended</small><input id="facebookToken" type="password" autocomplete="off"></label><label>Meta Graph version<input id="metaVersion" type="text" value="v25.0"></label><button id="facebookPublish" disabled>Publish Page Reel</button></details></div>
     </div>
   </section>
   <section class="card log-card"><span class="eyebrow">ACTIVITY</span><div id="log" class="log"></div></section>
 </main>
-<footer>Ridge Studio 3.8.3 · Android cloud-only final render · daily autopilot-ready · semantic lyric storyboard · one-click Vusic handoff</footer>
-<script defer src="./studio-v3-mobile-cloud.js?v=3.8.3"></script>
-<script defer src="./studio-v3-resilience.js?v=3.8.3"></script>
-<script defer src="./studio-v3-eval.js?v=3.8.3"></script>
-<script defer src="./studio-v3-release-bridge.js?v=3.8.3"></script>
-<script type="module" src="./studio-v3.js"></script>
+<footer>Ridge Studio 3.9 · Rave DNA release factory · Android cloud-only final render · semantic lyric storyboard · one-click Vusic handoff</footer>
+<script defer src="./studio-winning-dna.js?v=3.9.0"></script>
+<script defer src="./studio-v3-mobile-cloud.js?v=3.9.0"></script>
+<script defer src="./studio-v3-resilience.js?v=3.9.0"></script>
+<script defer src="./studio-v3-eval.js?v=3.9.0"></script>
+<script defer src="./studio-v3-release-bridge.js?v=3.9.0"></script>
+<script type="module" src="./studio-v3.js?v=3.9.0"></script>
 </body>
 </html>
