@@ -1,0 +1,39 @@
+name: Free provider policy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check cloud/src/providers/free-policy.js
+          node --check cloud/src/providers/director.js
+          node --check cloud/src/worker-v6.js
+          node --check tests/free-provider-policy-selftest.mjs
+      - name: Free-only regression test
+        run: node --experimental-default-type=module tests/free-provider-policy-selftest.mjs
+      - name: Reject paid or retired automatic defaults
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          wrangler=Path('cloud/wrangler.toml').read_text()
+          director=Path('cloud/src/providers/director.js').read_text()
+          assert 'RIDGE_PAID_FALLBACK = "false"' in wrangler
+          assert 'DIRECTOR_TEXT_MODEL = "@cf/zai-org/glm-4.7-flash"' in wrangler
+          assert 'meta/llama-3.3-70b-instruct' not in wrangler
+          assert 'integrate.api.nvidia.com' not in director
+          assert 'paidFallback:false' in director
+          print('No paid/retired automatic director fallback detected')
+          PY
