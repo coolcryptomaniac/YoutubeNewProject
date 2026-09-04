@@ -1,0 +1,140 @@
+name: Vusic E2E Canary
+
+on:
+  schedule:
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validation depth'
+        required: true
+        type: choice
+        default: login
+        options:
+          - login
+          - pre-agreement
+          - live-submit
+      confirm_live:
+        description: 'For live-submit only, type RELEASE_CANARY'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  vusic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
+      RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
+    steps:
+      - name: Resolve canary mode
+        id: mode
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "value=login" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require Ridge admin secret
+        run: test -n "$RIDGE_ADMIN_TOKEN"
+
+      - name: Login-only smoke
+        if: steps.mode.outputs.value == 'login'
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail-with-body --silent --show-error --max-time 90 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/vusic-login-smoke" \
+            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN")"
+          echo "$body"
+          node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.authenticated!==true||x.releaseAccessible!==true)process.exit(1)' "$body"
+
+      - name: Generate original canary audio and 3000x3000 artwork
+        if: steps.mode.outputs.value != 'login'
+        shell: python
+        run: |
+          import math, struct, wave, zlib, binascii
+          rate=44100; seconds=62
+          chords=[(220.00,277.18,329.63),(196.00,246.94,293.66),(174.61,220.00,261.63),(196.00,246.94,329.63)]
+          with wave.open('ridge-canary.wav','wb') as w:
+              w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+              block=bytearray()
+              for i in range(rate*seconds):
+                  t=i/rate; chord=chords[int(t//4)%len(chords)]
+                  env=min(1.0,t/1.5,max(0.0,(seconds-t)/2.0))
+                  pulse=0.72+0.28*math.sin(2*math.pi*2*t)**8
+                  sample=sum(math.sin(2*math.pi*f*t) for f in chord)/len(chord)
+                  melody=0.28*math.sin(2*math.pi*(440 if int(t*2)%4<2 else 493.88)*t)
+                  v=max(-1,min(1,(sample*.42+melody)*env*pulse))
+                  block += struct.pack('<h',int(v*15000))
+                  if len(block)>=65536:
+                      w.writeframesraw(block); block.clear()
+              if block:w.writeframesraw(block)
+          width=height=3000
+          def chunk(kind,data):
+              return struct.pack('>I',len(data))+kind+data+struct.pack('>I',binascii.crc32(kind+data)&0xffffffff)
+          row=b'\x00'+bytes((24,18,38))*width
+          raw=row*height
+          png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+          open('ridge-canary.png','wb').write(png)
+
+      - name: Stage canary assets in R2
+        if: steps.mode.outputs.value != 'login'
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          audio="$(curl --fail-with-body --silent --show-error --max-time 90 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/stage" \
+            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -F 'file=@ridge-canary.wav;type=audio/wav')"
+          art="$(curl --fail-with-body --silent --show-error --max-time 90 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/stage" \
+            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -F 'file=@ridge-canary.png;type=image/png')"
+          node -e 'for(const s of process.argv.slice(1)){const x=JSON.parse(s);if(!x.ok||x.storage!=="r2")process.exit(1)}' "$audio" "$art"
+          echo "audio_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$audio")" >> "$GITHUB_OUTPUT"
+          echo "art_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$art")" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse accidental live submission
+        if: steps.mode.outputs.value == 'live-submit' && inputs.confirm_live != 'RELEASE_CANARY'
+        run: |
+          echo 'live-submit requires confirm_live=RELEASE_CANARY'
+          exit 1
+
+      - name: Traverse Vusic wizard without accepting agreement
+        if: steps.mode.outputs.value == 'pre-agreement'
+        shell: bash
+        env:
+          AUDIO_URL: ${{ steps.stage.outputs.audio_url }}
+          ART_URL: ${{ steps.stage.outputs.art_url }}
+        run: |
+          set -euo pipefail
+          payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Canary ${new Date().toISOString().slice(0,10)}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation canary",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",canaryMode:"pre-agreement",confirmSubmit:false}))')"
+          body="$(curl --fail-with-body --silent --show-error --max-time 300 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
+            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' --data "$payload")"
+          echo "$body"
+          node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.canary!==true||x.stage!=="pre-agreement")process.exit(1)' "$body"
+
+      - name: LIVE - accept agreement and submit generated canary release
+        if: steps.mode.outputs.value == 'live-submit' && inputs.confirm_live == 'RELEASE_CANARY'
+        shell: bash
+        env:
+          AUDIO_URL: ${{ steps.stage.outputs.audio_url }}
+          ART_URL: ${{ steps.stage.outputs.art_url }}
+        run: |
+          set -euo pipefail
+          payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Canary ${new Date().toISOString().replace(/[:.]/g,"-")}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation canary",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",confirmSubmit:true}))')"
+          body="$(curl --fail-with-body --silent --show-error --max-time 360 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
+            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H 'Content-Type: application/json' --data "$payload")"
+          echo "$body"
+          node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.submitted!==true)process.exit(1)' "$body"
