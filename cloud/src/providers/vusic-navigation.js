@@ -20,6 +20,15 @@ async function runSettled(page,onSettled,{attempts=6,baseDelay=350}={}){
   return retryVusicAction(()=>onSettled(page),{attempts,baseDelay});
 }
 
+async function verifyStable(page,onSettled,{settleMs=900}={}){
+  await sleep(settleMs);
+  await runSettled(page,onSettled);
+  // Vusic uses client-side redirects after DOMContentLoaded. Validate a second
+  // time after a quiet window so Ridge never acts inside a context swap.
+  await sleep(Math.max(900,settleMs));
+  await runSettled(page,onSettled);
+}
+
 export async function gotoVusic(page,url,{timeout=30000,settleMs=900,onSettled=null}={}){
   await retryVusicAction(async()=>{
     try{
@@ -32,12 +41,10 @@ export async function gotoVusic(page,url,{timeout=30000,settleMs=900,onSettled=n
       if(!ready)throw e;
     }
   },{attempts:3,baseDelay:400});
-  await sleep(settleMs);
-  await runSettled(page,onSettled);
+  await verifyStable(page,onSettled,{settleMs});
 }
 
 export async function waitVusicNavigation(page,{timeout=12000,settleMs=800,onSettled=null}={}){
   await page.waitForNavigation({waitUntil:'domcontentloaded',timeout}).catch(()=>{});
-  await sleep(settleMs);
-  await runSettled(page,onSettled);
+  await verifyStable(page,onSettled,{settleMs});
 }
