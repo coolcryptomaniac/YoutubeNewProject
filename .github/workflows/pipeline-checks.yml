@@ -10,6 +10,8 @@ on:
       - 'cloud/src/worker-v4.js'
       - 'cloud/src/worker-v5.js'
       - 'cloud/src/worker-v6.js'
+      - 'cloud/src/worker-v7.js'
+      - 'cloud/src/worker-v8.js'
       - '.github/workflows/ridge-cloud-render.yml'
       - 'cloud/wrangler.toml'
 
@@ -30,15 +32,19 @@ jobs:
           node --check cloud/src/worker-v4.js
           node --check cloud/src/worker-v5.js
           node --check cloud/src/worker-v6.js
+          node --check cloud/src/worker-v7.js
+          node --check cloud/src/worker-v8.js
       - name: Cloud-first contracts
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           from pathlib import Path
           html=Path('pipeline.html').read_text()
           js=Path('pipeline.js').read_text()
           w4=Path('cloud/src/worker-v4.js').read_text()
           w5=Path('cloud/src/worker-v5.js').read_text()
           w6=Path('cloud/src/worker-v6.js').read_text()
+          w7=Path('cloud/src/worker-v7.js').read_text()
+          w8=Path('cloud/src/worker-v8.js').read_text()
           wr=Path('cloud/wrangler.toml').read_text()
           wf=Path('.github/workflows/ridge-cloud-render.yml').read_text()
           for text in ['Lyrics video','Music visualizer','Photo music video','Pexels cinematic stock edit']:
@@ -49,8 +55,11 @@ jobs:
           assert "paidFallback:false" in w4
           assert 'sessionValid' in w5
           assert 'phoneEncoding:false' in w6 and '/api/mobile/render' in w6 and 'RELEASE_MEDIA' in w6
-          assert 'src/worker-v6.js' in wr
+          assert 'pipeline-stage/' in w7 and 'pipeline-render/' in w7 and 'caches.default' not in w7
+          assert 'render-failure' in w8 and 'staleJobRecovery:true' in w8
+          assert 'main = "src/worker-v8.js"' in wr
           assert 'ffmpeg' in wf and 'showwaves' in wf and 'subtitles=lyrics.srt' in wf
+          assert 'Report render failure to Ridge Cloud' in wf and 'retry-all-errors' in wf
           assert 'Pexels' in html and '/api/pexels/search' in wf
-          print('Ridge cloud pipeline + Android cloud-render contracts OK')
+          print('Ridge durable cloud pipeline + v8 recovery contracts OK')
           PY
