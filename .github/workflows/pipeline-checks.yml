@@ -12,7 +12,9 @@ on:
       - 'cloud/src/worker-v6.js'
       - 'cloud/src/worker-v7.js'
       - 'cloud/src/worker-v8.js'
+      - 'cloud/src/worker-v9.js'
       - '.github/workflows/ridge-cloud-render.yml'
+      - '.github/workflows/ridge-render-queue.yml'
       - 'cloud/wrangler.toml'
 
 permissions:
@@ -34,6 +36,7 @@ jobs:
           node --check cloud/src/worker-v6.js
           node --check cloud/src/worker-v7.js
           node --check cloud/src/worker-v8.js
+          node --check cloud/src/worker-v9.js
       - name: Cloud-first contracts
         run: |
           python3 - <<'PY'
@@ -45,8 +48,10 @@ jobs:
           w6=Path('cloud/src/worker-v6.js').read_text()
           w7=Path('cloud/src/worker-v7.js').read_text()
           w8=Path('cloud/src/worker-v8.js').read_text()
+          w9=Path('cloud/src/worker-v9.js').read_text()
           wr=Path('cloud/wrangler.toml').read_text()
           wf=Path('.github/workflows/ridge-cloud-render.yml').read_text()
+          qf=Path('.github/workflows/ridge-render-queue.yml').read_text()
           for text in ['Lyrics video','Music visualizer','Photo music video','Pexels cinematic stock edit']:
               assert text in html,text
           assert 'RIDGE_ADMIN_TOKEN' not in html
@@ -57,9 +62,13 @@ jobs:
           assert 'phoneEncoding:false' in w6 and '/api/mobile/render' in w6 and 'RELEASE_MEDIA' in w6
           assert 'pipeline-stage/' in w7 and 'pipeline-render/' in w7 and 'caches.default' not in w7
           assert 'render-failure' in w8 and 'staleJobRecovery:true' in w8
-          assert 'main = "src/worker-v8.js"' in wr
+          assert 'render-queue/' in w9 and 'render-lease/' in w9 and 'r2-github-scheduler' in w9
+          assert '/api/render/claim' in w9 and '/api/render/ack/' in w9
+          assert 'main = "src/worker-v9.js"' in wr
           assert 'ffmpeg' in wf and 'showwaves' in wf and 'subtitles=lyrics.srt' in wf
           assert 'Report render failure to Ridge Cloud' in wf and 'retry-all-errors' in wf
+          assert "cron: '*/5 * * * *'" in qf and 'actions: write' in qf and 'gh workflow run ridge-cloud-render.yml' in qf
+          assert 'RIDGE_GITHUB_TOKEN' not in qf
           assert 'Pexels' in html and '/api/pexels/search' in wf
-          print('Ridge durable cloud pipeline + v8 recovery contracts OK')
+          print('Ridge durable cloud pipeline + v9 R2 render scheduler contracts OK')
           PY
