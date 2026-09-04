@@ -17,7 +17,7 @@ HF_VIDEO_MODEL = "Lightricks/LTX-Video-0.9.8-13B-distilled"
 FREE_VIDEO_ONLY = "true"
 RIDGE_PAID_FALLBACK = "false"
 YOUTUBE_DAILY_UPLOAD_CAP = "10"
-YOUTUBE_DEFAULT_PRIVACY = "public"
+YOUTUBE_DEFAULT_PRIVACY = "private"
 YOUTUBE_REDIRECT_URI = "https://ridge-cloud-media.founder-f53.workers.dev/api/youtube/oauth/callback"
 
 # Text refinement is optional and free-first. Ridge tries candidates in order,
