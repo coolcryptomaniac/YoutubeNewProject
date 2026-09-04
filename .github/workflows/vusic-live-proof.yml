@@ -72,7 +72,7 @@ jobs:
           echo "audio_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$audio")" >> "$GITHUB_OUTPUT"
           echo "art_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$art")" >> "$GITHUB_OUTPUT"
 
-      - name: LIVE - accept Vusic agreement and submit proof release
+      - name: Diagnose Vusic wizard before agreement
         shell: bash
         env:
           AUDIO_URL: ${{ steps.stage.outputs.audio_url }}
@@ -84,11 +84,16 @@ jobs:
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-live-proof")"
           oidc="$(printf '%s' "$token_json" | jq -r '.value')"
           test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
-          payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Automation Proof ${new Date().toISOString().replace(/[:.]/g,"-")}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation proof",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",confirmSubmit:true}))')"
-          body="$(curl --fail-with-body --silent --show-error --max-time 360 \
+          payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Automation Proof Diagnostic ${new Date().toISOString().replace(/[:.]/g,"-")}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation proof",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",canaryMode:"pre-agreement",confirmSubmit:false}))')"
+          status="$(curl --silent --show-error --max-time 360 \
+            -o vusic-response.json -w '%{http_code}' \
             -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
             -H "Authorization: Bearer $oidc" \
             -H 'Content-Type: application/json' \
             --data "$payload")"
-          echo "VUSIC_LIVE_PROOF_RESPONSE=$body"
-          node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.submitted!==true)throw new Error("Vusic did not confirm submission: "+process.argv[1]); console.log("VUSIC_LIVE_PROOF_SUBMITTED",JSON.stringify(x))' "$body"
+          echo "VUSIC_HTTP_STATUS=$status"
+          echo 'VUSIC_RESPONSE_BEGIN'
+          cat vusic-response.json
+          echo
+          echo 'VUSIC_RESPONSE_END'
+          node -e 'const fs=require("fs");const status=Number(process.argv[1]);const x=JSON.parse(fs.readFileSync("vusic-response.json","utf8"));if(status!==200||x.ok!==true||x.canary!==true||x.stage!=="pre-agreement")throw new Error("Vusic pre-agreement diagnostic failed: HTTP "+status+" "+JSON.stringify(x)); console.log("VUSIC_PRE_AGREEMENT_PASS",JSON.stringify(x))' "$status"
