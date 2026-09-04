@@ -25,6 +25,15 @@ function planSummary(text){
   const valid=(flat.match(/Valid\s*(?:Upto|Until|Through)\s*[:\-]?\s*([0-9A-Za-z /.-]{6,24})/i)||[])[1]||null;
   return{plan,active,expired,validThrough:valid?clean(valid).slice(0,24):null};
 }
+async function releaseState(page){return retryVusicAction(()=>page.evaluate(()=>({
+  fileInputs:document.querySelectorAll('input[type="file"]').length,
+  visibleInputs:[...document.querySelectorAll('input,textarea,select')].filter(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0}).length,
+  hasCreate:/Create New Release/i.test(document.body?.innerText||''),
+  hasCheckPlan:/Check Plan|View all plans/i.test(document.body?.innerText||''),
+  hasCurrentPlan:/Current Plan|Current Active/i.test(document.body?.innerText||''),
+  hasUpload:/upload|artwork|audio|cover|song file/i.test(document.body?.innerText||'')
+})))}
+async function waitReleaseState(page,{timeout=9000,interval=500}={}){const start=Date.now();let state=null;while(Date.now()-start<timeout){state=await releaseState(page);if(state.fileInputs>0||state.visibleInputs>0||state.hasCheckPlan||state.hasUpload)return state;await sleep(interval)}return state||releaseState(page)}
 
 export async function vusicAccountSmoke(env,input={}){
   if(!env.BROWSER||!env.VUSIC_USERNAME||!env.VUSIC_PASSWORD)return{ok:false,code:'VUSIC_NOT_CONFIGURED',configured:false};
@@ -51,16 +60,9 @@ export async function vusicAccountSmoke(env,input={}){
     const dashboardPlan=planSummary(dashboardText);
 
     await stableGoto(page,safe(env.VUSIC_SINGLE_RELEASE_URL||urls.single,500));
-    const releaseText=await poll(page,async()=>false,{timeout:2200,interval:550});
-    const releaseState=await retryVusicAction(()=>page.evaluate(()=>({
-      fileInputs:document.querySelectorAll('input[type="file"]').length,
-      visibleInputs:[...document.querySelectorAll('input,textarea,select')].filter(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0}).length,
-      hasCreate:/Create New Release/i.test(document.body?.innerText||''),
-      hasCheckPlan:/Check Plan|View all plans/i.test(document.body?.innerText||''),
-      hasCurrentPlan:/Current Plan|Current Active/i.test(document.body?.innerText||'')
-    })));
-
-    return{ok:true,configured:true,profileReady:true,expectedArtistMatch,profilePlan,dashboardPlan,releaseState,pageUrl:page.url(),releasePlan:planSummary(releaseText)};
+    const state=await waitReleaseState(page,{timeout:9000,interval:500});
+    const releaseText=await bodyText(page);
+    return{ok:true,configured:true,profileReady:true,expectedArtistMatch,profilePlan,dashboardPlan,releaseState:state,pageUrl:page.url(),releasePlan:planSummary(releaseText)};
   }catch(e){return{ok:false,code:'VUSIC_ACCOUNT_SMOKE_FAILED',error:safe(e?.message||e,500)}
   }finally{if(browser)await browser.close().catch(()=>{})}
 }
