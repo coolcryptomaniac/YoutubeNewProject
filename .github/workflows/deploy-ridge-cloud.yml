@@ -15,6 +15,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: cloud
@@ -23,7 +24,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install
+      - name: Install cloud dependencies with watchdog
+        timeout-minutes: 4
+        env:
+          npm_config_audit: "false"
+          npm_config_fund: "false"
+          npm_config_fetch_retries: "2"
+          npm_config_fetch_retry_mintimeout: "1000"
+          npm_config_fetch_retry_maxtimeout: "5000"
+          npm_config_fetch_timeout: "30000"
+        run: npm install --no-audit --no-fund --prefer-offline
       - name: Validate deploy credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
