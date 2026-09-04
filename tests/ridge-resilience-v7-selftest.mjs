@@ -5,6 +5,7 @@ const read=p=>fs.readFileSync(p,'utf8');
 const durable=read('cloud/src/worker-v7.js');
 const recovery=read('cloud/src/worker-v8.js');
 const queue=read('cloud/src/worker-v9.js');
+const oidc=read('cloud/src/providers/github-oidc.js');
 const wrangler=read('cloud/wrangler.toml');
 const cloudFirst=read('studio-v3-cloud-first.js');
 const legacy=read('studio-v3-mobile-cloud.js');
@@ -13,6 +14,7 @@ const vusic=read('cloud/src/providers/vusic.js');
 const vusicProfile=read('cloud/src/providers/vusic-profile.js');
 const renderWorkflow=read('.github/workflows/ridge-cloud-render.yml');
 const queueWorkflow=read('.github/workflows/ridge-render-queue.yml');
+const deployWorkflow=read('.github/workflows/deploy-ridge-cloud.yml');
 const vusicWorkflow=read('.github/workflows/vusic-e2e-canary.yml');
 
 assert.match(wrangler,/main\s*=\s*"src\/worker-v9\.js"/,'Worker v9 R2 queue layer must be deployed');
@@ -30,16 +32,33 @@ assert.match(queue,/render-lease\//,'v9 must use expiring dispatch leases');
 assert.match(queue,/api\/render\/claim/,'v9 must expose authenticated queue claims');
 assert.match(queue,/api\/render\/ack/,'v9 must acknowledge dispatched queue jobs');
 assert.match(queue,/r2-github-scheduler/,'v9 health must expose the tokenless render transport');
+assert.match(queue,/schedulerAuth:'github-oidc'/,'v9 render scheduler must use GitHub OIDC');
 assert.match(queue,/pickupIntervalMinutes:5/,'v9 must expose scheduler pickup interval');
+
+assert.match(oidc,/https:\/\/token\.actions\.githubusercontent\.com/,'OIDC issuer must be GitHub Actions');
+assert.match(oidc,/\.well-known\/jwks/,'OIDC verifier must use GitHub JWKS');
+assert.match(oidc,/RSASSA-PKCS1-v1_5/,'OIDC verifier must verify RS256 signatures');
+assert.match(oidc,/1321897216/,'OIDC trust must pin immutable repository id');
+assert.match(oidc,/claims\.workflow_ref/,'OIDC trust must pin workflow ref');
+assert.match(oidc,/claims\.repository/,'OIDC trust must verify repository claim');
+assert.match(oidc,/claims\.ref!==\'refs\/heads\/main\'/,'OIDC trust must be main-only');
+assert.match(oidc,/audMatches/,'OIDC trust must verify custom audience');
+
 assert.match(renderWorkflow,/Report render failure to Ridge Cloud/,'GitHub renderer must report failed runs');
 assert.match(renderWorkflow,/retry-all-errors/,'cloud downloads/callbacks should retry transient network errors');
 assert.match(renderWorkflow,/120000000/,'cloud renderer must enforce result-size ceiling');
 assert.match(queueWorkflow,/cron: '\*\/5 \* \* \* \*'/,'R2 dispatcher must run at GitHub minimum five-minute interval');
-assert.match(queueWorkflow,/actions: write/,'queue dispatcher needs only built-in GitHub Actions dispatch permission');
+assert.match(queueWorkflow,/actions: write/,'queue dispatcher needs built-in GitHub Actions dispatch permission');
+assert.match(queueWorkflow,/id-token: write/,'queue dispatcher must request short-lived GitHub OIDC');
+assert.match(queueWorkflow,/audience=ridge-render-queue/,'queue dispatcher must use dedicated OIDC audience');
 assert.match(queueWorkflow,/api\/render\/claim/,'queue workflow must claim from Worker/R2');
 assert.match(queueWorkflow,/gh workflow run ridge-cloud-render\.yml/,'queue workflow must dispatch existing FFmpeg renderer');
 assert.match(queueWorkflow,/api\/render\/release-claim/,'failed dispatches must release their queue lease');
 assert.doesNotMatch(queueWorkflow,/RIDGE_GITHUB_TOKEN/,'R2 dispatcher must not require a personal GitHub token');
+assert.doesNotMatch(queueWorkflow,/RIDGE_ADMIN_TOKEN/,'R2 dispatcher must not duplicate the Worker admin secret into GitHub');
+assert.match(deployWorkflow,/id-token: write/,'deploy smoke must use OIDC instead of copied Ridge credentials');
+assert.match(deployWorkflow,/audience=ridge-deploy-smoke/,'deploy smoke must use dedicated OIDC audience');
+assert.doesNotMatch(deployWorkflow,/RIDGE_ADMIN_TOKEN/,'deploy workflow must not require copied Ridge admin secret');
 
 assert.match(cloudFirst,/ridge\.cloud\.render\.job\.v1/,'browser must persist resumable cloud job id');
 assert.match(cloudFirst,/sessionStorage\.setItem\('ridge\.adminToken'/,'admin token should be session-scoped');
@@ -58,7 +77,10 @@ assert.match(vusic,/no agreement was accepted and nothing was submitted/,'pre-ag
 assert.match(vusic,/release\.confirmSubmit!==true/,'Vusic final submit must remain explicit');
 assert.match(vusicProfile,/finalSubmit:false/,'Vusic normalization must default to no final submit');
 assert.match(vusicWorkflow,/cron: '23 3 \* \* 1'/,'Vusic login smoke should run weekly');
+assert.match(vusicWorkflow,/id-token: write/,'Vusic canary must use short-lived GitHub OIDC');
+assert.match(vusicWorkflow,/audience=ridge-vusic-canary/,'Vusic canary must use dedicated OIDC audience');
+assert.doesNotMatch(vusicWorkflow,/RIDGE_ADMIN_TOKEN/,'Vusic canary must not copy Ridge admin secret into GitHub');
 assert.match(vusicWorkflow,/confirm_live.*RELEASE_CANARY/s,'live Vusic canary must require an explicit gate');
 assert.match(vusicWorkflow,/canaryMode:\"pre-agreement\"/,'safe canary must support pre-agreement traversal');
 
-console.log('Ridge v3.9 crash-resistance + R2 render queue contracts: PASS');
+console.log('Ridge v3.9 crash-resistance + R2 queue + GitHub OIDC contracts: PASS');

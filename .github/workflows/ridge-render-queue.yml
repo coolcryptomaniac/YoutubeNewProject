@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   actions: write
+  id-token: write
 
 concurrency:
   group: ridge-r2-render-dispatcher
@@ -19,23 +20,28 @@ jobs:
     timeout-minutes: 5
     env:
       RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
-      RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Validate dispatcher credentials
-        run: |
-          set -euo pipefail
-          test -n "$RIDGE_ADMIN_TOKEN"
-          test -n "$GH_TOKEN"
-
-      - name: Claim R2 jobs and dispatch cloud renders
+      - name: Claim R2 jobs with GitHub OIDC and dispatch cloud renders
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$GH_TOKEN"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_URL"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-render-queue")"
+          RIDGE_OIDC_TOKEN="$(printf '%s' "$token_json" | jq -r '.value')"
+          test -n "$RIDGE_OIDC_TOKEN"
+          test "$RIDGE_OIDC_TOKEN" != "null"
+          echo "::add-mask::$RIDGE_OIDC_TOKEN"
+
           for slot in 1 2 3 4; do
             claim="$(curl --fail-with-body --silent --show-error --max-time 30 \
               -X POST "$RIDGE_CLOUD_URL/api/render/claim" \
-              -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN")"
+              -H "Authorization: Bearer $RIDGE_OIDC_TOKEN")"
 
             if [ "$(printf '%s' "$claim" | jq -r '.empty // false')" = "true" ]; then
               echo "R2 render queue is empty."
@@ -68,14 +74,14 @@ jobs:
               -f callback_url="$callback_url"; then
               curl --fail-with-body --silent --show-error --max-time 30 \
                 -X POST "$RIDGE_CLOUD_URL/api/render/ack/$id" \
-                -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+                -H "Authorization: Bearer $RIDGE_OIDC_TOKEN" \
                 -H 'Content-Type: application/json' \
                 --data "$(jq -nc --arg claimId "$claim_id" '{claimId:$claimId}')"
               echo
             else
               curl --silent --show-error --max-time 30 \
                 -X POST "$RIDGE_CLOUD_URL/api/render/release-claim/$id" \
-                -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+                -H "Authorization: Bearer $RIDGE_OIDC_TOKEN" \
                 -H 'Content-Type: application/json' \
                 --data "$(jq -nc --arg claimId "$claim_id" '{claimId:$claimId}')" || true
               echo "GitHub dispatch failed for $id; lease released so the next scheduled run can retry."

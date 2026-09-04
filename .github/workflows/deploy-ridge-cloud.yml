@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   deploy:
@@ -39,12 +40,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$RIDGE_ADMIN_TOKEN"
-      - name: Validate adaptive free-first text and render queue configuration
+      - name: Validate adaptive free-first text, OIDC and render queue configuration
         run: |
           set -euo pipefail
           grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK' wrangler.toml
@@ -52,6 +51,7 @@ jobs:
           grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
           grep -q 'main = "src/worker-v9.js"' wrangler.toml
           node --check src/providers/text-refine.js
+          node --check src/providers/github-oidc.js
           node --check src/worker-v8.js
           node --check src/worker-v9.js
       - name: Ensure global release staging
@@ -100,32 +100,26 @@ jobs:
         env:
           RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
         run: node ../tests/ridge-cloud-live-smoke.mjs
-      - name: Vusic automation smoke
+      - name: Vusic automation smoke via GitHub OIDC
         env:
           RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
-          RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
-          VUSIC_USERNAME: ${{ secrets.VUSIC_USERNAME }}
-          VUSIC_PASSWORD: ${{ secrets.VUSIC_PASSWORD }}
+        shell: bash
         run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          const base=process.env.RIDGE_CLOUD_URL.replace(/\/$/,'');
-          const status=await fetch(base+'/api/release/vusic-status').then(async r=>({status:r.status,body:await r.json()}));
-          assert.equal(status.status,200,'Vusic status endpoint');
-          assert.equal(status.body.browserBound,true,'Browser Run binding missing');
-          if(process.env.VUSIC_USERNAME)assert.equal(status.body.usernamePresent,true,'Vusic username secret missing from deployed Worker');
-          if(process.env.VUSIC_PASSWORD)assert.equal(status.body.passwordPresent,true,'Vusic password secret missing from deployed Worker');
-          const caps=await fetch(base+'/api/release/capabilities',{headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
-          assert.equal(caps.status,200,'Release capabilities authorization failed');
-          const c=await caps.json();
-          assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
-          console.log('Vusic capabilities:',JSON.stringify({configured:c.vusic?.configured,browserBound:c.vusic?.browserBound,mediaStaging:c.vusic?.mediaStaging,stagingMode:c.stagingMode}));
-          if(process.env.VUSIC_USERNAME&&process.env.VUSIC_PASSWORD){
-            const r=await fetch(base+'/api/release/vusic-login-smoke',{method:'POST',headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
-            const body=await r.json().catch(()=>({}));
-            if(r.status!==200||body.ok!==true)throw new Error('Vusic login smoke failed: '+r.status+' '+JSON.stringify(body));
-            console.log('Vusic login smoke: PASS',JSON.stringify({authenticated:body.authenticated,releaseAccessible:body.releaseAccessible,browserBinding:body.browserBinding}));
-          } else {
-            console.log('Vusic login smoke skipped because GitHub VUSIC_USERNAME/VUSIC_PASSWORD secrets are not both present.');
-          }
-          NODE
+          set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-deploy-smoke")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"
+          test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
+
+          status="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/release/vusic-status")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.browserBound||!x.usernamePresent||!x.passwordPresent) throw new Error("Vusic Worker credentials/Browser binding incomplete: "+process.argv[1])' "$status"
+
+          caps="$(curl --fail-with-body --silent --show-error --max-time 30 \
+            "$RIDGE_CLOUD_URL/api/release/capabilities" -H "Authorization: Bearer $oidc")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.stagingMode!=="r2"||!x.vusic?.configured||!x.vusic?.browserBound||!x.vusic?.mediaStaging) throw new Error("Vusic capabilities not production-ready: "+process.argv[1])' "$caps"
+
+          login="$(curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST "$RIDGE_CLOUD_URL/api/release/vusic-login-smoke" \
+            -H "Authorization: Bearer $oidc")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(x.ok!==true||x.authenticated!==true||x.releaseAccessible!==true) throw new Error("Vusic login smoke failed: "+process.argv[1]); console.log("Vusic login smoke: PASS",JSON.stringify({authenticated:x.authenticated,releaseAccessible:x.releaseAccessible,browserBinding:x.browserBinding}))' "$login"

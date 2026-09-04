@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   vusic:
@@ -28,7 +29,6 @@ jobs:
     timeout-minutes: 12
     env:
       RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
-      RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
     steps:
       - name: Resolve canary mode
         id: mode
@@ -40,17 +40,16 @@ jobs:
             echo "value=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Require Ridge admin secret
-        run: test -n "$RIDGE_ADMIN_TOKEN"
-
       - name: Login-only smoke
         if: steps.mode.outputs.value == 'login'
         shell: bash
         run: |
           set -euo pipefail
-          body="$(curl --fail-with-body --silent --show-error --max-time 90 \
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != null; echo "::add-mask::$oidc"
+          body="$(curl --fail-with-body --silent --show-error --max-time 120 \
             -X POST "$RIDGE_CLOUD_URL/api/release/vusic-login-smoke" \
-            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN")"
+            -H "Authorization: Bearer $oidc")"
           echo "$body"
           node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.authenticated!==true||x.releaseAccessible!==true)process.exit(1)' "$body"
 
@@ -91,13 +90,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != null; echo "::add-mask::$oidc"
           audio="$(curl --fail-with-body --silent --show-error --max-time 90 \
             -X POST "$RIDGE_CLOUD_URL/api/release/stage" \
-            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H "Authorization: Bearer $oidc" \
             -F 'file=@ridge-canary.wav;type=audio/wav')"
           art="$(curl --fail-with-body --silent --show-error --max-time 90 \
             -X POST "$RIDGE_CLOUD_URL/api/release/stage" \
-            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H "Authorization: Bearer $oidc" \
             -F 'file=@ridge-canary.png;type=image/png')"
           node -e 'for(const s of process.argv.slice(1)){const x=JSON.parse(s);if(!x.ok||x.storage!=="r2")process.exit(1)}' "$audio" "$art"
           echo "audio_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$audio")" >> "$GITHUB_OUTPUT"
@@ -117,10 +118,12 @@ jobs:
           ART_URL: ${{ steps.stage.outputs.art_url }}
         run: |
           set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != null; echo "::add-mask::$oidc"
           payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Canary ${new Date().toISOString().slice(0,10)}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation canary",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",canaryMode:"pre-agreement",confirmSubmit:false}))')"
           body="$(curl --fail-with-body --silent --show-error --max-time 300 \
             -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
-            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H "Authorization: Bearer $oidc" \
             -H 'Content-Type: application/json' --data "$payload")"
           echo "$body"
           node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.canary!==true||x.stage!=="pre-agreement")process.exit(1)' "$body"
@@ -133,10 +136,12 @@ jobs:
           ART_URL: ${{ steps.stage.outputs.art_url }}
         run: |
           set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != null; echo "::add-mask::$oidc"
           payload="$(node -e 'console.log(JSON.stringify({title:`Ridge Canary ${new Date().toISOString().replace(/[:.]/g,"-")}`,artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation canary",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",confirmSubmit:true}))')"
           body="$(curl --fail-with-body --silent --show-error --max-time 360 \
             -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
-            -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+            -H "Authorization: Bearer $oidc" \
             -H 'Content-Type: application/json' --data "$payload")"
           echo "$body"
           node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.submitted!==true)process.exit(1)' "$body"
