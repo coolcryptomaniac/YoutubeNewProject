@@ -1,6 +1,7 @@
 'use strict';
 
 import base from './worker-v8.js';
+import {authorizeAutomation,isAdmin,GITHUB_OIDC_INFO} from './providers/github-oidc.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range,X-Ridge-Session','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors}});
@@ -9,13 +10,20 @@ const enc=new TextEncoder();
 const b64url=bytes=>{let s='';for(const b of new Uint8Array(bytes))s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
 const textB64=s=>b64url(enc.encode(String(s||'')));
 async function hmac(secret,message){const key=await crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return b64url(await crypto.subtle.sign('HMAC',key,enc.encode(message)))}
-function admin(request,env){const h=request.headers.get('Authorization')||'';return !!env.RIDGE_ADMIN_TOKEN&&h===`Bearer ${env.RIDGE_ADMIN_TOKEN}`}
+const admin=(request,env)=>isAdmin(request,env);
 
 const statusKey=id=>`mobile-render/${id}.json`;
 const queueKey=id=>`render-queue/${id}.json`;
 const leaseKey=id=>`render-lease/${id}.json`;
 async function readJson(env,key){const obj=await env.RELEASE_MEDIA?.get(key);if(!obj)return null;return obj.json().catch(()=>null)}
 async function writeJson(env,key,data,ttlMs=24*60*60*1000){if(!env.RELEASE_MEDIA)return false;await env.RELEASE_MEDIA.put(key,JSON.stringify(data),{httpMetadata:{contentType:'application/json'},customMetadata:{expires:String(Date.now()+ttlMs)}});return true}
+
+async function queueAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-render-queue',workflow:'ridge-render-queue.yml',events:['schedule','workflow_dispatch']})}
+async function deploySmokeAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-deploy-smoke',workflow:'deploy-ridge-cloud.yml',events:['push','workflow_dispatch']})}
+async function vusicCanaryAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-vusic-canary',workflow:'vusic-e2e-canary.yml',events:['schedule','workflow_dispatch']})}
+function asAdminRequest(request,env){const h=new Headers(request.headers);h.set('Authorization',`Bearer ${env.RIDGE_ADMIN_TOKEN}`);return new Request(request,{headers:h})}
+const deploySmokePath=(u,m)=>(u.pathname==='/api/release/capabilities'&&m==='GET')||(u.pathname==='/api/release/vusic-login-smoke'&&m==='POST');
+const vusicCanaryPath=(u,m)=>deploySmokePath(u,m)||(u.pathname==='/api/release/stage'&&(m==='POST'||m==='DELETE'))||(u.pathname==='/api/release/vusic'&&m==='POST');
 
 async function enqueueRender(request,env){
   if(!admin(request,env))return json({error:'Ridge admin authorization required'},401);
@@ -29,11 +37,11 @@ async function enqueueRender(request,env){
   const job={id,createdAt,mode,audio_url:audioUrl,cover_url:coverUrl,title_b64:textB64(title),lyrics_b64:textB64(lyrics),queries_b64:textB64(JSON.stringify(queries)),cloud_url:origin,callback_url:callback,title};
   await writeJson(env,statusKey(id),{id,status:'queued',createdAt,mode,title,transport:'r2-github-scheduler'});
   await writeJson(env,queueKey(id),job,2*60*60*1000);
-  return json({ok:true,id,status:'queued',transport:'r2-github-scheduler',pickupIntervalMinutes:5,resumable:true});
+  return json({ok:true,id,status:'queued',transport:'r2-github-scheduler',schedulerAuth:'github-oidc',pickupIntervalMinutes:5,resumable:true});
 }
 
 async function claimRender(request,env){
-  if(!admin(request,env))return json({error:'Ridge admin authorization required'},401);
+  if(!(await queueAuth(request,env)))return json({error:'Ridge queue authorization required'},401);
   if(!env.RELEASE_MEDIA)return json({error:'R2 unavailable'},503);
   const page=await env.RELEASE_MEDIA.list({prefix:'render-queue/',limit:25});
   const now=Date.now();
@@ -49,7 +57,7 @@ async function claimRender(request,env){
 }
 
 async function ackRender(request,env){
-  if(!admin(request,env))return json({error:'Ridge admin authorization required'},401);
+  if(!(await queueAuth(request,env)))return json({error:'Ridge queue authorization required'},401);
   if(!env.RELEASE_MEDIA)return json({error:'R2 unavailable'},503);
   const id=new URL(request.url).pathname.split('/').pop()||'',body=await request.json().catch(()=>({})),claimId=safe(body.claimId,120);
   if(!id||!claimId)return json({error:'render id and claimId required'},400);
@@ -61,7 +69,7 @@ async function ackRender(request,env){
 }
 
 async function releaseClaim(request,env){
-  if(!admin(request,env))return json({error:'Ridge admin authorization required'},401);
+  if(!(await queueAuth(request,env)))return json({error:'Ridge queue authorization required'},401);
   if(!env.RELEASE_MEDIA)return json({error:'R2 unavailable'},503);
   const id=new URL(request.url).pathname.split('/').pop()||'',body=await request.json().catch(()=>({})),claimId=safe(body.claimId,120);
   if(!id||!claimId)return json({error:'render id and claimId required'},400);
@@ -70,7 +78,15 @@ async function releaseClaim(request,env){
 }
 
 async function capabilities(env){
-  return json({ok:true,ready:!!(env.RELEASE_MEDIA&&env.RIDGE_ADMIN_TOKEN),r2:!!env.RELEASE_MEDIA,adminConfigured:!!env.RIDGE_ADMIN_TOKEN,githubRender:!!env.RELEASE_MEDIA,renderTransport:'r2-github-scheduler',directGithubDispatch:!!env.RIDGE_GITHUB_TOKEN,phoneEncoding:false,desktopEncoding:false,resumable:true,pickupIntervalMinutes:5,paidFallback:false});
+  return json({ok:true,ready:!!(env.RELEASE_MEDIA&&env.RIDGE_ADMIN_TOKEN),r2:!!env.RELEASE_MEDIA,adminConfigured:!!env.RIDGE_ADMIN_TOKEN,githubRender:!!env.RELEASE_MEDIA,renderTransport:'r2-github-scheduler',schedulerAuth:'github-oidc',directGithubDispatch:!!env.RIDGE_GITHUB_TOKEN,phoneEncoding:false,desktopEncoding:false,resumable:true,pickupIntervalMinutes:5,paidFallback:false});
+}
+
+async function maybeBridgeGitHubAutomation(request,env,ctx,u){
+  if(admin(request,env)||!env.RIDGE_ADMIN_TOKEN)return null;
+  let auth=null;
+  if(deploySmokePath(u,request.method))auth=await deploySmokeAuth(request,env);
+  if(!auth&&vusicCanaryPath(u,request.method))auth=await vusicCanaryAuth(request,env);
+  return auth?base.fetch(asAdminRequest(request,env),env,ctx):null;
 }
 
 export default{
@@ -81,9 +97,10 @@ export default{
     if(u.pathname==='/api/render/claim'&&request.method==='POST')return claimRender(request,env);
     if(u.pathname.startsWith('/api/render/ack/')&&request.method==='POST')return ackRender(request,env);
     if(u.pathname.startsWith('/api/render/release-claim/')&&request.method==='POST')return releaseClaim(request,env);
+    if(u.pathname.startsWith('/api/release/')){const bridged=await maybeBridgeGitHubAutomation(request,env,ctx,u);if(bridged)return bridged}
     if(u.pathname==='/api/resilience/health'&&request.method==='GET'){
       const upstream=await base.fetch(request,env,ctx);let body={};try{body=await upstream.clone().json()}catch{}
-      return json({...body,ok:true,worker:'v9',r2:!!env.RELEASE_MEDIA,adminConfigured:!!env.RIDGE_ADMIN_TOKEN,githubRender:!!env.RELEASE_MEDIA,renderTransport:'r2-github-scheduler',directGithubDispatch:!!env.RIDGE_GITHUB_TOKEN,pickupIntervalMinutes:5,paidFallback:false,localFinalRender:false,failureCallbacks:true,staleJobRecovery:true});
+      return json({...body,ok:true,worker:'v9',r2:!!env.RELEASE_MEDIA,adminConfigured:!!env.RIDGE_ADMIN_TOKEN,githubRender:!!env.RELEASE_MEDIA,renderTransport:'r2-github-scheduler',schedulerAuth:'github-oidc',oidcIssuer:GITHUB_OIDC_INFO.issuer,directGithubDispatch:!!env.RIDGE_GITHUB_TOKEN,pickupIntervalMinutes:5,paidFallback:false,localFinalRender:false,failureCallbacks:true,staleJobRecovery:true});
     }
     return base.fetch(request,env,ctx);
   },
