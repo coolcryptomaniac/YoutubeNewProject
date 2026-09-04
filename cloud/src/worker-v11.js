@@ -2,6 +2,7 @@
 
 import base from './worker-v10.js';
 import {browserBudget} from './providers/browser-budget.js';
+import {authorizeAutomation} from './providers/github-oidc.js';
 import {youtubeCapabilities,youtubeOauthStart,youtubeOauthCallback,youtubeStatus,youtubeUploadFromR2} from './providers/youtube-server.js';
 import {getSong,getSongFile,putSongFile,updateSong} from './providers/song-library.js';
 
@@ -16,6 +17,27 @@ function admin(request,env){return !!env.RIDGE_ADMIN_TOKEN&&(request.headers.get
 function sessionToken(request){const u=new URL(request.url),h=request.headers.get('X-Ridge-Session')||request.headers.get('Authorization')||u.searchParams.get('session')||'';return h.replace(/^Bearer\s+/i,'').trim()}
 async function session(request,env){const secret=String(env.RIDGE_ADMIN_TOKEN||env.VUSIC_PASSWORD||''),token=sessionToken(request);if(!secret||!token)return null;try{const [body,sig]=token.split('.');if(!body||!sig||await hmac(secret,body)!==sig)return null;const d=JSON.parse(dec.decode(fromB64url(body)));return d.scope==='ridge-session'&&Number(d.exp)>Date.now()?d:null}catch{return null}}
 async function authorised(request,env){return admin(request,env)||!!await session(request,env)}
+
+const VUSIC_ONE_KEY='private/vusic/one-live-release.json';
+async function vusicOneAuth(request,env){if(admin(request,env))return true;return authorizeAutomation(request,env,{audience:'ridge-vusic-live-proof',workflow:'vusic-live-proof.yml',events:['push','schedule','workflow_dispatch']})}
+async function readVusicOne(env){const o=await env.RELEASE_MEDIA?.get(VUSIC_ONE_KEY);return o?o.json().catch(()=>null):null}
+async function writeVusicOne(env,state){await env.RELEASE_MEDIA.put(VUSIC_ONE_KEY,JSON.stringify(state),{httpMetadata:{contentType:'application/json'}});return state}
+function vusicLocked(s){return !!s&&['submitted','ambiguous','attempting'].includes(s.status)}
+async function vusicOneStatus(request,env){if(!(await vusicOneAuth(request,env)))return json({error:'Vusic one-release authorization required'},401);if(!env.RELEASE_MEDIA)return json({error:'R2 unavailable'},503);const state=await readVusicOne(env);return json({ok:true,locked:vusicLocked(state),state:state||{status:'ready'}})}
+async function vusicOneExecute(request,env,ctx){
+  if(!(await vusicOneAuth(request,env)))return json({error:'Vusic one-release authorization required'},401);if(!env.RELEASE_MEDIA||!env.RIDGE_ADMIN_TOKEN)return json({error:'R2/admin configuration required'},503);
+  const old=await readVusicOne(env);if(vusicLocked(old))return json({ok:old.status==='submitted',locked:true,state:old},old.status==='submitted'?200:409);
+  const body=await request.json().catch(()=>({})),attemptId=crypto.randomUUID(),startedAt=new Date().toISOString();await writeVusicOne(env,{status:'attempting',attemptId,startedAt,title:safe(body.title,180)});
+  const u=new URL(request.url);u.pathname='/api/release/vusic';u.search='';const h=new Headers(request.headers);h.set('Authorization',`Bearer ${env.RIDGE_ADMIN_TOKEN}`);h.set('Content-Type','application/json');
+  let r,out={};try{r=await base.fetch(new Request(u,{method:'POST',headers:h,body:JSON.stringify({...body,canaryMode:'',confirmSubmit:true})}),env,ctx);try{out=await r.clone().json()}catch{}
+    const steps=Array.isArray(out?.detail?.steps)?out.detail.steps:Array.isArray(out?.steps)?out.steps:[],message=String(out?.message||out?.error||'');
+    if(r.ok&&out?.ok===true&&out?.submitted===true){const state=await writeVusicOne(env,{status:'submitted',attemptId,startedAt,finishedAt:new Date().toISOString(),title:safe(body.title,180),result:{provider:out.provider,pageUrl:out.pageUrl,message:out.message}});return json({ok:true,locked:true,state,result:out})}
+    const ambiguous=/final submit was clicked|confirmation text was not recognized/i.test(message)||steps.includes('review');
+    if(ambiguous){const state=await writeVusicOne(env,{status:'ambiguous',attemptId,startedAt,finishedAt:new Date().toISOString(),title:safe(body.title,180),reason:message||'Vusic reached review/final-submit boundary; automatic retries locked to prevent duplicate release.',result:out});return json({ok:false,locked:true,state,result:out},409)}
+    const browser429=out?.code==='VUSIC_BROWSER_FAILED'&&/429|rate limit/i.test(String(out?.error||out?.detail?.error||''))&&steps.length===0;
+    const state=await writeVusicOne(env,{status:'retryable',attemptId,startedAt,finishedAt:new Date().toISOString(),title:safe(body.title,180),reason:message||`HTTP ${r.status}`,browserRateLimited:browser429,result:out});return json({ok:false,locked:false,state,result:out},r.status||503)
+  }catch(e){const state=await writeVusicOne(env,{status:'retryable',attemptId,startedAt,finishedAt:new Date().toISOString(),title:safe(body.title,180),reason:safe(e?.message||e,700)});return json({ok:false,locked:false,state},503)}
+}
 
 async function readDirector(env,id){const o=await getSongFile(env,id,'analysis/director-plan.json');if(!o)return null;return o.json().catch(()=>null)}
 function hashtagList(xs=[]){return (Array.isArray(xs)?xs:[]).map(x=>String(x||'').trim()).filter(Boolean).map(x=>x.startsWith('#')?x:`#${x.replace(/[^\p{L}\p{N}_]/gu,'')}`).filter(x=>x.length>1).slice(0,12)}
@@ -41,9 +63,11 @@ async function youtubeRoute(request,env){const u=new URL(request.url);
 export default{
   async fetch(request,env,ctx){
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
+    if(u.pathname==='/api/vusic-one-release/status'&&request.method==='GET')return vusicOneStatus(request,env);
+    if(u.pathname==='/api/vusic-one-release/execute'&&request.method==='POST')return vusicOneExecute(request,env,ctx);
     if(u.pathname.startsWith('/api/youtube/')){try{return await youtubeRoute(request,env)}catch(e){return json({error:safe(e?.message||e,700)},503)}}
     if(u.pathname==='/api/browser/budget'&&request.method==='GET'){if(!(await authorised(request,env)))return json({error:'Ridge session login required'},401);return json(await browserBudget(env))}
-    if(u.pathname==='/api/resilience/health'&&request.method==='GET'){const r=await base.fetch(request,env,ctx);let b={};try{b=await r.clone().json()}catch{}return json({...b,ok:true,worker:'v11',youtube:youtubeCapabilities(env),browserBudgetRoute:'/api/browser/budget'})}
+    if(u.pathname==='/api/resilience/health'&&request.method==='GET'){const r=await base.fetch(request,env,ctx);let b={};try{b=await r.clone().json()}catch{}return json({...b,ok:true,worker:'v11',youtube:youtubeCapabilities(env),browserBudgetRoute:'/api/browser/budget',vusicOneRelease:{stateKey:VUSIC_ONE_KEY,idempotent:true}})}
     return base.fetch(request,env,ctx);
   },
   async scheduled(event,env,ctx){if(base.scheduled)return base.scheduled(event,env,ctx)}
