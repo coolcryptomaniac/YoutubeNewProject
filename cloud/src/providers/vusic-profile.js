@@ -3,7 +3,7 @@
 export const VUSIC_PROFILE=Object.freeze({
   email:'coolinfatuation@gmail.com',
   primaryArtist:'Mohit Pandey',composer:'Mohit Pandey',lyricist:'Mohit Pandey',label:'Vusic Records',copyrightOwner:'Vusic Records',signatory:'Mohit Pandey',
-  releasedPreviously:false,platforms:'all',explicitContent:false,releaseDateRule:'earliest-allowed',genre:'auto',language:'auto',finalSubmit:true,
+  releasedPreviously:false,platforms:'all',explicitContent:false,releaseDateRule:'earliest-allowed',genre:'auto',language:'auto',finalSubmit:false,
   choices:{
     releasedPreviously:['No','Not released before','Previously unreleased','New release'],
     platforms:['Select all','All platforms','All stores','All','Select All Stores','Every platform'],
