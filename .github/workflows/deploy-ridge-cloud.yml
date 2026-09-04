@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'cloud/**'
+      - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/deploy-ridge-cloud.yml'
 
 permissions:
@@ -30,12 +31,14 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Use current free NVIDIA NIM endpoint
+      - name: Validate adaptive free-first text configuration
         run: |
-          # The previous Meta Llama 3.3 endpoint reached NVIDIA EOL on 2026-08-26.
-          # Keep repository compatibility tests stable while deployments use NVIDIA's current free endpoint.
-          sed -i 's#meta/llama-3.3-70b-instruct#nvidia/nemotron-3.5-lightning-30b-a3b#g' wrangler.toml
-          grep -E 'NVIDIA_TEXT_MODEL|DIRECTOR_TEXT_MODEL' wrangler.toml
+          set -euo pipefail
+          grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK' wrangler.toml
+          ! grep -q 'meta/llama-3.3-70b-instruct' wrangler.toml
+          grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
+          node --check src/providers/text-refine.js
+          node --check src/worker-v8.js
       - name: Ensure global release staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -45,20 +48,27 @@ jobs:
           npx wrangler r2 bucket info ridge-release-media >/dev/null 2>&1
           found=$?
           if [ "$found" -ne 0 ]; then
-            echo "Creating free-tier R2 bucket ridge-release-media for cross-PoP Vusic uploads..."
+            echo "R2 is enabled but ridge-release-media is not visible yet; creating the bucket..."
             npx wrangler r2 bucket create ridge-release-media --location apac
-            found=$?
+            create_status=$?
+            if [ "$create_status" -eq 0 ]; then
+              sleep 2
+              npx wrangler r2 bucket info ridge-release-media >/dev/null 2>&1
+              found=$?
+            else
+              found=$create_status
+            fi
           fi
           if [ "$found" -eq 0 ]; then
             echo "RIDGE_R2_READY=1" >> "$GITHUB_ENV"
             echo "Global R2 release staging bucket is ready."
           else
             echo "RIDGE_R2_READY=0" >> "$GITHUB_ENV"
-            echo "::warning::R2 could not be provisioned. Ridge Cloud will deploy, but Android cloud final rendering and Vusic automatic media ingestion stay disabled until R2 is enabled in the Cloudflare Dashboard."
+            echo "::error::R2 is not ready. Ridge refuses edge-local staging because it is not crash-resistant."
+            exit 1
           fi
           set -e
       - name: Enable global release binding
-        if: env.RIDGE_R2_READY == '1'
         run: |
           cat >> wrangler.toml <<'EOF'
 
@@ -94,7 +104,7 @@ jobs:
             const caps=await fetch(base+'/api/release/capabilities',{headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
             assert.equal(caps.status,200,'Release capabilities authorization failed');
             const c=await caps.json();
-            if(process.env.RIDGE_R2_READY==='1')assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
+            assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
             console.log('Vusic capabilities:',JSON.stringify({configured:c.vusic?.configured,browserBound:c.vusic?.browserBound,mediaStaging:c.vusic?.mediaStaging,stagingMode:c.stagingMode}));
           }
           if(process.env.VUSIC_USERNAME&&process.env.VUSIC_PASSWORD&&process.env.RIDGE_ADMIN_TOKEN){
