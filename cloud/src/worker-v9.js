@@ -2,6 +2,7 @@
 
 import base from './worker-v8.js';
 import {authorizeAutomation,isAdmin,GITHUB_OIDC_INFO} from './providers/github-oidc.js';
+import {vusicAccountSmoke} from './providers/vusic-account-smoke.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range,X-Ridge-Session','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors}});
@@ -91,6 +92,16 @@ async function maybeBridgeGitHubAutomation(request,env,ctx,u){
   return auth?base.fetch(asAdminRequest(request,env),env,ctx):null;
 }
 
+async function accountSmokeRoute(request,env){
+  let allowed=admin(request,env);
+  if(!allowed)allowed=!!(await vusicCanaryAuth(request,env));
+  if(!allowed)allowed=!!(await vusicLiveProofAuth(request,env));
+  if(!allowed)return json({error:'Ridge Vusic automation authorization required'},401);
+  const body=await request.json().catch(()=>({}));
+  const out=await vusicAccountSmoke(env,body);
+  return json(out,out.ok?200:503);
+}
+
 export default{
   async fetch(request,env,ctx){
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
@@ -99,6 +110,7 @@ export default{
     if(u.pathname==='/api/render/claim'&&request.method==='POST')return claimRender(request,env);
     if(u.pathname.startsWith('/api/render/ack/')&&request.method==='POST')return ackRender(request,env);
     if(u.pathname.startsWith('/api/render/release-claim/')&&request.method==='POST')return releaseClaim(request,env);
+    if(u.pathname==='/api/release/vusic-account-smoke'&&request.method==='POST')return accountSmokeRoute(request,env);
     if(u.pathname.startsWith('/api/release/')){const bridged=await maybeBridgeGitHubAutomation(request,env,ctx,u);if(bridged)return bridged}
     if(u.pathname==='/api/resilience/health'&&request.method==='GET'){
       const upstream=await base.fetch(request,env,ctx);let body={};try{body=await upstream.clone().json()}catch{}
