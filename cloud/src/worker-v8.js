@@ -1,7 +1,7 @@
 'use strict';
 
 import base from './worker-v7.js';
-import {adaptiveRefine,adaptiveTextCapabilities} from './providers/text-refine.js';
+import {adaptiveRefine,adaptiveTextCapabilities} from './providers/text-refine-bounded.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range,X-Ridge-Session','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors}});
