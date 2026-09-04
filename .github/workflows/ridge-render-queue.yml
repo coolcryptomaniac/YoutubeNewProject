@@ -1,0 +1,84 @@
+name: Ridge R2 Render Queue
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ridge-r2-render-dispatcher
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
+      RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate dispatcher credentials
+        run: |
+          set -euo pipefail
+          test -n "$RIDGE_ADMIN_TOKEN"
+          test -n "$GH_TOKEN"
+
+      - name: Claim R2 jobs and dispatch cloud renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          for slot in 1 2 3 4; do
+            claim="$(curl --fail-with-body --silent --show-error --max-time 30 \
+              -X POST "$RIDGE_CLOUD_URL/api/render/claim" \
+              -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN")"
+
+            if [ "$(printf '%s' "$claim" | jq -r '.empty // false')" = "true" ]; then
+              echo "R2 render queue is empty."
+              exit 0
+            fi
+
+            id="$(printf '%s' "$claim" | jq -r '.job.id')"
+            claim_id="$(printf '%s' "$claim" | jq -r '.claimId')"
+            audio_url="$(printf '%s' "$claim" | jq -r '.job.audio_url')"
+            cover_url="$(printf '%s' "$claim" | jq -r '.job.cover_url // ""')"
+            mode="$(printf '%s' "$claim" | jq -r '.job.mode // "auto"')"
+            title_b64="$(printf '%s' "$claim" | jq -r '.job.title_b64')"
+            lyrics_b64="$(printf '%s' "$claim" | jq -r '.job.lyrics_b64 // ""')"
+            queries_b64="$(printf '%s' "$claim" | jq -r '.job.queries_b64 // ""')"
+            cloud_url="$(printf '%s' "$claim" | jq -r '.job.cloud_url')"
+            callback_url="$(printf '%s' "$claim" | jq -r '.job.callback_url')"
+
+            echo "Dispatching Ridge render $id from R2 queue (slot $slot)."
+            if gh workflow run ridge-cloud-render.yml \
+              --repo "$GITHUB_REPOSITORY" \
+              --ref main \
+              -f job_id="$id" \
+              -f audio_url="$audio_url" \
+              -f cover_url="$cover_url" \
+              -f mode="$mode" \
+              -f title_b64="$title_b64" \
+              -f lyrics_b64="$lyrics_b64" \
+              -f queries_b64="$queries_b64" \
+              -f cloud_url="$cloud_url" \
+              -f callback_url="$callback_url"; then
+              curl --fail-with-body --silent --show-error --max-time 30 \
+                -X POST "$RIDGE_CLOUD_URL/api/render/ack/$id" \
+                -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+                -H 'Content-Type: application/json' \
+                --data "$(jq -nc --arg claimId "$claim_id" '{claimId:$claimId}')"
+              echo
+            else
+              curl --silent --show-error --max-time 30 \
+                -X POST "$RIDGE_CLOUD_URL/api/render/release-claim/$id" \
+                -H "Authorization: Bearer $RIDGE_ADMIN_TOKEN" \
+                -H 'Content-Type: application/json' \
+                --data "$(jq -nc --arg claimId "$claim_id" '{claimId:$claimId}')" || true
+              echo "GitHub dispatch failed for $id; lease released so the next scheduled run can retry."
+              exit 1
+            fi
+          done
