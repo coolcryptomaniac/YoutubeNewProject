@@ -8,6 +8,7 @@ on:
       - 'studio-v3-resilience.js'
       - 'cloud/**'
       - 'tests/ridge-resilience-v7-selftest.mjs'
+      - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - 'studio-v3-resilience.js'
       - 'cloud/**'
       - 'tests/ridge-resilience-v7-selftest.mjs'
+      - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
   schedule:
     - cron: '11 2 * * *'
@@ -37,12 +39,28 @@ jobs:
         run: |
           node --check cloud/src/worker-v7.js
           node --check cloud/src/worker-v8.js
+          node --check cloud/src/providers/text-refine.js
           node --check cloud/src/providers/vusic.js
           node --check studio-v3-cloud-first.js
           node --check studio-v3-mobile-cloud.js
           node --check studio-v3-resilience.js
       - name: Crash-resistance contracts
         run: node tests/ridge-resilience-v7-selftest.mjs
+      - name: Adaptive text fallback contracts
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const text=fs.readFileSync('cloud/src/providers/text-refine.js','utf8');
+          const worker=fs.readFileSync('cloud/src/worker-v8.js','utf8');
+          const wr=fs.readFileSync('cloud/wrangler.toml','utf8');
+          if(text.includes('meta/llama-3.3-70b-instruct'))throw new Error('retired NVIDIA model must not be a candidate');
+          if(!text.includes("provider:'bypass'")||!text.includes('paidFallback:false'))throw new Error('safe keep-current bypass missing');
+          if(!text.includes('ALLOW_GROQ_TEXT_FALLBACK'))throw new Error('Groq paid-use gate missing');
+          if(!worker.includes("/api/text/refine")||!worker.includes("/api/nvidia/refine"))throw new Error('adaptive/legacy routes missing');
+          if(!wr.includes('TEXT_PROVIDER_ORDER')||!wr.includes('NVIDIA_TEXT_MODELS')||!wr.includes('CF_TEXT_MODELS'))throw new Error('adaptive model pools missing');
+          if(!wr.includes('ALLOW_GROQ_TEXT_FALLBACK = "false"'))throw new Error('Groq must default off');
+          console.log('Adaptive free-first text contracts: PASS');
+          NODE
 
   live-health:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
