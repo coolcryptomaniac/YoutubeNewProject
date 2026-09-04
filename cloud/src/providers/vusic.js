@@ -2,12 +2,21 @@ import puppeteer from '@cloudflare/puppeteer';
 import {VUSIC_PROFILE,normalizeVusicRelease} from './vusic-profile.js';
 import {gotoVusic,waitVusicNavigation,retryVusicAction} from './vusic-navigation.js';
 
-const safe=(v,n=4000)=>String(v??'').trim().slice(0,n),sleep=ms=>new Promise(r=>setTimeout(r,ms));
-export class VusicProviderError extends Error{constructor(message,{status=502,code='VUSIC_PROVIDER_ERROR',detail=null}={}){super(message);this.name='VusicProviderError';this.status=status;this.code=code;this.detail=detail;}}
+const safe=(v,n=4000)=>String(v??'').trim().slice(0,n);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+export class VusicProviderError extends Error{
+  constructor(message,{status=502,code='VUSIC_PROVIDER_ERROR',detail=null}={}){
+    super(message);this.name='VusicProviderError';this.status=status;this.code=code;this.detail=detail;
+  }
+}
 const defaults={login:'https://vusicstudio.com/?login=true',release:'https://vusicstudio.com/song-release',single:'https://vusicstudio.com/single-song-release'};
 export function vusicCapabilities(env){return{configured:!!(env.BROWSER&&env.VUSIC_USERNAME&&env.VUSIC_PASSWORD),mode:'browser-automation',credentialsServerSide:true,browserBound:!!env.BROWSER,mediaStaging:!!env.RELEASE_MEDIA,profileDriven:true,fallbackChoices:true,canaryModes:['login','pre-agreement','review','live-submit'],workflow:['login','create-release','single','assets','go-live-date','song-details','artist','platforms','agreement','review'],navigationMode:'domcontentloaded-bounded',note:'Deterministic Browser Run executes Vusic. Scheduled canaries stop before the legal agreement; CAPTCHA/OTP is never bypassed.'};}
 async function bodyText(page){return safe(await retryVusicAction(()=>page.evaluate(()=>document.body?.innerText||'')),16000)}
-async function humanGate(page){const otp=await retryVusicAction(()=>page.$('input[autocomplete="one-time-code"],input[name*="otp" i],input[name*="code" i]')),text=await bodyText(page);if(otp||/captcha|verify you are human|security code|two[- ]factor|one[- ]time password|\botp\b/i.test(text))throw new VusicProviderError('Vusic requires CAPTCHA/OTP or another human verification step',{status:409,code:'VUSIC_HUMAN_VERIFICATION_REQUIRED',detail:{url:page.url()}});}
+async function humanGate(page){
+  const otp=await retryVusicAction(()=>page.$('input[autocomplete="one-time-code"],input[name*="otp" i],input[name*="code" i]'));
+  const text=await bodyText(page);
+  if(otp||/captcha|verify you are human|security code|two[- ]factor|one[- ]time password|\botp\b/i.test(text))throw new VusicProviderError('Vusic requires CAPTCHA/OTP or another human verification step',{status:409,code:'VUSIC_HUMAN_VERIFICATION_REQUIRED',detail:{url:page.url()}});
+}
 async function settle(page,ms=750){await sleep(ms);await humanGate(page)}
 async function stableGoto(page,url,timeout=30000){await gotoVusic(page,url,{timeout,settleMs:700,onSettled:humanGate})}
 async function stableNavigation(page,timeout=12000){await waitVusicNavigation(page,{timeout,settleMs:650,onSettled:humanGate})}
@@ -15,19 +24,83 @@ async function first(page,selector,label){const el=await retryVusicAction(()=>pa
 async function fill(page,selector,value,label){if(!value)return false;return retryVusicAction(async()=>{const el=await first(page,selector,label);await el.click({clickCount:3});await page.keyboard.press('Backspace').catch(()=>{});await el.type(String(value),{delay:6});return true})}
 async function click(page,selector,label){return retryVusicAction(async()=>{const el=await first(page,selector,label);await el.click();return true})}
 const arr=x=>Array.isArray(x)?x:[x];
-async function clickText(page,patterns,label,{optional=false}={}){const list=arr(patterns).filter(Boolean).map(x=>String(x).toLowerCase());const hit=await retryVusicAction(()=>page.evaluate(needles=>{const norm=s=>String(s||'').trim().toLowerCase(),visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&r.width>0&&r.height>0};const els=[...document.querySelectorAll('button,a,[role="button"],label,span,div')].filter(visible);for(const needle of needles){let e=els.find(x=>norm(x.innerText||x.textContent)===needle)||els.find(x=>norm(x.innerText||x.textContent).includes(needle));if(e){e.click();return true}}return false},list));if(!hit&&!optional)throw new VusicProviderError(`Could not find Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns:list,url:page.url()}});return hit}
+async function clickText(page,patterns,label,{optional=false}={}){
+  const list=arr(patterns).filter(Boolean).map(x=>String(x).toLowerCase());
+  const hit=await retryVusicAction(()=>page.evaluate(needles=>{const norm=s=>String(s||'').trim().toLowerCase(),visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&r.width>0&&r.height>0};const els=[...document.querySelectorAll('button,a,[role="button"],label,span,div')].filter(visible);for(const needle of needles){let e=els.find(x=>norm(x.innerText||x.textContent)===needle)||els.find(x=>norm(x.innerText||x.textContent).includes(needle));if(e){e.click();return true}}return false},list));
+  if(!hit&&!optional)throw new VusicProviderError(`Could not find Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns:list,url:page.url()}});
+  return hit;
+}
 async function chooseText(page,patterns,label,{optional=false}={}){for(const p of arr(patterns)){if(await clickText(page,[p],label,{optional:true})){await settle(page,250);return p}}if(!optional)throw new VusicProviderError(`Could not choose Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns,url:page.url()}});return null}
-async function inputByLabel(page,labelPatterns,value,{optional=false,type=null}={}){if(value==null||value==='')return false;const patterns=arr(labelPatterns).map(x=>String(x).toLowerCase());const found=await retryVusicAction(()=>page.evaluate(({patterns,value,type})=>{const norm=s=>String(s||'').trim().toLowerCase(),inputs=[...document.querySelectorAll(type?`input[type="${type}"]`:'input,textarea')];let target=null;for(const label of document.querySelectorAll('label')){const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(p)))continue;target=label.htmlFor?document.getElementById(label.htmlFor):label.querySelector('input,textarea')||label.parentElement?.querySelector('input,textarea');if(target)break}if(!target)target=inputs.find(i=>patterns.some(p=>norm(i.placeholder).includes(p)||norm(i.name).includes(p)||norm(i.id).includes(p)))||null;if(!target)return false;const proto=Object.getPrototypeOf(target),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(target,String(value)):target.value=String(value);target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));return true},{patterns,value:String(value),type}));if(!found&&!optional)throw new VusicProviderError(`Could not fill Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url()}});return found}
-async function selectByLabel(page,labelPatterns,values,{optional=false}={}){const patterns=arr(labelPatterns).map(x=>String(x).toLowerCase()),choices=arr(values).filter(Boolean).map(String);const found=await retryVusicAction(()=>page.evaluate(({patterns,choices})=>{const norm=s=>String(s||'').trim().toLowerCase();let target=null;for(const label of document.querySelectorAll('label')){const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(p)))continue;target=label.htmlFor?document.getElementById(label.htmlFor):label.parentElement?.querySelector('select');if(target)break}if(!target)target=[...document.querySelectorAll('select')].find(s=>patterns.some(p=>norm(s.name).includes(p)||norm(s.id).includes(p)))||null;if(!target)return'';for(const value of choices){const opt=[...target.options].find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt){target.value=opt.value;target.dispatchEvent(new Event('change',{bubbles:true}));return value}}return''},{patterns,choices}));if(!found&&!optional)throw new VusicProviderError(`Could not select Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{choices,url:page.url()}});return found||null}
+async function inputByLabel(page,labelPatterns,value,{optional=false,type=null}={}){
+  if(value==null||value==='')return false;
+  const patterns=arr(labelPatterns).map(x=>String(x).toLowerCase());
+  const found=await retryVusicAction(()=>page.evaluate(({patterns,value,type})=>{const norm=s=>String(s||'').trim().toLowerCase(),inputs=[...document.querySelectorAll(type?`input[type="${type}"]`:'input,textarea')];let target=null;for(const label of document.querySelectorAll('label')){const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(p)))continue;target=label.htmlFor?document.getElementById(label.htmlFor):label.querySelector('input,textarea')||label.parentElement?.querySelector('input,textarea');if(target)break}if(!target)target=inputs.find(i=>patterns.some(p=>norm(i.placeholder).includes(p)||norm(i.name).includes(p)||norm(i.id).includes(p)))||null;if(!target)return false;const proto=Object.getPrototypeOf(target),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(target,String(value)):target.value=String(value);target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));return true},{patterns,value:String(value),type}));
+  if(!found&&!optional)throw new VusicProviderError(`Could not fill Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url()}});
+  return found;
+}
+async function selectByLabel(page,labelPatterns,values,{optional=false}={}){
+  const patterns=arr(labelPatterns).map(x=>String(x).toLowerCase()),choices=arr(values).filter(Boolean).map(String);
+  const found=await retryVusicAction(()=>page.evaluate(({patterns,choices})=>{const norm=s=>String(s||'').trim().toLowerCase();let target=null;for(const label of document.querySelectorAll('label')){const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(p)))continue;target=label.htmlFor?document.getElementById(label.htmlFor):label.parentElement?.querySelector('select');if(target)break}if(!target)target=[...document.querySelectorAll('select')].find(s=>patterns.some(p=>norm(s.name).includes(p)||norm(s.id).includes(p)))||null;if(!target)return'';for(const value of choices){const opt=[...target.options].find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt){target.value=opt.value;target.dispatchEvent(new Event('change',{bubbles:true}));return value}}return''},{patterns,choices}));
+  if(!found&&!optional)throw new VusicProviderError(`Could not select Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{choices,url:page.url()}});
+  return found||null;
+}
 async function chooseField(page,labels,values,label,{optional=true}={}){const selected=await selectByLabel(page,labels,values,{optional:true});if(selected)return selected;await clickText(page,labels,label,{optional:true});const clicked=await chooseText(page,values,label,{optional:true});if(clicked)return clicked;if(!optional)throw new VusicProviderError(`Could not choose ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{values,url:page.url()}});return null}
-async function attachRemoteFile(page,selector,url,name,mime){if(!url)throw new VusicProviderError(`${name} staging URL is required`,{status:400,code:'VUSIC_MEDIA_REQUIRED'});const found=await retryVusicAction(()=>page.$(selector));if(!found)throw new VusicProviderError(`Vusic ${name} upload field was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{selector,url:page.url()}});const result=await retryVusicAction(()=>page.evaluate(async({selector,url,name,mime})=>{const input=document.querySelector(selector);if(!input)return{ok:false,error:'input missing'};const r=await fetch(url);if(!r.ok)return{ok:false,error:`media fetch ${r.status}`};const blob=await r.blob(),file=new File([blob],name,{type:mime||blob.type||'application/octet-stream'}),dt=new DataTransfer();dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return{ok:true,size:file.size,type:file.type}},{selector,url,name,mime}));if(!result?.ok)throw new VusicProviderError(`Could not attach ${name}: ${result?.error||'unknown error'}`,{status:502,code:'VUSIC_FILE_ATTACH_FAILED'});return result}
+
+async function fileInputSnapshot(page){
+  return retryVusicAction(()=>page.evaluate(()=>[...document.querySelectorAll('input[type="file"]')].map((i,index)=>({index,accept:i.getAttribute('accept')||'',name:i.getAttribute('name')||'',id:i.id||'',aria:i.getAttribute('aria-label')||'',multiple:i.multiple,context:(i.closest('label,section,article,div')?.innerText||'').trim().slice(0,240)}))));
+}
+async function attachRemoteFile(page,selector,url,name,mime){
+  if(!url)throw new VusicProviderError(`${name} staging URL is required`,{status:400,code:'VUSIC_MEDIA_REQUIRED'});
+  const kind=/^image\//i.test(mime)?'image':'audio';
+  let result=null;
+  for(let attempt=0;attempt<8;attempt++){
+    result=await retryVusicAction(()=>page.evaluate(async({selector,url,name,mime,kind})=>{
+      const norm=s=>String(s||'').toLowerCase();
+      const inputs=[...document.querySelectorAll('input[type="file"]')];
+      let input=null;
+      try{input=document.querySelector(selector)}catch{}
+      if(!input){
+        const scored=inputs.map((el,index)=>{
+          let context='';let p=el;
+          for(let n=0;n<4&&p;n++,p=p.parentElement)context+=' '+(p.innerText||'');
+          const hay=norm([el.accept,el.name,el.id,el.getAttribute('aria-label'),context].filter(Boolean).join(' '));
+          let score=0;
+          if(kind==='audio'){
+            if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score+=12;
+            if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score-=14;
+          }else{
+            if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score+=12;
+            if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score-=14;
+          }
+          return{el,index,score};
+        }).sort((a,b)=>b.score-a.score);
+        if(scored[0]?.score>0)input=scored[0].el;
+      }
+      if(!input)return{ok:false,error:'input missing',retryable:true,fileCount:inputs.length};
+      const r=await fetch(url);
+      if(!r.ok)return{ok:false,error:`media fetch ${r.status}`};
+      const blob=await r.blob(),file=new File([blob],name,{type:mime||blob.type||'application/octet-stream'}),dt=new DataTransfer();
+      dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+      return{ok:true,size:file.size,type:file.type};
+    },{selector,url,name,mime,kind}));
+    if(result?.ok)return result;
+    if(!result?.retryable)break;
+    await sleep(650+attempt*350);
+    await humanGate(page);
+  }
+  const inputs=await fileInputSnapshot(page).catch(()=>[]);
+  throw new VusicProviderError(`Vusic ${name} upload field was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{selector,kind,url:page.url(),fileInputs:inputs}});
+}
 async function next(page){await chooseText(page,['Next Step','Next','Continue','Save & Continue'],'Next Step');await settle(page,850)}
 function candidates(primary,fallback){return [...new Set([primary,...arr(fallback)].filter(Boolean))]}
 
 export async function distributeVusic(env,input={}){
-  const caps=vusicCapabilities(env);if(!caps.configured)throw new VusicProviderError('Vusic browser automation is not fully configured',{status:503,code:'VUSIC_NOT_CONFIGURED',detail:caps});const release=normalizeVusicRelease(input),fb=release.choiceFallbacks||VUSIC_PROFILE.choices;
-  const canary=safe(input.canaryMode||release.canaryMode,40);const title=safe(release.title,180),artist=safe(release.primaryArtist||release.artist,180);if(!title||!artist)throw new VusicProviderError('title and primary artist are required',{status:400,code:'BAD_REQUEST'});
-  const urls={login:safe(env.VUSIC_LOGIN_URL||defaults.login,500),release:safe(env.VUSIC_NEW_RELEASE_URL||defaults.release,500),single:safe(env.VUSIC_SINGLE_RELEASE_URL||defaults.single,500)},selectors={loginUser:safe(env.VUSIC_LOGIN_USER_SELECTOR||'input[type="email"],input[name*="email" i],input[name*="user" i]',500),loginPassword:safe(env.VUSIC_LOGIN_PASSWORD_SELECTOR||'input[type="password"]',500),loginSubmit:safe(env.VUSIC_LOGIN_SUBMIT_SELECTOR||'button[type="submit"],input[type="submit"]',500),audio:safe(env.VUSIC_AUDIO_SELECTOR||'input[type="file"][accept*="audio"],input[name*="audio" i]',500),artwork:safe(env.VUSIC_ARTWORK_SELECTOR||'input[type="file"][accept*="image"],input[name*="art" i],input[name*="cover" i]',500)};
+  const caps=vusicCapabilities(env);if(!caps.configured)throw new VusicProviderError('Vusic browser automation is not fully configured',{status:503,code:'VUSIC_NOT_CONFIGURED',detail:caps});
+  const release=normalizeVusicRelease(input),fb=release.choiceFallbacks||VUSIC_PROFILE.choices;
+  const canary=safe(input.canaryMode||release.canaryMode,40),title=safe(release.title,180),artist=safe(release.primaryArtist||release.artist,180);
+  if(!title||!artist)throw new VusicProviderError('title and primary artist are required',{status:400,code:'BAD_REQUEST'});
+  const urls={login:safe(env.VUSIC_LOGIN_URL||defaults.login,500),release:safe(env.VUSIC_NEW_RELEASE_URL||defaults.release,500),single:safe(env.VUSIC_SINGLE_RELEASE_URL||defaults.single,500)};
+  const selectors={loginUser:safe(env.VUSIC_LOGIN_USER_SELECTOR||'input[type="email"],input[name*="email" i],input[name*="user" i]',500),loginPassword:safe(env.VUSIC_LOGIN_PASSWORD_SELECTOR||'input[type="password"]',500),loginSubmit:safe(env.VUSIC_LOGIN_SUBMIT_SELECTOR||'button[type="submit"],input[type="submit"]',500),audio:safe(env.VUSIC_AUDIO_SELECTOR||'input[type="file"][accept*="audio"],input[type="file"][accept*=".wav"],input[type="file"][accept*=".mp3"],input[name*="audio" i],input[name*="song" i],input[name*="track" i]',500),artwork:safe(env.VUSIC_ARTWORK_SELECTOR||'input[type="file"][accept*="image"],input[type="file"][accept*=".png"],input[type="file"][accept*=".jpg"],input[name*="art" i],input[name*="cover" i]',500)};
   let browser,pageRef=null;const steps=[];const mark=s=>steps.push({step:s,url:pageRef?.url?.()||''});
   try{
     browser=await puppeteer.launch(env.BROWSER);const page=pageRef=await browser.newPage();
@@ -37,7 +110,10 @@ export async function distributeVusic(env,input={}){
     if(!/\/single-song(?:-release)?(?:[/?#]|$)/i.test(page.url())){await chooseText(page,['Upload Single','Single','Create New Release'],'Upload Single');await stableNavigation(page)}
     if(!/\/single-song(?:-release)?(?:[/?#]|$)/i.test(page.url()))await stableGoto(page,urls.single);
     await settle(page,900);mark('single');
-    await attachRemoteFile(page,selectors.artwork,safe(release.artworkUrl,2000),safe(release.artworkName||`${title}-cover.jpg`,180),safe(release.artworkType||'image/jpeg',120));await attachRemoteFile(page,selectors.audio,safe(release.audioUrl,2000),safe(release.audioName||`${title}.wav`,180),safe(release.audioType||'audio/wav',120));await settle(page,1100);mark('assets');await next(page);
+    await attachRemoteFile(page,selectors.artwork,safe(release.artworkUrl,2000),safe(release.artworkName||`${title}-cover.jpg`,180),safe(release.artworkType||'image/jpeg',120));
+    await settle(page,700);
+    await attachRemoteFile(page,selectors.audio,safe(release.audioUrl,2000),safe(release.audioName||`${title}.wav`,180),safe(release.audioType||'audio/wav',120));
+    await settle(page,1100);mark('assets');await next(page);
     const releaseDate=safe(release.releaseDate||release.goLiveDate,30);if(releaseDate)await inputByLabel(page,['go live date','release date'],releaseDate,{type:'date',optional:true}).catch(()=>inputByLabel(page,['go live date','release date'],releaseDate,{optional:true}));await chooseField(page,['previously released','released previously','already released'],release.releasedPreviously?['Yes']:candidates('No',fb.releasedPreviously),'previously released',{optional:true});mark('go-live-date');await next(page);
     await inputByLabel(page,['song title','title'],title);const genreKey=safe(release.genre||'default',80),genreValues=candidates(genreKey,fb.genre?.[genreKey]||fb.genre?.default||[]);await chooseField(page,['genre'],genreValues,'genre',{optional:true});const languageKey=safe(release.language||'default',80),languageValues=candidates(languageKey,fb.language?.[languageKey]||fb.language?.default||[]);await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});await inputByLabel(page,['lyrics','song lyrics'],safe(release.lyrics,12000),{optional:true});await inputByLabel(page,['composer'],safe(release.composer||artist,180),{optional:true});await inputByLabel(page,['lyricist','lyrics writer','writer'],safe(release.lyricist||artist,180),{optional:true});await inputByLabel(page,['label','record label'],safe(release.label,180),{optional:true});await inputByLabel(page,['copyright owner','copyright'],safe(release.copyrightOwner,180),{optional:true});mark('song-details');await next(page);
     await chooseField(page,['primary artist','select artist','artist'],[artist],'Primary Artist',{optional:true});await inputByLabel(page,['composer'],safe(release.composer||artist,180),{optional:true});await inputByLabel(page,['lyricist','lyrics writer'],safe(release.lyricist||artist,180),{optional:true});mark('artist');await next(page);
