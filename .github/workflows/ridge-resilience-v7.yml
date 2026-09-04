@@ -1,4 +1,4 @@
-name: Ridge Resilience v8
+name: Ridge Resilience v9
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ on:
       - 'tests/ridge-resilience-v7-selftest.mjs'
       - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
+      - '.github/workflows/ridge-render-queue.yml'
   push:
     branches: [main]
     paths:
@@ -20,6 +21,7 @@ on:
       - 'tests/ridge-resilience-v7-selftest.mjs'
       - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
+      - '.github/workflows/ridge-render-queue.yml'
   schedule:
     - cron: '11 2 * * *'
   workflow_dispatch:
@@ -39,12 +41,13 @@ jobs:
         run: |
           node --check cloud/src/worker-v7.js
           node --check cloud/src/worker-v8.js
+          node --check cloud/src/worker-v9.js
           node --check cloud/src/providers/text-refine.js
           node --check cloud/src/providers/vusic.js
           node --check studio-v3-cloud-first.js
           node --check studio-v3-mobile-cloud.js
           node --check studio-v3-resilience.js
-      - name: Crash-resistance contracts
+      - name: Crash-resistance and queue contracts
         run: node tests/ridge-resilience-v7-selftest.mjs
       - name: Adaptive text fallback contracts
         run: |
@@ -52,14 +55,17 @@ jobs:
           import fs from 'node:fs';
           const text=fs.readFileSync('cloud/src/providers/text-refine.js','utf8');
           const worker=fs.readFileSync('cloud/src/worker-v8.js','utf8');
+          const queue=fs.readFileSync('cloud/src/worker-v9.js','utf8');
           const wr=fs.readFileSync('cloud/wrangler.toml','utf8');
           if(text.includes('meta/llama-3.3-70b-instruct'))throw new Error('retired NVIDIA model must not be a candidate');
           if(!text.includes("provider:'bypass'")||!text.includes('paidFallback:false'))throw new Error('safe keep-current bypass missing');
           if(!text.includes('ALLOW_GROQ_TEXT_FALLBACK'))throw new Error('Groq paid-use gate missing');
           if(!worker.includes("/api/text/refine")||!worker.includes("/api/nvidia/refine"))throw new Error('adaptive/legacy routes missing');
+          if(!queue.includes('r2-github-scheduler')||!queue.includes('/api/render/claim'))throw new Error('R2 render scheduler missing');
           if(!wr.includes('TEXT_PROVIDER_ORDER')||!wr.includes('NVIDIA_TEXT_MODELS')||!wr.includes('CF_TEXT_MODELS'))throw new Error('adaptive model pools missing');
           if(!wr.includes('ALLOW_GROQ_TEXT_FALLBACK = "false"'))throw new Error('Groq must default off');
-          console.log('Adaptive free-first text contracts: PASS');
+          if(!wr.includes('main = "src/worker-v9.js"'))throw new Error('worker v9 must be deployed');
+          console.log('Adaptive free-first text + R2 scheduler contracts: PASS');
           NODE
 
   live-health:
@@ -73,4 +79,4 @@ jobs:
           set -euo pipefail
           body="$(curl --fail --silent --show-error --max-time 20 "$RIDGE_CLOUD_URL/api/resilience/health")"
           echo "$body"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.githubRender||x.paidFallback!==false||x.localFinalRender!==false) process.exit(1)' "$body"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.adminConfigured||!x.githubRender||x.renderTransport!=="r2-github-scheduler"||x.paidFallback!==false||x.localFinalRender!==false) process.exit(1)' "$body"

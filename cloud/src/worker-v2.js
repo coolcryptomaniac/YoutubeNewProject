@@ -17,12 +17,14 @@ function cacheStageRequest(request,name){const u=new URL(request.url);u.pathname
 async function stageUpload(request,env){
   const form=await request.formData().catch(()=>null),file=form?.get('file');if(!(file instanceof File))return json({error:'multipart file field required'},400);
   const max=60*1024*1024;if(file.size>max)return json({error:'file exceeds 60 MB staging limit'},413);
-  const id=crypto.randomUUID(),ext=(file.name.match(/\.[a-z0-9]{1,8}$/i)||[''])[0].toLowerCase(),name=`${id}${ext}`,key=`release-stage/${name}`,expires=Date.now()+20*60*1000,origin=new URL(request.url).origin;
+  // Two hours covers the five-minute R2 queue pickup plus GitHub runner delays.
+  // Expired objects are still removed by Ridge's scheduled R2 cleanup.
+  const id=crypto.randomUUID(),ext=(file.name.match(/\.[a-z0-9]{1,8}$/i)||[''])[0].toLowerCase(),name=`${id}${ext}`,key=`release-stage/${name}`,expires=Date.now()+2*60*60*1000,origin=new URL(request.url).origin;
   if(env.RELEASE_MEDIA){
     await env.RELEASE_MEDIA.put(key,file.stream(),{httpMetadata:{contentType:file.type||'application/octet-stream'},customMetadata:{expires:String(expires),name:safe(file.name,180)}});
     return json({ok:true,id,key,url:`${origin}/api/release/stage/${encodeURIComponent(name)}`,name:file.name,type:file.type,size:file.size,expiresAt:new Date(expires).toISOString(),storage:'r2'});
   }
-  const headers=new Headers({'Content-Type':file.type||'application/octet-stream','Cache-Control':'public, max-age=1200','X-Ridge-Expires':String(expires),'X-Ridge-Name':encodeURIComponent(safe(file.name,180)),...cors});
+  const headers=new Headers({'Content-Type':file.type||'application/octet-stream','Cache-Control':'public, max-age=7200','X-Ridge-Expires':String(expires),'X-Ridge-Name':encodeURIComponent(safe(file.name,180)),...cors});
   await caches.default.put(cacheStageRequest(request,name),new Response(file.stream(),{headers}));
   return json({ok:true,id,key:`cache-stage/${name}`,url:`${origin}/api/release/stage/${encodeURIComponent(name)}`,name:file.name,type:file.type,size:file.size,expiresAt:new Date(expires).toISOString(),storage:'worker-cache'});
 }
