@@ -1,5 +1,5 @@
 name = "ridge-cloud-media"
-main = "src/worker-v9.js"
+main = "src/worker-v10.js"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat"]
 
@@ -16,6 +16,7 @@ crons = ["17 * * * *"]
 HF_VIDEO_MODEL = "Lightricks/LTX-Video-0.9.8-13B-distilled"
 FREE_VIDEO_ONLY = "true"
 RIDGE_PAID_FALLBACK = "false"
+YOUTUBE_DAILY_UPLOAD_CAP = "10"
 
 # Text refinement is optional and free-first. Ridge tries candidates in order,
 # skips retired/out-of-capacity models, and finally keeps the canonical package.
