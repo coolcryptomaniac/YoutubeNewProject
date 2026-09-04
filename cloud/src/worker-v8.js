@@ -1,6 +1,7 @@
 'use strict';
 
 import base from './worker-v7.js';
+import {adaptiveRefine,adaptiveTextCapabilities} from './providers/text-refine.js';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type,Authorization,Range,X-Ridge-Session','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'};
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...cors}});
@@ -34,10 +35,19 @@ async function statusWithStaleGuard(request,env,ctx,kind){
   await writeStatus(env,kind==='pipeline'?pipelineStatusKey(id):mobileStatusKey(id),failed);return json(failed);
 }
 
+async function adaptiveHealth(request,env,ctx){
+  const baseHealth=await base.fetch(request,env,ctx);let body={ok:baseHealth.ok};
+  try{body=await baseHealth.clone().json()}catch{}
+  const textRefine=adaptiveTextCapabilities(env);
+  return json({...body,ok:true,textRefine,nvidia:!!env.NVIDIA_API_KEY,nvidiaModel:null,adaptiveTextRefine:true,paidTextFallback:false});
+}
+
 export default{
   async fetch(request,env,ctx){
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors});const u=new URL(request.url);
-    if(u.pathname==='/api/resilience/health'&&request.method==='GET')return json({ok:true,worker:'v8',r2:!!env.RELEASE_MEDIA,githubRender:!!env.RIDGE_GITHUB_TOKEN,browserRun:!!env.BROWSER,vusicConfigured:!!(env.BROWSER&&env.VUSIC_USERNAME&&env.VUSIC_PASSWORD),paidFallback:false,localFinalRender:false,failureCallbacks:true,staleJobRecovery:true});
+    if(u.pathname==='/api/health'&&request.method==='GET')return adaptiveHealth(request,env,ctx);
+    if((u.pathname==='/api/text/refine'||u.pathname==='/api/nvidia/refine')&&request.method==='POST'){const out=await adaptiveRefine(request,env);return json(out.body,out.status)}
+    if(u.pathname==='/api/resilience/health'&&request.method==='GET')return json({ok:true,worker:'v8',r2:!!env.RELEASE_MEDIA,githubRender:!!env.RIDGE_GITHUB_TOKEN,browserRun:!!env.BROWSER,vusicConfigured:!!(env.BROWSER&&env.VUSIC_USERNAME&&env.VUSIC_PASSWORD),paidFallback:false,localFinalRender:false,failureCallbacks:true,staleJobRecovery:true,textRefine:adaptiveTextCapabilities(env)});
     if(u.pathname.startsWith('/api/mobile/render-failure/'))return failureCallback(request,env,'mobile');
     if(u.pathname.startsWith('/api/pipeline/render-failure/'))return failureCallback(request,env,'pipeline');
     if(u.pathname.startsWith('/api/render/status/')&&request.method==='GET')return statusWithStaleGuard(request,env,ctx,'mobile');
