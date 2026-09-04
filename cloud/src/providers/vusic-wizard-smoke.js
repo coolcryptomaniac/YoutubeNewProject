@@ -26,9 +26,9 @@ async function snapshot(page){return retryVusicAction(()=>page.evaluate(()=>{
   const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
   const inputs=[...document.querySelectorAll('input,textarea,select')].filter(visible).slice(0,24).map((e,index)=>({index,tag:e.tagName.toLowerCase(),type:e.type||'',name:e.name||'',id:e.id||'',placeholder:e.placeholder||'',aria:e.getAttribute('aria-label')||'',accept:e.getAttribute('accept')||'',files:e.files?.length||0,disabled:!!e.disabled,context:norm(e.closest('label,fieldset,section,article,div')?.innerText||'').slice(0,140)}));
   const allFileInputs=[...document.querySelectorAll('input[type="file"]')].map((e,index)=>({index,accept:e.getAttribute('accept')||'',name:e.name||'',id:e.id||'',aria:e.getAttribute('aria-label')||'',files:e.files?.length||0}));
-  const buttons=[...document.querySelectorAll('button,[role="button"],a')].filter(visible).map((e,index)=>({index,text:norm(e.innerText||e.textContent).slice(0,100),disabled:!!(e.disabled||e.getAttribute('aria-disabled')==='true'),tag:e.tagName.toLowerCase()})).filter(x=>x.text).slice(0,40);
+  const buttons=[...document.querySelectorAll('button,[role="button"],a')].filter(visible).map((e,index)=>({index,text:norm(e.innerText||e.textContent).slice(0,100),disabled:!!(e.disabled||e.getAttribute('aria-disabled')==='true'),tag:e.tagName.toLowerCase()})).filter(x=>x.text).slice(0,48);
   const text=norm(document.body?.innerText||'');
-  const notices=[...document.querySelectorAll('[role="alert"],.alert,.error,.success,.toast,[class*="error" i],[class*="success" i],[class*="upload" i],[class*="progress" i]')].filter(visible).map(e=>norm(e.innerText||e.textContent).slice(0,160)).filter(Boolean).slice(0,20);
+  const notices=[...document.querySelectorAll('[role="alert"],.alert,.error,.success,.toast,[class*="error" i],[class*="success" i],[class*="upload" i],[class*="progress" i]')].filter(visible).map(e=>norm(e.innerText||e.textContent).slice(0,180)).filter(Boolean).slice(0,24);
   return{url:location.href,inputs,allFileInputs,buttons,notices,textFlags:{uploading:/uploading|please wait|processing|progress/i.test(text),uploaded:/uploaded|upload complete|successfully uploaded|upload successful|ready/i.test(text),goLive:/go live date|release date|live date|previously released|already released/i.test(text),songDetails:/song title|song name|track title|genre|language/i.test(text),agreement:/agreement|signatory|sign the agreement/i.test(text)}};
 }))}
 
@@ -44,11 +44,9 @@ async function attachRemoteFile(page,selector,url,name,mime,kind){
   for(let attempt=0;attempt<10;attempt++){
     last=await retryVusicAction(()=>page.evaluate(async({selector,url,name,mime,kind})=>{
       const norm=s=>String(s||'').toLowerCase(),inputs=[...document.querySelectorAll('input[type="file"]')];
-      let input=null;
-      try{input=document.querySelector(selector)}catch{}
+      let input=null;try{input=document.querySelector(selector)}catch{}
       if(!input){
-        const ranked=inputs.map((el,index)=>{let context='',p=el;for(let n=0;n<5&&p;n++,p=p.parentElement)context+=' '+(p.innerText||'');const hay=norm([el.accept,el.name,el.id,el.getAttribute('aria-label'),context].filter(Boolean).join(' '));let score=0;if(kind==='audio'){if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score+=20;if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score-=20}else{if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score+=20;if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score-=20}return{el,index,score}}).sort((a,b)=>b.score-a.score);
-        if(ranked[0]?.score>0)input=ranked[0].el;
+        const ranked=inputs.map((el,index)=>{let context='',p=el;for(let n=0;n<5&&p;n++,p=p.parentElement)context+=' '+(p.innerText||'');const hay=norm([el.accept,el.name,el.id,el.getAttribute('aria-label'),context].filter(Boolean).join(' '));let score=0;if(kind==='audio'){if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score+=20;if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score-=20}else{if(/image|artwork|cover|photo|\.png|\.jpg|jpeg/.test(hay))score+=20;if(/audio|\.wav|\.mp3|mpeg|song|track|music|sound/.test(hay))score-=20}return{el,index,score}}).sort((a,b)=>b.score-a.score);if(ranked[0]?.score>0)input=ranked[0].el;
       }
       if(!input)return{ok:false,retry:true,count:inputs.length,inputs:inputs.map((e,index)=>({index,accept:e.getAttribute('accept')||'',name:e.name||'',id:e.id||'',aria:e.getAttribute('aria-label')||''}))};
       const r=await fetch(url);if(!r.ok)return{ok:false,error:`media fetch ${r.status}`};const blob=await r.blob(),file=new File([blob],name,{type:mime||blob.type||'application/octet-stream'}),dt=new DataTransfer();dt.items.add(file);input.files=dt.files;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));return{ok:true,size:file.size,type:file.type,index:inputs.indexOf(input),files:input.files.length};
@@ -65,7 +63,8 @@ async function waitUploadReady(page,{timeout=45000}={}){
     const filesAttached=(last.allFileInputs||[]).reduce((n,x)=>n+x.files,0);
     const next=last.buttons.find(x=>/^(next step|next|continue|save & continue)$/i.test(x.text))||last.buttons.find(x=>/next|continue/i.test(x.text));
     const uploadBusy=last.textFlags.uploading&&!last.textFlags.uploaded;
-    if(filesAttached>=2&&next&&!next.disabled&&!uploadBusy)return{ready:true,filesAttached,next,last,waitMs:Date.now()-start};
+    const uploadUiReady=last.notices.some(x=>/remove image/i.test(x))&&last.notices.some(x=>/remove file|\.wav|\.mp3|\.aiff/i.test(x));
+    if(next&&!next.disabled&&!uploadBusy&&(filesAttached>=2||uploadUiReady))return{ready:true,filesAttached,uploadUiReady,next,last,waitMs:Date.now()-start};
     await sleep(750);
   }
   return{ready:false,last,waitMs:Date.now()-start};
@@ -79,8 +78,9 @@ async function clickNextAndVerify(page,before,{timeout=15000}={}){
   while(Date.now()-start<timeout){
     await humanGate(page);after=await snapshot(page);
     const normalInputs=after.inputs.filter(x=>!['file','hidden','submit','button'].includes(String(x.type).toLowerCase()));
-    const beforeFiles=(before.allFileInputs||[]).length,afterFiles=(after.allFileInputs||[]).length;
-    const leftUploadStep=after.url!==before.url||after.textFlags.goLive||after.textFlags.songDetails||normalInputs.length>0||afterFiles<beforeFiles;
+    const uploadUiStillVisible=after.notices.some(x=>/artwork 3000|audio track|remove image|remove file/i.test(x));
+    const newGoLive=!before.textFlags.goLive&&after.textFlags.goLive,newSongDetails=!before.textFlags.songDetails&&after.textFlags.songDetails;
+    const leftUploadStep=after.url!==before.url||normalInputs.length>0||newGoLive||newSongDetails||!uploadUiStillVisible;
     if(leftUploadStep)return{advanced:true,after,waitMs:Date.now()-start};
     await sleep(650);
   }
@@ -104,8 +104,8 @@ export async function vusicWizardSmoke(env,input={}){
     const readiness=await waitUploadReady(page,{timeout:45000});
     if(!readiness.ready)return{ok:false,code:'VUSIC_UPLOAD_NOT_READY',initial,art:{ok:art.ok,size:art.size},audio:{ok:audio.ok,size:audio.size},readiness};
     const transition=await clickNextAndVerify(page,readiness.last,{timeout:15000});
-    if(!transition.advanced)return{ok:false,code:'VUSIC_WIZARD_STAGE_BLOCKED',initial,readiness:{ready:true,filesAttached:readiness.filesAttached,waitMs:readiness.waitMs},transition};
-    return{ok:true,stage:'after-assets',initial,readiness:{ready:true,filesAttached:readiness.filesAttached,waitMs:readiness.waitMs},transition:{advanced:true,waitMs:transition.waitMs,after:transition.after},pageUrl:page.url()};
+    if(!transition.advanced)return{ok:false,code:'VUSIC_WIZARD_STAGE_BLOCKED',initial,readiness:{ready:true,filesAttached:readiness.filesAttached,uploadUiReady:readiness.uploadUiReady,waitMs:readiness.waitMs},transition};
+    return{ok:true,stage:'after-assets',initial,readiness:{ready:true,filesAttached:readiness.filesAttached,uploadUiReady:readiness.uploadUiReady,waitMs:readiness.waitMs},transition:{advanced:true,waitMs:transition.waitMs,after:transition.after},pageUrl:page.url()};
   }catch(e){return{ok:false,code:'VUSIC_WIZARD_SMOKE_FAILED',error:safe(e?.message||e,900)}
   }finally{if(browser)await browser.close().catch(()=>{})}
 }
