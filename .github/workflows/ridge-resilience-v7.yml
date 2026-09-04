@@ -1,0 +1,57 @@
+name: Ridge Resilience v7
+
+on:
+  pull_request:
+    paths:
+      - 'studio-v3-cloud-first.js'
+      - 'studio-v3-mobile-cloud.js'
+      - 'studio-v3-resilience.js'
+      - 'cloud/**'
+      - 'tests/ridge-resilience-v7-selftest.mjs'
+      - '.github/workflows/ridge-resilience-v7.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'studio-v3-cloud-first.js'
+      - 'studio-v3-mobile-cloud.js'
+      - 'studio-v3-resilience.js'
+      - 'cloud/**'
+      - 'tests/ridge-resilience-v7-selftest.mjs'
+      - '.github/workflows/ridge-resilience-v7.yml'
+  schedule:
+    - cron: '11 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: |
+          node --check cloud/src/worker-v7.js
+          node --check cloud/src/providers/vusic.js
+          node --check studio-v3-cloud-first.js
+          node --check studio-v3-mobile-cloud.js
+          node --check studio-v3-resilience.js
+      - name: Crash-resistance contracts
+        run: node tests/ridge-resilience-v7-selftest.mjs
+
+  live-health:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployed Ridge health without spending provider credits
+        env:
+          RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 20 "$RIDGE_CLOUD_URL/api/resilience/health")"
+          echo "$body"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.githubRender||x.paidFallback!==false) process.exit(1)' "$body"
