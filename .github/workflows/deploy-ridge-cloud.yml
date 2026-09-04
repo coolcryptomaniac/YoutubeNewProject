@@ -8,6 +8,7 @@ on:
       - 'cloud/**'
       - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/deploy-ridge-cloud.yml'
+      - '.github/workflows/ridge-render-queue.yml'
 
 permissions:
   contents: read
@@ -38,17 +39,21 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RIDGE_ADMIN_TOKEN: ${{ secrets.RIDGE_ADMIN_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Validate adaptive free-first text configuration
+          test -n "$RIDGE_ADMIN_TOKEN"
+      - name: Validate adaptive free-first text and render queue configuration
         run: |
           set -euo pipefail
           grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK' wrangler.toml
           ! grep -q 'meta/llama-3.3-70b-instruct' wrangler.toml
           grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
+          grep -q 'main = "src/worker-v9.js"' wrangler.toml
           node --check src/providers/text-refine.js
           node --check src/worker-v8.js
+          node --check src/worker-v9.js
       - name: Ensure global release staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -110,17 +115,17 @@ jobs:
           assert.equal(status.body.browserBound,true,'Browser Run binding missing');
           if(process.env.VUSIC_USERNAME)assert.equal(status.body.usernamePresent,true,'Vusic username secret missing from deployed Worker');
           if(process.env.VUSIC_PASSWORD)assert.equal(status.body.passwordPresent,true,'Vusic password secret missing from deployed Worker');
-          if(process.env.RIDGE_ADMIN_TOKEN){
-            const caps=await fetch(base+'/api/release/capabilities',{headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
-            assert.equal(caps.status,200,'Release capabilities authorization failed');
-            const c=await caps.json();
-            assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
-            console.log('Vusic capabilities:',JSON.stringify({configured:c.vusic?.configured,browserBound:c.vusic?.browserBound,mediaStaging:c.vusic?.mediaStaging,stagingMode:c.stagingMode}));
-          }
-          if(process.env.VUSIC_USERNAME&&process.env.VUSIC_PASSWORD&&process.env.RIDGE_ADMIN_TOKEN){
+          const caps=await fetch(base+'/api/release/capabilities',{headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
+          assert.equal(caps.status,200,'Release capabilities authorization failed');
+          const c=await caps.json();
+          assert.equal(c.stagingMode,'r2','R2 binding did not reach deployed Worker');
+          console.log('Vusic capabilities:',JSON.stringify({configured:c.vusic?.configured,browserBound:c.vusic?.browserBound,mediaStaging:c.vusic?.mediaStaging,stagingMode:c.stagingMode}));
+          if(process.env.VUSIC_USERNAME&&process.env.VUSIC_PASSWORD){
             const r=await fetch(base+'/api/release/vusic-login-smoke',{method:'POST',headers:{Authorization:'Bearer '+process.env.RIDGE_ADMIN_TOKEN}});
             const body=await r.json().catch(()=>({}));
             if(r.status!==200||body.ok!==true)throw new Error('Vusic login smoke failed: '+r.status+' '+JSON.stringify(body));
             console.log('Vusic login smoke: PASS',JSON.stringify({authenticated:body.authenticated,releaseAccessible:body.releaseAccessible,browserBinding:body.browserBinding}));
+          } else {
+            console.log('Vusic login smoke skipped because GitHub VUSIC_USERNAME/VUSIC_PASSWORD secrets are not both present.');
           }
           NODE
