@@ -72,7 +72,7 @@ jobs:
           if(!html.includes('./studio-v3.js')||!html.includes('./studio-v3.css')||!html.includes('./studio-v3-eval.js'))throw new Error('V3 runtime entrypoints missing');
           for(const legacy of ['./studio-v2-lite.js','./studio-v2-combo.js','./studio-v2-credentials.js'])if(html.includes(legacy))throw new Error('Legacy runtime still loaded: '+legacy);
           const moduleScripts=[...html.matchAll(/<script[^>]+type=["']module["'][^>]+src=["']([^"']+)/g)].map(x=>x[1]);
-          if(moduleScripts.length!==1||moduleScripts[0]!=='./studio-v3.js')throw new Error('V3 should keep exactly one local module entrypoint');
+          if(moduleScripts.length!==1||moduleScripts[0].split('?')[0]!=='./studio-v3.js')throw new Error('V3 should keep exactly one local module entrypoint (cache-busting query allowed)');
           console.log(`V3 DOM OK: ${refs.size} references · semantic story + crashproof renderer retained`);
           NODE
 

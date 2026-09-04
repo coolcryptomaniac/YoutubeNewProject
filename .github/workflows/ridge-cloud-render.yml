@@ -22,27 +22,41 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Install media tools
+
+      - name: Verify media tools
+        shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg jq fonts-dejavu-core
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null || ! command -v jq >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg jq fonts-dejavu-core
+          fi
+          ffmpeg -version | head -1
+          df -h .
+
       - name: Download staged media
         env:
           AUDIO_URL: ${{ inputs.audio_url }}
           COVER_URL: ${{ inputs.cover_url }}
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --retry-delay 2 "$AUDIO_URL" -o song.bin
-          if [ -n "$COVER_URL" ]; then curl --fail --location --retry 3 "$COVER_URL" -o cover.jpg || true; fi
+          curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 180 "$AUDIO_URL" -o song.bin
+          if [ -n "$COVER_URL" ]; then
+            curl --fail --location --retry 4 --retry-all-errors --connect-timeout 15 --max-time 120 "$COVER_URL" -o cover.jpg || true
+          fi
+          test -s song.bin
           ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 song.bin > duration.txt
+          DURATION="$(cat duration.txt)"
+          python3 -c 'import sys; d=float(sys.argv[1]); assert 0.5 < d < 7200' "$DURATION"
+
       - name: Decode metadata and prepare subtitles
         env:
           TITLE_B64: ${{ inputs.title_b64 }}
           LYRICS_B64: ${{ inputs.lyrics_b64 }}
           QUERIES_B64: ${{ inputs.queries_b64 }}
         run: |
-          python - <<'PY'
-          import base64,json,os,math
+          python3 - <<'PY'
+          import base64,json,os
           def dec(s):
               if not s:return ''
               s=s+'='*((4-len(s)%4)%4)
@@ -50,7 +64,7 @@ jobs:
           title=dec(os.environ.get('TITLE_B64','')) or 'Ridge Music Video'
           lyrics=dec(os.environ.get('LYRICS_B64',''))
           try: queries=json.loads(dec(os.environ.get('QUERIES_B64','')) or '[]')
-          except: queries=[]
+          except Exception: queries=[]
           open('title.txt','w').write(title)
           open('queries.json','w').write(json.dumps(queries[:6]))
           dur=float(open('duration.txt').read().strip() or 180)
@@ -65,6 +79,7 @@ jobs:
                       st=i*step;en=min(dur,(i+1)*step-.12)
                       f.write(f'{i+1}\n{ts(st)} --> {ts(en)}\n{line[:180]}\n\n')
           PY
+
       - name: Prepare Pexels clips in cloud runner
         if: ${{ inputs.mode == 'pexels' || inputs.mode == 'auto' }}
         env:
@@ -72,17 +87,18 @@ jobs:
         run: |
           set +e
           mkdir -p clips norm
-          python - <<'PY' > queries.txt
+          python3 - <<'PY' > queries.txt
           import json
           for q in json.load(open('queries.json')): print(q)
           PY
           n=0
           while IFS= read -r q; do
             [ -z "$q" ] && continue
-            enc=$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$q")
-            url=$(curl -fsSL "$CLOUD_URL/api/pexels/search?q=$enc&orientation=landscape&per_page=1" | jq -r '.videos[0].mediaUrl // empty')
+            enc=$(python3 -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$q")
+            url=$(curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 "$CLOUD_URL/api/pexels/search?q=$enc&orientation=landscape&per_page=1" | jq -r '.videos[0].mediaUrl // empty')
             if [ -n "$url" ]; then
-              n=$((n+1)); curl -fsSL --retry 2 "$url" -o "clips/$n.mp4" || true
+              n=$((n+1))
+              curl -fsSL --retry 3 --retry-all-errors --connect-timeout 10 --max-time 120 "$url" -o "clips/$n.mp4" || true
               ffmpeg -y -v error -i "clips/$n.mp4" -t 12 -an -vf "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,fps=30" -c:v libx264 -preset veryfast -b:v 1300k -pix_fmt yuv420p "norm/$n.mp4" || true
             fi
             [ $n -ge 5 ] && break
@@ -90,6 +106,7 @@ jobs:
           : > concat.txt
           for f in norm/*.mp4; do [ -f "$f" ] && echo "file '$PWD/$f'" >> concat.txt; done
           exit 0
+
       - name: Render final video
         env:
           MODE: ${{ inputs.mode }}
@@ -98,20 +115,47 @@ jobs:
           DURATION=$(cat duration.txt)
           MODE="$MODE"
           [ "$MODE" = auto ] && { if [ -s concat.txt ]; then MODE=pexels; elif [ -s cover.jpg ]; then MODE=photo; elif [ -s lyrics.srt ]; then MODE=lyrics; else MODE=visualizer; fi; }
-          COMMON="-map 0:a? -c:a aac -b:a 128k -c:v libx264 -preset veryfast -b:v 1350k -maxrate 1600k -bufsize 3200k -pix_fmt yuv420p -movflags +faststart -t $DURATION"
           if [ "$MODE" = pexels ] && [ -s concat.txt ]; then
-            ffmpeg -y -stream_loop -1 -f concat -safe 0 -i concat.txt -i song.bin -filter_complex "[0:v]scale=1280:720,fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1350k -maxrate 1600k -bufsize 3200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
+            ffmpeg -y -v error -stream_loop -1 -f concat -safe 0 -i concat.txt -i song.bin -filter_complex "[0:v]scale=1280:720,fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1350k -maxrate 1600k -bufsize 3200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
           elif [ "$MODE" = photo ] && [ -s cover.jpg ]; then
-            ffmpeg -y -loop 1 -framerate 30 -i cover.jpg -i song.bin -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,zoompan=z='min(zoom+0.00035,1.08)':d=1:s=1280x720:fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
+            ffmpeg -y -v error -loop 1 -framerate 30 -i cover.jpg -i song.bin -filter_complex "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,zoompan=z='min(zoom+0.00035,1.08)':d=1:s=1280x720:fps=30[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 1200k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -t "$DURATION" out.mp4
           elif [ "$MODE" = lyrics ] && [ -s lyrics.srt ]; then
-            ffmpeg -y -f lavfi -i "color=c=0x0c1020:s=1280x720:r=30:d=$DURATION" -i song.bin -vf "subtitles=lyrics.srt:force_style='FontName=DejaVu Sans,FontSize=28,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=58'" -map 0:v -map 1:a:0 -c:v libx264 -preset veryfast -b:v 950k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
+            ffmpeg -y -v error -f lavfi -i "color=c=0x0c1020:s=1280x720:r=30:d=$DURATION" -i song.bin -vf "subtitles=lyrics.srt:force_style='FontName=DejaVu Sans,FontSize=28,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=58'" -map 0:v -map 1:a:0 -c:v libx264 -preset veryfast -b:v 950k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
           else
-            ffmpeg -y -f lavfi -i "color=c=0x090d18:s=1280x720:r=30:d=$DURATION" -i song.bin -filter_complex "[1:a]showwaves=s=1280x260:mode=p2p:rate=30:colors=white[wave];[0:v][wave]overlay=0:230[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 900k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
+            ffmpeg -y -v error -f lavfi -i "color=c=0x090d18:s=1280x720:r=30:d=$DURATION" -i song.bin -filter_complex "[1:a]showwaves=s=1280x260:mode=p2p:rate=30:colors=white[wave];[0:v][wave]overlay=0:230[v]" -map "[v]" -map 1:a:0 -c:v libx264 -preset veryfast -b:v 900k -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart -shortest out.mp4
           fi
           test -s out.mp4
-          ls -lh out.mp4
+
+          # Keep Worker/R2 callback safely below the 120 MB mobile-result ceiling.
+          bytes=$(stat -c%s out.mp4)
+          if [ "$bytes" -gt 115000000 ]; then
+            echo "Output is large ($bytes bytes); creating compact 854x480 fallback."
+            ffmpeg -y -v error -i out.mp4 -vf "scale=854:-2" -c:v libx264 -preset veryfast -b:v 800k -maxrate 950k -bufsize 1900k -c:a aac -b:a 112k -movflags +faststart compact.mp4
+            mv compact.mp4 out.mp4
+          fi
+          test "$(stat -c%s out.mp4)" -lt 120000000
+          ffprobe -v error -show_entries format=duration,size -of json out.mp4
+          df -h .
+
       - name: Return result to Ridge Cloud
         env:
           CALLBACK_URL: ${{ inputs.callback_url }}
         run: |
-          curl --fail --location --retry 3 -X PUT -H 'Content-Type: video/mp4' --data-binary @out.mp4 "$CALLBACK_URL"
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 15 --max-time 240 \
+            -X PUT -H 'Content-Type: video/mp4' --data-binary @out.mp4 "$CALLBACK_URL"
+
+      - name: Report render failure to Ridge Cloud
+        if: failure()
+        continue-on-error: true
+        env:
+          CALLBACK_URL: ${{ inputs.callback_url }}
+          JOB_ID: ${{ inputs.job_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail_url="${CALLBACK_URL/render-result/render-failure}"
+          payload="$(node -e 'console.log(JSON.stringify({error:"GitHub Actions cloud render failed",step:"ridge-cloud-render",runUrl:process.env.RUN_URL,jobId:process.env.JOB_ID}))')"
+          curl --fail --location --retry 4 --retry-all-errors --connect-timeout 15 --max-time 60 \
+            -X POST -H 'Content-Type: application/json' --data "$payload" "$fail_url"
