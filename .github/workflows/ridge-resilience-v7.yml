@@ -1,4 +1,4 @@
-name: Ridge Resilience v7
+name: Ridge Resilience v8
 
 on:
   pull_request:
@@ -36,6 +36,7 @@ jobs:
       - name: Syntax checks
         run: |
           node --check cloud/src/worker-v7.js
+          node --check cloud/src/worker-v8.js
           node --check cloud/src/providers/vusic.js
           node --check studio-v3-cloud-first.js
           node --check studio-v3-mobile-cloud.js
@@ -54,4 +55,4 @@ jobs:
           set -euo pipefail
           body="$(curl --fail --silent --show-error --max-time 20 "$RIDGE_CLOUD_URL/api/resilience/health")"
           echo "$body"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.githubRender||x.paidFallback!==false) process.exit(1)' "$body"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.githubRender||x.paidFallback!==false||x.localFinalRender!==false) process.exit(1)' "$body"
