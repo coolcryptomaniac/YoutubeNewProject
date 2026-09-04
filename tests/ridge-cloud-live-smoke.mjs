@@ -20,9 +20,23 @@ assert.equal(rr.status,200,'resilience health must return 200');
 const resilience=await rr.json();
 assert.equal(resilience.ok,true,'resilience health must be ok');
 assert.equal(resilience.r2,true,'R2 durable storage binding must be active');
-assert.equal(resilience.githubRender,true,'GitHub cloud renderer must be configured');
+assert.equal(resilience.adminConfigured,true,'Ridge admin signing secret must be configured');
+assert.equal(resilience.githubRender,true,'GitHub cloud renderer must be available through the R2 scheduler');
+assert.equal(resilience.renderTransport,'r2-github-scheduler','render transport must not depend on a Worker GitHub PAT');
 assert.equal(resilience.localFinalRender,false,'local final rendering must remain disabled');
 assert.equal(resilience.paidFallback,false,'paid fallback must remain disabled');
+
+const rc=await fetch(base+'/api/render/capabilities',{cache:'no-store',signal:timeout(15000)});
+assert.equal(rc.status,200,'render capabilities must return 200');
+const render=await rc.json();
+assert.equal(render.ready,true,'R2 scheduled render transport must be ready');
+assert.equal(render.renderTransport,'r2-github-scheduler');
+assert.equal(render.r2,true);
+assert.equal(render.adminConfigured,true);
+assert.equal(render.resumable,true);
+assert.equal(render.phoneEncoding,false);
+assert.equal(render.desktopEncoding,false);
+assert.equal(render.paidFallback,false);
 
 const pr=await fetch(base+'/api/pexels/search?q='+encodeURIComponent('cinematic rain night')+'&orientation=landscape&per_page=1',{signal:timeout(20000)});
 assert.equal(pr.status,200,'Pexels smoke query must return 200');
@@ -40,5 +54,5 @@ assert.equal(t.paidFallback,false,'adaptive text router must not use paid fallba
 assert.ok(t.candidate?.title&&t.candidate?.description&&t.candidate?.clean_lyrics,'adaptive text candidate is incomplete');
 assert.match(t.candidate.title,/\p{Script=Devanagari}/u,'Hindi title should remain in Devanagari');
 
-console.log('ridge-cloud-live-smoke: PASS',JSON.stringify({health:{pexels:health.pexels,freeVideo:health.freeVideo,textRefine:health.textRefine},resilience:{r2:resilience.r2,githubRender:resilience.githubRender},pexels:p.videos.length,textRefine:{provider:t.provider,model:t.model,degraded:t.degraded,attempts:t.attempts?.length||0,summary:t.changesSummary}}));
+console.log('ridge-cloud-live-smoke: PASS',JSON.stringify({health:{pexels:health.pexels,freeVideo:health.freeVideo,textRefine:health.textRefine},resilience:{worker:resilience.worker,r2:resilience.r2,renderTransport:resilience.renderTransport,directGithubDispatch:resilience.directGithubDispatch},render:{ready:render.ready,pickupIntervalMinutes:render.pickupIntervalMinutes},pexels:p.videos.length,textRefine:{provider:t.provider,model:t.model,degraded:t.degraded,attempts:t.attempts?.length||0,summary:t.changesSummary}}));
 console.log('HF video generation intentionally NOT called: this smoke test spends no video credits.');
