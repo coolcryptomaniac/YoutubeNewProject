@@ -43,17 +43,20 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Validate adaptive free-first text, OIDC and render queue configuration
+      - name: Validate adaptive free-first text, OIDC, R2 library and render queue configuration
         run: |
           set -euo pipefail
-          grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK' wrangler.toml
+          grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK|YOUTUBE_DAILY_UPLOAD_CAP' wrangler.toml
           ! grep -q 'meta/llama-3.3-70b-instruct' wrangler.toml
           grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
-          grep -q 'main = "src/worker-v9.js"' wrangler.toml
+          grep -q 'YOUTUBE_DAILY_UPLOAD_CAP = "10"' wrangler.toml
+          grep -q 'main = "src/worker-v10.js"' wrangler.toml
           node --check src/providers/text-refine.js
           node --check src/providers/github-oidc.js
+          node --check src/providers/song-library.js
           node --check src/worker-v8.js
           node --check src/worker-v9.js
+          node --check src/worker-v10.js
       - name: Ensure global release staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -76,7 +79,7 @@ jobs:
           fi
           if [ "$found" -eq 0 ]; then
             echo "RIDGE_R2_READY=1" >> "$GITHUB_ENV"
-            echo "Global R2 release staging bucket is ready."
+            echo "Global R2 release staging + song library bucket is ready."
           else
             echo "RIDGE_R2_READY=0" >> "$GITHUB_ENV"
             echo "::error::R2 is not ready. Ridge refuses edge-local staging because it is not crash-resistant."
