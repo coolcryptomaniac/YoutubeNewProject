@@ -14,7 +14,7 @@ function migrateToken(){try{const old=localStorage.getItem('ridge.adminToken');i
 function token({promptUser=false}={}){migrateToken();let t='';try{t=sessionStorage.getItem('ridge.adminToken')||''}catch{}if(!t&&promptUser){t=prompt('Ridge admin token (kept only for this browser session):')||'';if(t)try{sessionStorage.setItem('ridge.adminToken',t)}catch{}}return t}
 async function api(path,t,opts={},timeout=25000){
   const h=new Headers(opts.headers||{});if(t)h.set('Authorization','Bearer '+t);const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeout);
-  try{const r=await fetch(base()+path,{...opts,headers:h,signal:ctrl.signal});const text=await r.text(),j=text?JSON.parse(text):{};if(!r.ok)throw Error(j.error||j.detail||`Ridge Cloud HTTP ${r.status}`);return j}catch(e){if(e?.name==='AbortError')throw Error('Ridge Cloud request timed out; the job is safe to retry.');throw e}finally{clearTimeout(timer)}
+  try{const r=await fetch(base()+path,{...opts,headers:h,signal:ctrl.signal});const text=await r.text();let j={};try{j=text?JSON.parse(text):{}}catch{throw Error(`Ridge Cloud returned an invalid response (${r.status}).`)}if(!r.ok)throw Error(j.error||j.detail||`Ridge Cloud HTTP ${r.status}`);return j}catch(e){if(e?.name==='AbortError')throw Error('Ridge Cloud request timed out; the job is safe to retry.');throw e}finally{clearTimeout(timer)}
 }
 async function stage(file,t){const f=new FormData();f.append('file',file,file.name);const r=await api('/api/release/stage',t,{method:'POST',body:f},90000);if(r.storage&&r.storage!=='r2')throw Error('Ridge refused edge-local staging. R2 global storage is required for crash-resistant rendering.');return r}
 async function coverFile(title){
@@ -25,7 +25,7 @@ async function coverFile(title){
   const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.9));c.width=c.height=1;if(!blob)throw Error('Could not prepare cloud-render cover');return new File([blob],'ridge-cover.jpg',{type:'image/jpeg'});
 }
 function queries(){const lyrics=$('#lyrics')?.value||'',title=$('#title')?.value||'',idea=$('#idea')?.value||'';const lines=lyrics.split(/\n+/).map(x=>x.replace(/^\[[^\]]+\]\s*/,'').trim()).filter(x=>x.length>10).slice(0,5);return [idea,title,...lines].filter(Boolean).slice(0,6)}
-function installDownload(url){const b=$('#downloadBtn');if(!b)return;b.disabled=false;b.textContent='Download cloud video';b.dataset.cloudUrl=url;b.addEventListener('click',function cloudDownload(ev){if(!b.dataset.cloudUrl)return;ev.preventDefault();ev.stopImmediatePropagation();location.href=b.dataset.cloudUrl},{capture:true,once:false})}
+function installDownload(url){const b=$('#downloadBtn');if(!b)return;b.disabled=false;b.textContent='Download cloud video';b.dataset.cloudUrl=url}
 async function getJobState(job,t){return api('/api/render/status/'+encodeURIComponent(job.id),t,{},20000)}
 async function watch(job,t){
   let delay=3500;for(let i=0;i<360;i++){
@@ -55,7 +55,8 @@ async function cloudCreate(ev){
   }catch(e){status(e.message,'err');log(e.message,'err')}finally{btn.disabled=false}
 }
 function install(){
-  migrateToken();document.documentElement.dataset.ridgeRender='cloud-first';const b=$('#createBtn');if(b){b.textContent='DIRECT + CREATE IN CLOUD';b.addEventListener('click',cloudCreate,true)}const q=$('#qualityState');if(q)q.textContent='Cloud final render · resumable · crash-resistant';
+  migrateToken();document.documentElement.dataset.ridgeRender='cloud-first';window.__RIDGE_CLOUD_FIRST_READY__=true;
+  const b=$('#createBtn');if(b){b.textContent='DIRECT + CREATE IN CLOUD';b.addEventListener('click',cloudCreate,true)}const q=$('#qualityState');if(q)q.textContent='Cloud final render · resumable · crash-resistant';
   const d=$('#downloadBtn');if(d)d.addEventListener('click',ev=>{if(!d.dataset.cloudUrl)return;ev.preventDefault();ev.stopImmediatePropagation();location.href=d.dataset.cloudUrl},true);
   const existing=readJob();if(existing?.id){const t=token();if(t)resumeExisting(t);else status(`Saved cloud job ${String(existing.id).slice(0,8)} detected. Press Create to resume it.`,'warn')}
 }
