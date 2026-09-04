@@ -21,6 +21,7 @@ async function writeJson(env,key,data,ttlMs=24*60*60*1000){if(!env.RELEASE_MEDIA
 async function queueAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-render-queue',workflow:'ridge-render-queue.yml',events:['schedule','workflow_dispatch']})}
 async function deploySmokeAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-deploy-smoke',workflow:'deploy-ridge-cloud.yml',events:['push','workflow_dispatch']})}
 async function vusicCanaryAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-vusic-canary',workflow:'vusic-e2e-canary.yml',events:['schedule','workflow_dispatch']})}
+async function vusicLiveProofAuth(request,env){return authorizeAutomation(request,env,{audience:'ridge-vusic-live-proof',workflow:'vusic-live-proof.yml',events:['push']})}
 function asAdminRequest(request,env){const h=new Headers(request.headers);h.set('Authorization',`Bearer ${env.RIDGE_ADMIN_TOKEN}`);return new Request(request,{headers:h})}
 const deploySmokePath=(u,m)=>(u.pathname==='/api/release/capabilities'&&m==='GET')||(u.pathname==='/api/release/vusic-login-smoke'&&m==='POST');
 const vusicCanaryPath=(u,m)=>deploySmokePath(u,m)||(u.pathname==='/api/release/stage'&&(m==='POST'||m==='DELETE'))||(u.pathname==='/api/release/vusic'&&m==='POST');
@@ -86,6 +87,7 @@ async function maybeBridgeGitHubAutomation(request,env,ctx,u){
   let auth=null;
   if(deploySmokePath(u,request.method))auth=await deploySmokeAuth(request,env);
   if(!auth&&vusicCanaryPath(u,request.method))auth=await vusicCanaryAuth(request,env);
+  if(!auth&&vusicCanaryPath(u,request.method))auth=await vusicLiveProofAuth(request,env);
   return auth?base.fetch(asAdminRequest(request,env),env,ctx):null;
 }
 
