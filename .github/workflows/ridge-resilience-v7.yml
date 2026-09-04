@@ -11,6 +11,8 @@ on:
       - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
       - '.github/workflows/ridge-render-queue.yml'
+      - '.github/workflows/vusic-e2e-canary.yml'
+      - '.github/workflows/deploy-ridge-cloud.yml'
   push:
     branches: [main]
     paths:
@@ -22,6 +24,8 @@ on:
       - 'tests/ridge-cloud-live-smoke.mjs'
       - '.github/workflows/ridge-resilience-v7.yml'
       - '.github/workflows/ridge-render-queue.yml'
+      - '.github/workflows/vusic-e2e-canary.yml'
+      - '.github/workflows/deploy-ridge-cloud.yml'
   schedule:
     - cron: '11 2 * * *'
   workflow_dispatch:
@@ -43,11 +47,12 @@ jobs:
           node --check cloud/src/worker-v8.js
           node --check cloud/src/worker-v9.js
           node --check cloud/src/providers/text-refine.js
+          node --check cloud/src/providers/github-oidc.js
           node --check cloud/src/providers/vusic.js
           node --check studio-v3-cloud-first.js
           node --check studio-v3-mobile-cloud.js
           node --check studio-v3-resilience.js
-      - name: Crash-resistance and queue contracts
+      - name: Crash-resistance, queue and OIDC contracts
         run: node tests/ridge-resilience-v7-selftest.mjs
       - name: Adaptive text fallback contracts
         run: |
@@ -56,16 +61,18 @@ jobs:
           const text=fs.readFileSync('cloud/src/providers/text-refine.js','utf8');
           const worker=fs.readFileSync('cloud/src/worker-v8.js','utf8');
           const queue=fs.readFileSync('cloud/src/worker-v9.js','utf8');
+          const oidc=fs.readFileSync('cloud/src/providers/github-oidc.js','utf8');
           const wr=fs.readFileSync('cloud/wrangler.toml','utf8');
           if(text.includes('meta/llama-3.3-70b-instruct'))throw new Error('retired NVIDIA model must not be a candidate');
           if(!text.includes("provider:'bypass'")||!text.includes('paidFallback:false'))throw new Error('safe keep-current bypass missing');
           if(!text.includes('ALLOW_GROQ_TEXT_FALLBACK'))throw new Error('Groq paid-use gate missing');
           if(!worker.includes("/api/text/refine")||!worker.includes("/api/nvidia/refine"))throw new Error('adaptive/legacy routes missing');
-          if(!queue.includes('r2-github-scheduler')||!queue.includes('/api/render/claim'))throw new Error('R2 render scheduler missing');
+          if(!queue.includes('r2-github-scheduler')||!queue.includes('/api/render/claim')||!queue.includes("schedulerAuth:'github-oidc'"))throw new Error('OIDC R2 render scheduler missing');
+          if(!oidc.includes('token.actions.githubusercontent.com')||!oidc.includes('repository_id')||!oidc.includes('workflow_ref')||!oidc.includes('RSASSA-PKCS1-v1_5'))throw new Error('GitHub OIDC claim/signature verification missing');
           if(!wr.includes('TEXT_PROVIDER_ORDER')||!wr.includes('NVIDIA_TEXT_MODELS')||!wr.includes('CF_TEXT_MODELS'))throw new Error('adaptive model pools missing');
           if(!wr.includes('ALLOW_GROQ_TEXT_FALLBACK = "false"'))throw new Error('Groq must default off');
           if(!wr.includes('main = "src/worker-v9.js"'))throw new Error('worker v9 must be deployed');
-          console.log('Adaptive free-first text + R2 scheduler contracts: PASS');
+          console.log('Adaptive free-first text + R2 scheduler + OIDC contracts: PASS');
           NODE
 
   live-health:
@@ -79,4 +86,4 @@ jobs:
           set -euo pipefail
           body="$(curl --fail --silent --show-error --max-time 20 "$RIDGE_CLOUD_URL/api/resilience/health")"
           echo "$body"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.adminConfigured||!x.githubRender||x.renderTransport!=="r2-github-scheduler"||x.paidFallback!==false||x.localFinalRender!==false) process.exit(1)' "$body"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.r2||!x.adminConfigured||!x.githubRender||x.renderTransport!=="r2-github-scheduler"||x.schedulerAuth!=="github-oidc"||x.paidFallback!==false||x.localFinalRender!==false) process.exit(1)' "$body"
