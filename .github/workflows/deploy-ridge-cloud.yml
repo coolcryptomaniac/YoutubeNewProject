@@ -7,6 +7,7 @@ on:
     paths:
       - 'cloud/**'
       - 'tests/ridge-cloud-live-smoke.mjs'
+      - 'tests/vusic-browser-contract-selftest.mjs'
       - '.github/workflows/deploy-ridge-cloud.yml'
       - '.github/workflows/ridge-render-queue.yml'
 
@@ -43,7 +44,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Validate v12 free-first, R2 library, YouTube and Vusic proof auth
+      - name: Validate v12 free-first, R2 library, YouTube and Vusic browser contracts
         run: |
           set -euo pipefail
           grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK|YOUTUBE_DAILY_UPLOAD_CAP|YOUTUBE_DEFAULT_PRIVACY' wrangler.toml
@@ -56,11 +57,13 @@ jobs:
           node --check src/providers/github-oidc.js
           node --check src/providers/song-library.js
           node --check src/providers/youtube-server.js
+          node --check src/providers/vusic.js
           node --check src/worker-v8.js
           node --check src/worker-v9.js
           node --check src/worker-v10.js
           node --check src/worker-v11.js
           node --check src/worker-v12.js
+          node ../tests/vusic-browser-contract-selftest.mjs
           grep -q "audience:'ridge-vusic-live-proof'" src/worker-v12.js
           grep -q "events:\['push','schedule','workflow_dispatch'\]" src/worker-v12.js
           grep -q "u.pathname==='/api/release/stage'" src/worker-v12.js
