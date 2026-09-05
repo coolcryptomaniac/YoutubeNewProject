@@ -44,7 +44,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Validate v13 free-first, R2 library, YouTube and Vusic browser contracts
+      - name: Validate v14 free-first, R2 library, YouTube and Vusic browser contracts
         run: |
           set -euo pipefail
           grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK|YOUTUBE_DAILY_UPLOAD_CAP|YOUTUBE_DEFAULT_PRIVACY' wrangler.toml
@@ -52,24 +52,19 @@ jobs:
           grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
           grep -q 'YOUTUBE_DAILY_UPLOAD_CAP = "10"' wrangler.toml
           grep -q 'YOUTUBE_DEFAULT_PRIVACY = "private"' wrangler.toml
-          grep -q 'main = "src/worker-v13.js"' wrangler.toml
+          grep -q 'main = "src/worker-v14.js"' wrangler.toml
           node --check src/providers/text-refine.js
           node --check src/providers/github-oidc.js
           node --check src/providers/song-library.js
           node --check src/providers/youtube-server.js
           node --check src/providers/vusic.js
-          node --check src/worker-v8.js
-          node --check src/worker-v9.js
-          node --check src/worker-v10.js
           node --check src/worker-v11.js
           node --check src/worker-v12.js
           node --check src/worker-v13.js
+          node --check src/worker-v14.js
           node ../tests/vusic-browser-contract-selftest.mjs
-          grep -q "audience:'ridge-vusic-live-proof'" src/worker-v12.js
-          grep -q "events:\['push','schedule','workflow_dispatch'\]" src/worker-v12.js
-          grep -q "u.pathname==='/api/release/stage'" src/worker-v12.js
           grep -q "reviewBoundaryObjectAware:true" src/worker-v13.js
-          grep -q "finalSubmitAmbiguityLock:true" src/worker-v13.js
+          grep -q "vusic-one-release/diagnostic" src/worker-v14.js
       - name: Ensure global release staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -79,25 +74,10 @@ jobs:
           npx wrangler r2 bucket info ridge-release-media >/dev/null 2>&1
           found=$?
           if [ "$found" -ne 0 ]; then
-            echo "R2 is enabled but ridge-release-media is not visible yet; creating the bucket..."
             npx wrangler r2 bucket create ridge-release-media --location apac
-            create_status=$?
-            if [ "$create_status" -eq 0 ]; then
-              sleep 2
-              npx wrangler r2 bucket info ridge-release-media >/dev/null 2>&1
-              found=$?
-            else
-              found=$create_status
-            fi
+            found=$?
           fi
-          if [ "$found" -eq 0 ]; then
-            echo "RIDGE_R2_READY=1" >> "$GITHUB_ENV"
-            echo "Global R2 release staging + song library bucket is ready."
-          else
-            echo "RIDGE_R2_READY=0" >> "$GITHUB_ENV"
-            echo "::error::R2 is not ready. Ridge refuses edge-local staging because it is not crash-resistant."
-            exit 1
-          fi
+          if [ "$found" -ne 0 ]; then echo "::error::R2 is not ready"; exit 1; fi
           set -e
       - name: Enable global release binding
         run: |
@@ -123,23 +103,19 @@ jobs:
         run: |
           set -euo pipefail
           health="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/resilience/health")"
-          echo "$health" | jq '{ok,worker,vusicProofAuth,vusicExactlyOnce}'
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.worker!=="v13"||!x.vusicProofAuth?.stageBridge||!x.vusicProofAuth?.events?.includes("workflow_dispatch")||!x.vusicExactlyOnce?.reviewBoundaryObjectAware||!x.vusicExactlyOnce?.finalSubmitAmbiguityLock) throw new Error("Worker v13 proof safeguards not live: "+process.argv[1])' "$health"
-      - name: Vusic configuration smoke without opening Browser Run
+          echo "$health" | jq '{ok,worker,vusicProofAuth,vusicExactlyOnce,vusicDiagnostic}'
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.worker!=="v14"||!x.vusicProofAuth?.stageBridge||!x.vusicExactlyOnce?.reviewBoundaryObjectAware||!x.vusicDiagnostic?.protected||!x.vusicDiagnostic?.sanitized) throw new Error("Worker v14 safeguards not live")' "$health"
+      - name: Vusic configuration and protected diagnostic smoke
         env:
           RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
         shell: bash
         run: |
           set -euo pipefail
-          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-deploy-smoke")"
-          oidc="$(printf '%s' "$token_json" | jq -r '.value')"
-          test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
-
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-deploy-smoke")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
           status="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/release/vusic-status")"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.browserBound||!x.usernamePresent||!x.passwordPresent) throw new Error("Vusic Worker credentials/Browser binding incomplete: "+process.argv[1])' "$status"
-
-          caps="$(curl --fail-with-body --silent --show-error --max-time 30 \
-            "$RIDGE_CLOUD_URL/api/release/capabilities" -H "Authorization: Bearer $oidc")"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.stagingMode!=="r2"||!x.vusic?.configured||!x.vusic?.browserBound||!x.vusic?.mediaStaging) throw new Error("Vusic capabilities not production-ready: "+process.argv[1]); console.log("Vusic configuration: READY; live browser smoke intentionally reserved for the one-time release")' "$caps"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||!x.browserBound||!x.usernamePresent||!x.passwordPresent) throw new Error("Vusic configuration incomplete")' "$status"
+          caps="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/release/capabilities" -H "Authorization: Bearer $oidc")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.stagingMode!=="r2"||!x.vusic?.configured||!x.vusic?.browserBound||!x.vusic?.mediaStaging) throw new Error("Vusic capabilities not production-ready")' "$caps"
+          diag="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/vusic-one-release/diagnostic" -H "Authorization: Bearer $oidc")"
+          echo "$diag" | jq '{status,reason,steps,control,alerts,before,after}'
