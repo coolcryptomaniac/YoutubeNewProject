@@ -3,6 +3,7 @@ from pathlib import Path
 p = Path('cloud/src/providers/vusic.js')
 s = p.read_text()
 anchor = "function candidates(primary,fallback){return [...new Set([primary,...arr(fallback)].filter(Boolean))]}"
+
 helper = r'''async function requireDateStage(page,{timeout=30000,maxReclicks=2}={}){
   const deadline=Date.now()+timeout;let reclicks=0,last=null,nextAttemptAt=Date.now()+4500;
   while(Date.now()<deadline){
@@ -21,39 +22,53 @@ helper = r'''async function requireDateStage(page,{timeout=30000,maxReclicks=2}=
 
 radio_helper = r'''async function chooseRadioNearQuestion(page,questionPatterns,values,label,{optional=false}={}){
   const questions=arr(questionPatterns).map(x=>String(x).toLowerCase()),choices=arr(values).map(x=>String(x).toLowerCase());
-  const hit=await retryVusicAction(()=>page.evaluate(({questions,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' '),visible=e=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0};const nodes=[...document.querySelectorAll('label,legend,p,span,div')].filter(visible);const q=nodes.find(n=>questions.some(x=>norm(n.innerText||n.textContent).includes(norm(x))));if(!q)return false;let box=q;for(let i=0;i<4&&box;i++,box=box.parentElement){const radios=[...box.querySelectorAll('input[type="radio"]')];const labels=[...box.querySelectorAll('label')].filter(visible);for(const choice of choices){const lab=labels.find(l=>norm(l.innerText||l.textContent)===norm(choice));if(lab){lab.click();return true}const radio=radios.find(r=>norm(r.value)===norm(choice)||norm(r.id).includes(norm(choice)));if(radio){radio.click();radio.dispatchEvent(new Event('change',{bubbles:true}));return true}}}return false},{questions,choices}));
+  const hit=await retryVusicAction(()=>page.evaluate(({questions,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' '),visible=e=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0};const nodes=[...document.querySelectorAll('label,legend,p,span,div')].filter(visible);const q=nodes.find(n=>questions.some(x=>norm(n.innerText||n.textContent).includes(norm(x))));if(!q)return false;let box=q;for(let i=0;i<4&&box;i++,box=box.parentElement){const radios=[...box.querySelectorAll('input[type="radio"]')];const labels=[...box.querySelectorAll('label')].filter(visible);for(const choice of choices){const lab=labels.find(l=>norm(l.innerText||l.textContent)===norm(choice));if(lab){lab.click();return true}const radio=radios.find(r=>norm(r.value)===norm(choice)||norm(r.id).includes(norm(choice)));if(radio){radio.click();radio.dispatchEvent(new Event('input',{bubbles:true}));radio.dispatchEvent(new Event('change',{bubbles:true}));return true}}}return false},{questions,choices}));
   if(!hit&&!optional)throw new VusicProviderError(`Could not choose Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{questionPatterns,values,url:page.url()}});
   return hit;
 }
 '''
 
+required_select_helper = r'''async function selectRequiredById(page,id,values,label){
+  const choices=arr(values).filter(Boolean).map(String);
+  const result=await retryVusicAction(()=>page.evaluate(({id,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');const el=document.getElementById(id);if(!el||String(el.tagName||'').toLowerCase()!=='select')return{ok:false,reason:'select-missing',id};const opts=Array.from(el.options||[]);let opt=null;for(const value of choices){opt=opts.find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt&&String(opt.value||'').trim())break;opt=null}if(!opt)opt=opts.find(o=>String(o.value||'').trim()&&!/select|choose|please/i.test(norm(o.textContent)));if(!opt)return{ok:false,reason:'no-nonempty-option',id,options:opts.map(o=>({text:String(o.textContent||'').trim().slice(0,100),value:String(o.value||'')})).slice(0,30)};const proto=Object.getPrototypeOf(el),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(el,opt.value):el.value=opt.value;for(const type of ['input','change','blur'])el.dispatchEvent(new Event(type,{bubbles:true}));return{ok:String(el.value||'').trim().length>0,id,value:String(el.value||''),text:String(opt.textContent||'').trim()};},{id,choices}));
+  if(!result?.ok)throw new VusicProviderError(`Could not select required Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{id,choices,result,url:page.url()}});
+  await settle(page,250);
+  const verified=await retryVusicAction(()=>page.evaluate(id=>{const el=document.getElementById(id);return !!el&&String(el.value||'').trim().length>0},id));
+  if(!verified)throw new VusicProviderError(`Vusic ${label} did not retain a selected value`,{status:503,code:'VUSIC_STAGE_BLOCKED',detail:{id,url:page.url()}});
+  return result;
+}
+'''
+
 if 'async function requireDateStage' not in s:
-    if anchor not in s:
-        raise SystemExit('anchor missing')
-    s = s.replace(anchor, helper + '\n' + anchor, 1)
+    if anchor not in s: raise SystemExit('anchor missing')
+    s=s.replace(anchor,helper+'\n'+anchor,1)
 else:
-    old_ready = "return{ready:!!dateInput||/go live date|release date|date for live|date of release/.test(text),assetStage"
-    if old_ready in s:
-        s = s.replace(old_ready, "return{ready:!!dateInput,assetStage", 1)
+    old_ready="return{ready:!!dateInput||/go live date|release date|date for live|date of release/.test(text),assetStage"
+    if old_ready in s:s=s.replace(old_ready,"return{ready:!!dateInput,assetStage",1)
 
 if 'async function chooseRadioNearQuestion' not in s:
-    if anchor not in s:
-        raise SystemExit('radio helper anchor missing')
-    s = s.replace(anchor, radio_helper + '\n' + anchor, 1)
+    if anchor not in s: raise SystemExit('radio helper anchor missing')
+    s=s.replace(anchor,radio_helper+'\n'+anchor,1)
+if 'async function selectRequiredById' not in s:
+    if anchor not in s: raise SystemExit('required select helper anchor missing')
+    s=s.replace(anchor,required_select_helper+'\n'+anchor,1)
 
-old = "mark('assets');await next(page);\n    const releaseDate="
-new = "mark('assets');await next(page);await requireDateStage(page);\n    const releaseDate="
-if old in s:
-    s = s.replace(old, new, 1)
-elif "mark('assets');await next(page);await requireDateStage(page);" not in s:
-    raise SystemExit('asset transition call site missing')
+old="mark('assets');await next(page);\n    const releaseDate="
+new="mark('assets');await next(page);await requireDateStage(page);\n    const releaseDate="
+if old in s:s=s.replace(old,new,1)
+elif "mark('assets');await next(page);await requireDateStage(page);" not in s:raise SystemExit('asset transition call site missing')
 
-needle = "await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
-replacement = "await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['sub-genre','sub genre','subcategory'],candidates(safe(release.subGenre||genreKey,80),genreValues),'sub-genre',{optional:false});await chooseField(page,['mood'],candidates(safe(release.mood||'Calm',80),['Calm','Passion','Inspirational']),'mood',{optional:false});await chooseField(page,['registered label','label'],candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label',{optional:false});await chooseRadioNearQuestion(page,['I Want To Use My Own ISRC Code','own isrc'],['No'],'own ISRC',{optional:false});await chooseRadioNearQuestion(page,['Is your track Adult 18+','Adult 18+'],release.explicitContent?['Yes']:['No'],'Adult 18+',{optional:false});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
-if needle in s:
-    s = s.replace(needle, replacement, 1)
-elif "'sub-genre'" not in s:
-    raise SystemExit('song details insertion point missing')
+# Upgrade prior semantic required-field calls to exact DOM IDs observed in protected production diagnostics.
+s=s.replace("await chooseField(page,['sub-genre','sub genre','subcategory'],candidates(safe(release.subGenre||genreKey,80),genreValues),'sub-genre',{optional:false});","await selectRequiredById(page,'subGenre',candidates(safe(release.subGenre||'Electronic',80),['Electronic','Electronica','Ambient']),'sub-genre');")
+s=s.replace("await chooseField(page,['registered label','label'],candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label',{optional:false});","await selectRequiredById(page,'labels',candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label');")
+
+# If the older insertion is not present yet, add the full required-field sequence.
+needle="await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
+replacement="await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await selectRequiredById(page,'subGenre',candidates(safe(release.subGenre||'Electronic',80),['Electronic','Electronica','Ambient']),'sub-genre');await chooseField(page,['mood'],candidates(safe(release.mood||'Calm',80),['Calm','Passion','Inspirational']),'mood',{optional:false});await selectRequiredById(page,'labels',candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label');await chooseRadioNearQuestion(page,['I Want To Use My Own ISRC Code','own isrc'],['No'],'own ISRC',{optional:false});await chooseRadioNearQuestion(page,['Is your track Adult 18+','Adult 18+'],release.explicitContent?['Yes']:['No'],'Adult 18+',{optional:false});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
+if needle in s:s=s.replace(needle,replacement,1)
+
+if "selectRequiredById(page,'subGenre'" not in s or "selectRequiredById(page,'labels'" not in s:
+    raise SystemExit('direct required-select calls missing')
 
 p.write_text(s)
-print('Vusic required song-detail fields patched')
+print('Vusic direct required selects patched and verified')
