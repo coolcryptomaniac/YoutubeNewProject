@@ -111,14 +111,14 @@ async function chooseRadioNearQuestion(page,questionPatterns,values,label,{optio
   return hit;
 }
 
-async function selectRequiredById(page,id,values,label){
-  const choices=arr(values).filter(Boolean).map(String);
-  const result=await retryVusicAction(()=>page.evaluate(({id,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');const el=document.getElementById(id);if(!el||String(el.tagName||'').toLowerCase()!=='select')return{ok:false,reason:'select-missing',id};const opts=Array.from(el.options||[]);let opt=null;for(const value of choices){opt=opts.find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt&&String(opt.value||'').trim())break;opt=null}if(!opt)opt=opts.find(o=>String(o.value||'').trim()&&!/select|choose|please/i.test(norm(o.textContent)));if(!opt)return{ok:false,reason:'no-nonempty-option',id,options:opts.map(o=>({text:String(o.textContent||'').trim().slice(0,100),value:String(o.value||'')})).slice(0,30)};const proto=Object.getPrototypeOf(el),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(el,opt.value):el.value=opt.value;for(const type of ['input','change','blur'])el.dispatchEvent(new Event(type,{bubbles:true}));return{ok:String(el.value||'').trim().length>0,id,value:String(el.value||''),text:String(opt.textContent||'').trim()};},{id,choices}));
-  if(!result?.ok)throw new VusicProviderError(`Could not select required Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{id,choices,result,url:page.url()}});
-  await settle(page,250);
-  const verified=await retryVusicAction(()=>page.evaluate(id=>{const el=document.getElementById(id);return !!el&&String(el.value||'').trim().length>0},id));
-  if(!verified)throw new VusicProviderError(`Vusic ${label} did not retain a selected value`,{status:503,code:'VUSIC_STAGE_BLOCKED',detail:{id,url:page.url()}});
-  return result;
+async function selectRequiredById(page,id,values,label,{timeout=10000}={}){
+  const choices=arr(values).filter(Boolean).map(String),deadline=Date.now()+timeout;let last=null;
+  while(Date.now()<deadline){
+    last=await retryVusicAction(()=>page.evaluate(({id,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');const el=document.getElementById(id);if(!el||String(el.tagName||'').toLowerCase()!=='select')return{ok:false,retryable:true,reason:'select-missing',id};const opts=Array.from(el.options||[]);const usable=opts.filter(o=>String(o.value||'').trim()&&!/select|choose|please/i.test(norm(o.textContent)));if(!usable.length)return{ok:false,retryable:true,reason:'options-not-ready',id,optionCount:opts.length,options:opts.map(o=>({text:String(o.textContent||'').trim().slice(0,100),value:String(o.value||'')})).slice(0,30)};let opt=null;for(const value of choices){opt=usable.find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt)break}if(!opt)opt=usable[0];const proto=Object.getPrototypeOf(el),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(el,opt.value):el.value=opt.value;for(const type of ['input','change','blur'])el.dispatchEvent(new Event(type,{bubbles:true}));return{ok:String(el.value||'').trim().length>0,retryable:false,id,value:String(el.value||''),text:String(opt.textContent||'').trim(),optionCount:opts.length};},{id,choices}));
+    if(last?.ok){await settle(page,300);const kept=await retryVusicAction(()=>page.evaluate(id=>{const el=document.getElementById(id);return !!el&&String(el.value||'').trim().length>0},id));if(kept)return last}
+    await sleep(450);
+  }
+  throw new VusicProviderError(`Could not select required Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{id,choices,last,url:page.url()}});
 }
 
 function candidates(primary,fallback){return [...new Set([primary,...arr(fallback)].filter(Boolean))]}
