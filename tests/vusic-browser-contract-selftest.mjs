@@ -8,6 +8,10 @@ if(!src.includes("isSelect=e=>!!e&&String(e.tagName||'').toLowerCase()==='select
 if(!src.includes('Array.from(target.options||[])'))fail('Vusic select options must use a null-safe conversion.');
 if(!src.includes("if(!isSelect(target))return''"))fail('Vusic custom controls must fall back instead of entering native select logic.');
 if(!src.includes("chooseText(page,values,label,{optional:true})"))fail('Custom-select click fallback is missing.');
+if(!src.includes("querySelectorAll('h1,h2,h3,legend,[role=\"heading\"]')"))fail('Wizard stage fingerprint must include headings.');
+if(!src.includes("buttons:(s?.buttons||[]).map"))fail('Wizard stage fingerprint must include action controls.');
+if(!src.includes("querySelectorAll('button,input[type=\"submit\"],[role=\"button\"]')"))fail('Next must prefer real interactive controls and avoid navigation anchors.');
+if(!src.includes("alerts:after?.alerts||[]"))fail('Blocked stages must capture visible validation errors.');
 if(!src.includes("code:'VUSIC_STAGE_BLOCKED'"))fail('Wizard stage-advance protection is missing.');
 if(!src.includes('confirmSubmit!==true'))fail('Final release must remain explicitly gated.');
 
