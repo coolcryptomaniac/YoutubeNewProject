@@ -1,0 +1,29 @@
+name: Trigger Vusic Live Proof Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/trigger-vusic-live-proof-once.yml'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch the existing exactly-once Vusic proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/vusic-live-proof.yml/dispatches \
+            -d '{"ref":"main"}'
+          echo 'Vusic proof workflow dispatched.'
