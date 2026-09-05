@@ -28,4 +28,4 @@ jobs:
             -d '{"ref":"main"}'
           echo 'Vusic proof workflow dispatched.'
 
-# retry after strict real-date-control readiness deploy
+# retry after required Sub-Genre, Mood, Registered Label, ISRC and Adult metadata fix
