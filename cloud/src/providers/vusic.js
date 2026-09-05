@@ -57,7 +57,26 @@ async function fillReleaseDate(page,value){
   for(const v of variants){const ok=await retryVusicAction(()=>page.evaluate(value=>{const el=document.querySelector('#date_for_live')||[...document.querySelectorAll('input')].find(i=>/date_for_live|go.?live|release.?date/i.test([i.id,i.name,i.placeholder,i.getAttribute('aria-label')].filter(Boolean).join(' ')));if(!el)return false;const proto=Object.getPrototypeOf(el),setter=Object.getOwnPropertyDescriptor(proto,'value')?.set;setter?setter.call(el,value):el.value=value;for(const type of ['input','change','blur'])el.dispatchEvent(new Event(type,{bubbles:true}));return String(el.value||'').length>0},v));if(ok){await settle(page,250);return true}}
   return inputByLabel(page,['go live date','release date'],iso,{optional:false});
 }
-async function selectByLabel(page,labelPatterns,values,{optional=false}={}){const patterns=semanticAliases(labelPatterns),choices=arr(values).filter(Boolean).map(String);const found=await retryVusicAction(()=>page.evaluate(({patterns,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/[_-]+/g,' '),visible=e=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0};const selects=[...document.querySelectorAll('select')].filter(visible);let target=null,best=-1;for(const label of document.querySelectorAll('label')){const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(norm(p))))continue;target=label.htmlFor?document.getElementById(label.htmlFor):label.parentElement?.querySelector('select');if(target)break}if(!target){for(const s of selects){const hay=norm([s.name,s.id,s.getAttribute('aria-label'),s.closest('div,section,fieldset')?.innerText].filter(Boolean).join(' '));const score=patterns.reduce((n,p)=>n+(hay.includes(norm(p))?10:0),0);if(score>best){best=score;target=s}}if(best<=0)target=null}if(!target)return'';for(const value of choices){const opt=[...target.options].find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt){target.value=opt.value;target.dispatchEvent(new Event('change',{bubbles:true}));return value}}return''},{patterns,choices}));if(!found&&!optional)throw new VusicProviderError(`Could not select Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{choices,url:page.url()}});return found||null}
+async function selectByLabel(page,labelPatterns,values,{optional=false}={}){
+  const patterns=semanticAliases(labelPatterns),choices=arr(values).filter(Boolean).map(String);
+  const found=await retryVusicAction(()=>page.evaluate(({patterns,choices})=>{
+    const norm=s=>String(s||'').trim().toLowerCase().replace(/[_-]+/g,' '),visible=e=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0},isSelect=e=>!!e&&String(e.tagName||'').toLowerCase()==='select';
+    const selects=[...document.querySelectorAll('select')].filter(visible);let target=null,best=-1;
+    for(const label of document.querySelectorAll('label')){
+      const t=norm(label.innerText||label.textContent);if(!patterns.some(p=>t.includes(norm(p))))continue;
+      const linked=label.htmlFor?document.getElementById(label.htmlFor):null;
+      target=isSelect(linked)?linked:(label.querySelector('select')||label.parentElement?.querySelector('select'));
+      if(isSelect(target)&&visible(target))break;target=null;
+    }
+    if(!target){for(const s of selects){const hay=norm([s.name,s.id,s.getAttribute('aria-label'),s.closest('div,section,fieldset')?.innerText].filter(Boolean).join(' '));const score=patterns.reduce((n,p)=>n+(hay.includes(norm(p))?10:0),0);if(score>best){best=score;target=s}}if(best<=0)target=null}
+    if(!isSelect(target))return'';
+    const options=Array.from(target.options||[]);
+    for(const value of choices){const opt=options.find(o=>norm(o.textContent)===norm(value)||norm(o.textContent).includes(norm(value)));if(opt){target.value=opt.value;target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));return value}}
+    return'';
+  },{patterns,choices}));
+  if(!found&&!optional)throw new VusicProviderError(`Could not select Vusic field: ${patterns[0]}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{choices,url:page.url()}});
+  return found||null;
+}
 async function chooseField(page,labels,values,label,{optional=true}={}){const selected=await selectByLabel(page,labels,values,{optional:true});if(selected)return selected;await clickText(page,semanticAliases(labels),label,{optional:true});const clicked=await chooseText(page,values,label,{optional:true});if(clicked)return clicked;if(!optional)throw new VusicProviderError(`Could not choose ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{values,url:page.url()}});return null}
 
 async function fileInputSnapshot(page){return retryVusicAction(()=>page.evaluate(()=>[...document.querySelectorAll('input[type="file"]')].map((i,index)=>({index,accept:i.getAttribute('accept')||'',name:i.getAttribute('name')||'',id:i.id||'',aria:i.getAttribute('aria-label')||'',multiple:i.multiple,context:(i.closest('label,section,article,div')?.innerText||'').trim().slice(0,240)}))));}
