@@ -19,15 +19,27 @@ helper = r'''async function requireDateStage(page,{timeout=30000,maxReclicks=2}=
 }
 '''
 
+radio_helper = r'''async function chooseRadioNearQuestion(page,questionPatterns,values,label,{optional=false}={}){
+  const questions=arr(questionPatterns).map(x=>String(x).toLowerCase()),choices=arr(values).map(x=>String(x).toLowerCase());
+  const hit=await retryVusicAction(()=>page.evaluate(({questions,choices})=>{const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' '),visible=e=>{const st=getComputedStyle(e),r=e.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0};const nodes=[...document.querySelectorAll('label,legend,p,span,div')].filter(visible);const q=nodes.find(n=>questions.some(x=>norm(n.innerText||n.textContent).includes(norm(x))));if(!q)return false;let box=q;for(let i=0;i<4&&box;i++,box=box.parentElement){const radios=[...box.querySelectorAll('input[type="radio"]')];const labels=[...box.querySelectorAll('label')].filter(visible);for(const choice of choices){const lab=labels.find(l=>norm(l.innerText||l.textContent)===norm(choice));if(lab){lab.click();return true}const radio=radios.find(r=>norm(r.value)===norm(choice)||norm(r.id).includes(norm(choice)));if(radio){radio.click();radio.dispatchEvent(new Event('change',{bubbles:true}));return true}}}return false},{questions,choices}));
+  if(!hit&&!optional)throw new VusicProviderError(`Could not choose Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{questionPatterns,values,url:page.url()}});
+  return hit;
+}
+'''
+
 if 'async function requireDateStage' not in s:
     if anchor not in s:
         raise SystemExit('anchor missing')
     s = s.replace(anchor, helper + '\n' + anchor, 1)
 else:
     old_ready = "return{ready:!!dateInput||/go live date|release date|date for live|date of release/.test(text),assetStage"
-    new_ready = "return{ready:!!dateInput,assetStage"
     if old_ready in s:
-        s = s.replace(old_ready, new_ready, 1)
+        s = s.replace(old_ready, "return{ready:!!dateInput,assetStage", 1)
+
+if 'async function chooseRadioNearQuestion' not in s:
+    if anchor not in s:
+        raise SystemExit('radio helper anchor missing')
+    s = s.replace(anchor, radio_helper + '\n' + anchor, 1)
 
 old = "mark('assets');await next(page);\n    const releaseDate="
 new = "mark('assets');await next(page);await requireDateStage(page);\n    const releaseDate="
@@ -36,5 +48,12 @@ if old in s:
 elif "mark('assets');await next(page);await requireDateStage(page);" not in s:
     raise SystemExit('asset transition call site missing')
 
+needle = "await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
+replacement = "await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await chooseField(page,['sub-genre','sub genre','subcategory'],candidates(safe(release.subGenre||genreKey,80),genreValues),'sub-genre',{optional:false});await chooseField(page,['mood'],candidates(safe(release.mood||'Calm',80),['Calm','Passion','Inspirational']),'mood',{optional:false});await chooseField(page,['registered label','label'],candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label',{optional:false});await chooseRadioNearQuestion(page,['I Want To Use My Own ISRC Code','own isrc'],['No'],'own ISRC',{optional:false});await chooseRadioNearQuestion(page,['Is your track Adult 18+','Adult 18+'],release.explicitContent?['Yes']:['No'],'Adult 18+',{optional:false});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});"
+if needle in s:
+    s = s.replace(needle, replacement, 1)
+elif "'sub-genre'" not in s:
+    raise SystemExit('song details insertion point missing')
+
 p.write_text(s)
-print('Vusic asset-stage guard patched with strict date-control readiness')
+print('Vusic required song-detail fields patched')
