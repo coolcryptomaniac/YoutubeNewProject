@@ -27,3 +27,5 @@ jobs:
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/vusic-live-proof.yml/dispatches \
             -d '{"ref":"main"}'
           echo 'Vusic proof workflow dispatched.'
+
+# retry after strict real-date-control readiness deploy
