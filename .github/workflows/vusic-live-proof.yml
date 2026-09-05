@@ -28,10 +28,26 @@ jobs:
           set -euo pipefail
           token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-live-proof")"
           oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
-          status="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/vusic-one-release/status" -H "Authorization: Bearer $oidc")"
-          echo "$status" | jq '{locked,state:{status:.state.status,title:.state.title,finishedAt:.state.finishedAt}}'
+          status_file="$(mktemp)"
+          http="$(curl --silent --show-error --max-time 30 -o "$status_file" -w '%{http_code}' "$RIDGE_CLOUD_URL/api/vusic-one-release/status" -H "Authorization: Bearer $oidc")"
+          cat "$status_file" | jq '{locked,state:{status:.state.status,title:.state.title,finishedAt:.state.finishedAt},error}' || cat "$status_file"
+          if [ "$http" != "200" ]; then echo "::error::One-release status check failed with HTTP $http"; exit 1; fi
+          status="$(cat "$status_file")"
           locked="$(printf '%s' "$status" | jq -r '.locked')"
           if [ "$locked" = "true" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Preflight proof authentication and R2/Vusic capabilities
+        if: steps.guard.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-live-proof")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
+          body="$(mktemp)"
+          http="$(curl --silent --show-error --max-time 30 -o "$body" -w '%{http_code}' "$RIDGE_CLOUD_URL/api/release/capabilities" -H "Authorization: Bearer $oidc")"
+          cat "$body" | jq '{ok,stagingMode,vusic,error}' || cat "$body"
+          if [ "$http" != "200" ]; then echo "::error::Proof OIDC bridge rejected capabilities preflight with HTTP $http"; exit 1; fi
+          node -e 'const x=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); if(!x.ok||x.stagingMode!=="r2"||!x.vusic?.configured||!x.vusic?.browserBound||!x.vusic?.mediaStaging) throw new Error("Vusic/R2 preflight is not production-ready")' "$body"
 
       - name: Generate original synthetic WAV and 3000x3000 artwork
         if: steps.guard.outputs.skip != 'true'
@@ -69,9 +85,20 @@ jobs:
           set -euo pipefail
           token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-live-proof")"
           oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != "null"; echo "::add-mask::$oidc"
-          audio="$(curl --fail-with-body --silent --show-error --max-time 90 -X POST "$RIDGE_CLOUD_URL/api/release/stage" -H "Authorization: Bearer $oidc" -F 'file=@ridge-canary.wav;type=audio/wav')"
-          art="$(curl --fail-with-body --silent --show-error --max-time 90 -X POST "$RIDGE_CLOUD_URL/api/release/stage" -H "Authorization: Bearer $oidc" -F 'file=@ridge-canary.png;type=image/png')"
-          node -e 'for(const s of process.argv.slice(1)){const x=JSON.parse(s);if(!x.ok||x.storage!=="r2")throw new Error("R2 staging failed")}' "$audio" "$art"
+          stage_one(){
+            local path="$1" type="$2" out http
+            out="$(mktemp)"
+            http="$(curl --silent --show-error --max-time 90 -o "$out" -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/release/stage" -H "Authorization: Bearer $oidc" -F "file=@$path;type=$type")"
+            if [ "$http" != "200" ] && [ "$http" != "201" ]; then
+              echo "::error::R2 staging failed for $path with HTTP $http"
+              cat "$out"
+              return 1
+            fi
+            node -e 'const x=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(!x.ok||x.storage!=="r2"||!x.url)throw new Error("R2 staging response invalid")' "$out"
+            cat "$out"
+          }
+          audio="$(stage_one ridge-canary.wav audio/wav)"
+          art="$(stage_one ridge-canary.png image/png)"
           echo "audio_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$audio")" >> "$GITHUB_OUTPUT"
           echo "art_url=$(node -e 'console.log(JSON.parse(process.argv[1]).url)' "$art")" >> "$GITHUB_OUTPUT"
 
@@ -88,11 +115,12 @@ jobs:
           payload="$(node -e 'console.log(JSON.stringify({title:"Ridge Automation Canary One-Time",artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",releasedPreviously:false,platforms:"all",explicitContent:false,genre:"Electronic",language:"English",lyrics:"Instrumental Ridge automation canary",releaseDate:"2026-09-12",audioUrl:process.env.AUDIO_URL,audioName:"ridge-canary.wav",audioType:"audio/wav",artworkUrl:process.env.ART_URL,artworkName:"ridge-canary.png",artworkType:"image/png",confirmSubmit:true}))')"
           http="$(curl --silent --show-error --max-time 420 -o vusic-result.json -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/vusic-one-release/execute" -H "Authorization: Bearer $oidc" -H 'Content-Type: application/json' --data "$payload")"
           echo "VUSIC_ONE_RELEASE_HTTP_STATUS=$http"
-          jq '{ok,locked,state:{status:.state.status,title:.state.title,finishedAt:.state.finishedAt,reason:.state.reason},result:{submitted:.result.submitted,message:.result.message,pageUrl:.result.pageUrl}}' vusic-result.json
+          jq '{ok,locked,state:{status:.state.status,title:.state.title,finishedAt:.state.finishedAt,reason:.state.reason},result:{submitted:.result.submitted,message:.result.message,pageUrl:.result.pageUrl},error}' vusic-result.json
           state="$(jq -r '.state.status // empty' vusic-result.json)"
           if [ "$state" = "submitted" ]; then echo "VUSIC_ONE_RELEASE_SUCCESS=1"; exit 0; fi
           if [ "$state" = "ambiguous" ]; then echo "::error::Final submission may have occurred; exactly-once lock engaged. Manual Vusic verification required before any reset."; exit 1; fi
-          echo "::error::Vusic release not submitted yet; state=$state. Scheduled retry remains safe because no final-submit boundary was crossed."
+          if [ "$http" = "401" ]; then echo "::error::Proof OIDC authentication failed at final execute; deployment/auth contract is inconsistent."; exit 1; fi
+          echo "::error::Vusic release not submitted yet; state=$state, HTTP=$http. Automatic retry remains safe only when state is retryable and the final-submit boundary was not crossed."
           exit 1
 
       - name: Already completed or locked

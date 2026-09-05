@@ -1,5 +1,5 @@
 name = "ridge-cloud-media"
-main = "src/worker-v11.js"
+main = "src/worker-v12.js"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat"]
 
