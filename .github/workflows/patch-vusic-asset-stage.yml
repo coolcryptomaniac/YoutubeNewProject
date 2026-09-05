@@ -65,3 +65,5 @@ jobs:
           git add cloud/src/providers/vusic.js
           git commit -m 'Require real Vusic date stage after asset upload'
           git push origin HEAD:fix/vusic-asset-stage-advance
+
+# retrigger: 2026-09-06
