@@ -44,7 +44,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - name: Validate v12 free-first, R2 library, YouTube and Vusic browser contracts
+      - name: Validate v13 free-first, R2 library, YouTube and Vusic browser contracts
         run: |
           set -euo pipefail
           grep -E 'TEXT_PROVIDER_ORDER|CF_TEXT_MODELS|NVIDIA_TEXT_MODELS|ALLOW_GROQ_TEXT_FALLBACK|YOUTUBE_DAILY_UPLOAD_CAP|YOUTUBE_DEFAULT_PRIVACY' wrangler.toml
@@ -52,7 +52,7 @@ jobs:
           grep -q 'ALLOW_GROQ_TEXT_FALLBACK = "false"' wrangler.toml
           grep -q 'YOUTUBE_DAILY_UPLOAD_CAP = "10"' wrangler.toml
           grep -q 'YOUTUBE_DEFAULT_PRIVACY = "private"' wrangler.toml
-          grep -q 'main = "src/worker-v12.js"' wrangler.toml
+          grep -q 'main = "src/worker-v13.js"' wrangler.toml
           node --check src/providers/text-refine.js
           node --check src/providers/github-oidc.js
           node --check src/providers/song-library.js
@@ -63,10 +63,13 @@ jobs:
           node --check src/worker-v10.js
           node --check src/worker-v11.js
           node --check src/worker-v12.js
+          node --check src/worker-v13.js
           node ../tests/vusic-browser-contract-selftest.mjs
           grep -q "audience:'ridge-vusic-live-proof'" src/worker-v12.js
           grep -q "events:\['push','schedule','workflow_dispatch'\]" src/worker-v12.js
           grep -q "u.pathname==='/api/release/stage'" src/worker-v12.js
+          grep -q "reviewBoundaryObjectAware:true" src/worker-v13.js
+          grep -q "finalSubmitAmbiguityLock:true" src/worker-v13.js
       - name: Ensure global release staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -120,8 +123,8 @@ jobs:
         run: |
           set -euo pipefail
           health="$(curl --fail-with-body --silent --show-error --max-time 30 "$RIDGE_CLOUD_URL/api/resilience/health")"
-          echo "$health" | jq '{ok,worker,vusicProofAuth}'
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.worker!=="v12"||!x.vusicProofAuth?.stageBridge||!x.vusicProofAuth?.events?.includes("workflow_dispatch")) throw new Error("Worker v12 proof bridge not live: "+process.argv[1])' "$health"
+          echo "$health" | jq '{ok,worker,vusicProofAuth,vusicExactlyOnce}'
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.worker!=="v13"||!x.vusicProofAuth?.stageBridge||!x.vusicProofAuth?.events?.includes("workflow_dispatch")||!x.vusicExactlyOnce?.reviewBoundaryObjectAware||!x.vusicExactlyOnce?.finalSubmitAmbiguityLock) throw new Error("Worker v13 proof safeguards not live: "+process.argv[1])' "$health"
       - name: Vusic configuration smoke without opening Browser Run
         env:
           RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
