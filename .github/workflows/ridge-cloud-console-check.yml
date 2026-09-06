@@ -1,0 +1,57 @@
+name: Ridge Cloud Console Checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ridge-cloud-studio.html'
+      - 'ridge-cloud-studio.css'
+      - 'ridge-cloud-studio.js'
+      - 'ridge-android.html'
+      - 'music.html'
+      - '.github/workflows/ridge-cloud-console-check.yml'
+  pull_request:
+    paths:
+      - 'ridge-cloud-studio.html'
+      - 'ridge-cloud-studio.css'
+      - 'ridge-cloud-studio.js'
+      - 'ridge-android.html'
+      - 'music.html'
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: node --check ridge-cloud-studio.js
+      - name: Ban local media processing
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -E 'FileReader|AudioContext|webkitAudioContext|decodeAudioData|MediaRecorder|createMediaElementSource|getUserMedia' ridge-cloud-studio.js
+          grep -q '/api/library/songs' ridge-cloud-studio.js
+          grep -q '/multipart/start' ridge-cloud-studio.js
+          grep -q '/multipart/part' ridge-cloud-studio.js
+          grep -q '/multipart/complete' ridge-cloud-studio.js
+          grep -q '/api/render/start' ridge-cloud-studio.js
+          grep -q '/api/render/status/' ridge-cloud-studio.js
+      - name: Canonical mobile routes
+        shell: bash
+        run: |
+          grep -q 'ridge-cloud-studio.html' ridge-android.html
+          grep -q 'ridge-cloud-studio.html' music.html
+          ! grep -q 'studio-v2.html' ridge-android.html
+          test "$(wc -c < music.html)" -lt 3000
+      - name: Mobile budget
+        shell: bash
+        run: |
+          test "$(wc -c < ridge-cloud-studio.js)" -lt 30000
+          test "$(wc -c < ridge-cloud-studio.html)" -lt 20000
+          echo 'Ridge cloud console is upload-first and contains no local media renderer.'
