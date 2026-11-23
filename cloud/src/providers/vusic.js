@@ -222,6 +222,23 @@ async function tickAgreement(page){
   return false;
 }
 
+async function finalSubmit(page){
+  // Review page: the forward button in #nav-actions (Vusic's wizard footer). Step past "Next Step" at most twice.
+  for(let i=0;i<3;i++){
+    const r=await page.evaluate(()=>{const vis=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&r.width>0&&r.height>0};
+      const scope=document.querySelector('#nav-actions')||document;const btns=[...scope.querySelectorAll('button,[role="button"],input[type="submit"]')].filter(vis).filter(b=>!b.disabled);
+      const txt=b=>(b.innerText||b.value||'').replace(/\s+/g,' ').trim();
+      const sub=btns.find(b=>/submit|release|publish|finish|distribute|send for|complete|confirm/i.test(txt(b))&&!/back|cancel|new release/i.test(txt(b)));
+      if(sub){sub.click();return {clicked:txt(sub),final:true}}
+      const nx=scope.id==='nav-actions'?btns.find(b=>/next/i.test(txt(b))):null;if(nx){nx.click();return {clicked:txt(nx),final:false}}
+      return null}).catch(()=>null);
+    if(!r)return null;
+    if(r.final)return r.clicked;
+    await settle(page,1800);
+  }
+  return null;
+}
+
 function candidates(primary,fallback){return [...new Set([primary,...arr(fallback)].filter(Boolean))]}
 
 export async function distributeVusic(env,input={}){
@@ -242,6 +259,6 @@ export async function distributeVusic(env,input={}){
     if(canary==='pre-agreement')return{ok:true,provider:'vusic-browser',canary:true,stage:'pre-agreement',title,artist,steps,pageUrl:page.url(),message:'Vusic wizard canary reached the agreement boundary; no agreement was accepted and nothing was submitted'};
     await next(page);await inputByLabel(page,['signatory','signature','full name','name'],safe(release.signatory,180),{optional:true});const signed=await tickAgreement(page)||await chooseText(page,fb.agreement||['I agree','Sign the agreement'],'agreement',{optional:true});if(!signed)throw new VusicProviderError('Could not sign Vusic agreement',{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url()}});release.agreementHtml=await page.evaluate(()=>{const n=[...document.querySelectorAll('body *')].filter(e=>/i agree to the terms/i.test(e.innerText||'')&&e.children.length<12).sort((a,b)=>a.innerText.length-b.innerText.length)[0];const c=n&&(n.closest('label,[wire\\:click],[x-on\\:click],[role="checkbox"]')||n.parentElement?.parentElement||n);return c?c.outerHTML.replace(/\s+/g,' ').slice(0,3000):''}).catch(()=>'');mark('agreement');await next(page);
     mark('review');if(release.dryRun===true||release.confirmSubmit!==true)return{ok:true,provider:'vusic-browser',dryRun:true,readyToSubmit:true,title,artist,releaseDate:release.releaseDateUsed,artistPicks:release.artistPicks,steps,pageUrl:page.url(),message:'Vusic wizard completed through Review; final submission not sent'};
-    const submitted=await chooseText(page,fb.finalSubmit||['Submit Release','Submit','Release Now'],'final submit',{optional:true});if(!submitted)throw new VusicProviderError('Vusic final submit control was not found',{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url()}});await stableNavigation(page,15000);await settle(page,1100);const text=await bodyText(page),success=/submitted|success|release created|under review|processing|pending review|thank you/i.test(text);return{ok:success,provider:'vusic-browser',submitted:success,releaseDate:release.releaseDateUsed,artistPicks:release.artistPicks,pageUrl:page.url(),steps,message:success?'Release submitted to Vusic':'Final submit was clicked; confirmation text was not recognized'};
+    const submitted=await finalSubmit(page)||await chooseText(page,fb.finalSubmit||['Submit Release','Submit','Release Now'],'final submit',{optional:true});if(!submitted)throw new VusicProviderError('Vusic final submit control was not found',{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url(),snapshot:await formSnapshot(page).catch(()=>null),navHtml:await page.evaluate(()=>{const n=document.querySelector('#nav-actions');return n?n.outerHTML.replace(/\s+/g,' ').replace(/class="[^"]{60,}"/g,'class="…"').slice(0,3000):''}).catch(()=>''),pageText:(await bodyText(page)).slice(-1500)}});await stableNavigation(page,15000);await settle(page,1100);const text=await bodyText(page),success=/submitted|success|release created|under review|processing|pending review|thank you/i.test(text);return{ok:success,provider:'vusic-browser',submitted:success,releaseDate:release.releaseDateUsed,artistPicks:release.artistPicks,pageUrl:page.url(),steps,message:success?'Release submitted to Vusic':'Final submit was clicked; confirmation text was not recognized'};
   }catch(e){if(e instanceof VusicProviderError){e.detail={...(e.detail||{}),steps,agreementHtml:release.agreementHtml};throw e}const detail={steps,url:pageRef?.url?.()||''};try{detail.pageText=(await bodyText(pageRef)).slice(0,1200)}catch{}throw new VusicProviderError(safe(e?.message||e,500),{status:503,code:'VUSIC_BROWSER_FAILED',detail});}finally{if(browser)await browser.close().catch(()=>{})}
 }
