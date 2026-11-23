@@ -14,8 +14,13 @@ on:
           - login
           - pre-agreement
           - live-submit
+          - release
       confirm_live:
         description: 'For live-submit only, type RELEASE_CANARY'
+        required: false
+        type: string
+      slug:
+        description: 'For release mode: folder under releases/ (release.json + cover.jpg + master.mp3|wav)'
         required: false
         type: string
 
@@ -54,7 +59,7 @@ jobs:
           node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.authenticated!==true||x.releaseAccessible!==true)process.exit(1)' "$body"
 
       - name: Generate original canary audio and 3000x3000 artwork
-        if: steps.mode.outputs.value != 'login'
+        if: steps.mode.outputs.value != 'login' && steps.mode.outputs.value != 'release'
         shell: bash
         run: |
           python3 - <<'PY'
@@ -85,7 +90,7 @@ jobs:
           PY
 
       - name: Stage canary assets in R2
-        if: steps.mode.outputs.value != 'login'
+        if: steps.mode.outputs.value != 'login' && steps.mode.outputs.value != 'release'
         id: stage
         shell: bash
         run: |
@@ -145,3 +150,62 @@ jobs:
             -H 'Content-Type: application/json' --data "$payload")"
           echo "$body"
           node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.submitted!==true)process.exit(1)' "$body"
+
+      # ---------- Real song release: releases/<slug>/ ----------
+      - name: Check out release folder
+        if: steps.mode.outputs.value == 'release'
+        uses: actions/checkout@v4
+
+      - name: Validate release folder
+        if: steps.mode.outputs.value == 'release'
+        id: rel
+        shell: bash
+        env:
+          SLUG: ${{ inputs.slug }}
+        run: |
+          set -euo pipefail
+          [[ "$SLUG" =~ ^[a-z0-9-]+$ ]] || { echo "::error::slug must be lowercase letters, digits and dashes"; exit 1; }
+          dir="releases/$SLUG"
+          test -f "$dir/release.json" && test -f "$dir/cover.jpg" || { echo "::error::$dir needs release.json and cover.jpg"; exit 1; }
+          jq -e '.title and .lyrics and .genre and .language' "$dir/release.json" >/dev/null
+          python3 - "$dir/cover.jpg" <<'PY'
+          import struct, sys
+          d = open(sys.argv[1], 'rb').read(); assert d[:2] == b'\xff\xd8', 'cover is not a JPG'
+          i = 2
+          while i < len(d):
+              m = d[i+1]; L = struct.unpack('>H', d[i+2:i+4])[0]
+              if m in (0xC0, 0xC1, 0xC2):
+                  h, w = struct.unpack('>HH', d[i+5:i+9]); assert (w, h) == (3000, 3000), f'cover is {w}x{h}'; break
+              i += 2 + L
+          print('cover ok')
+          PY
+          if [ -f "$dir/master.wav" ]; then m="$dir/master.wav"; t=audio/wav; else m="$dir/master.mp3"; t=audio/mpeg; fi
+          test -f "$m" || { echo "::error::no master.wav or master.mp3 in $dir"; exit 1; }
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"; echo "master=$m" >> "$GITHUB_OUTPUT"; echo "type=$t" >> "$GITHUB_OUTPUT"
+
+      - name: Stage master + cover and submit to Vusic
+        if: steps.mode.outputs.value == 'release'
+        shell: bash
+        env:
+          DIR: ${{ steps.rel.outputs.dir }}
+          MASTER: ${{ steps.rel.outputs.master }}
+          MTYPE: ${{ steps.rel.outputs.type }}
+        run: |
+          set -euo pipefail
+          token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"
+          oidc="$(printf '%s' "$token_json" | jq -r '.value')"; test -n "$oidc"; test "$oidc" != null; echo "::add-mask::$oidc"
+          stage(){ curl --fail-with-body --silent --show-error --max-time 120 -X POST "$RIDGE_CLOUD_URL/api/release/stage" -H "Authorization: Bearer $oidc" -F "file=@$1;type=$2"; }
+          a="$(stage "$MASTER" "$MTYPE")"; c="$(stage "$DIR/cover.jpg" image/jpeg)"
+          node -e 'for(const s of process.argv.slice(1)){const x=JSON.parse(s);if(!x.ok||!x.url)process.exit(1)}' "$a" "$c"
+          tomorrow="$(TZ=Asia/Kolkata date -d '+1 day' +%F)"
+          payload="$(jq --arg a "$(jq -r .url <<<"$a")" --arg c "$(jq -r .url <<<"$c")" --arg f "$(basename "$MASTER")" --arg t "$MTYPE" --arg d "$tomorrow" '
+            {artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",
+             label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",
+             releasedPreviously:false,explicitContent:false,platforms:"all"} + . +
+            {releaseDate:(.releaseDate // $d),audioUrl:$a,audioName:$f,audioType:$t,
+             artworkUrl:$c,artworkName:"cover.jpg",artworkType:"image/jpeg",confirmSubmit:true}' "$DIR/release.json")"
+          http="$(curl --silent --show-error --max-time 480 -o result.json -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
+                    -H "Authorization: Bearer $oidc" -H 'Content-Type: application/json' --data "$payload")"
+          echo "HTTP $http"; jq '{ok,submitted,stage,message,code,error,pageUrl}' result.json || cat result.json
+          { echo "### Vusic release: $(jq -r .title "$DIR/release.json")"; echo "- HTTP $http"; echo "- Submitted: $(jq -r '.submitted // false' result.json)"; echo "- $(jq -r '.message // .error // ""' result.json)"; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$http" = 200 ] && jq -e '.ok==true and .submitted==true' result.json >/dev/null
