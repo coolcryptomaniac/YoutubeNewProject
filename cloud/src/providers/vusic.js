@@ -203,7 +203,7 @@ async function tickAgreement(page){
   for(let i=0;i<3;i++){
     const st=await retryVusicAction(()=>page.evaluate(()=>{
       const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
-      const boxes=[...document.querySelectorAll('input[type="checkbox"]')];
+      const boxes=[...document.querySelectorAll(`input[type="checkbox"],input[type="radio"]`)];
       const ctx=b=>norm((b.labels&&[...b.labels].map(l=>l.innerText).join(' '))||'')+' '+norm(b.closest('label,div')?.innerText||'');
       const b=boxes.find(x=>/i agree|authori[sz]e upload|terms/.test(ctx(x)));
       if(!b){const n=[...document.querySelectorAll('body *')].filter(e=>/i agree to the terms/i.test(e.innerText||'')&&e.children.length<12).sort((a,c)=>a.innerText.length-c.innerText.length)[0];const t=n&&(n.closest('[role="checkbox"],[wire\\:click],[x-on\\:click],label')||n);if(t){const before=t.outerHTML;if(!/aria-checked="true"|fa-check|checked/.test(before)){t.click();}return {found:true,custom:true,changed:t.outerHTML!==before}}return {found:false};}
@@ -216,7 +216,7 @@ async function tickAgreement(page){
     if(!st.found)return false;
     if(st.custom)return true;
     await sleep(1200);
-    const ok=await page.evaluate(()=>{const b=[...document.querySelectorAll('input[type="checkbox"]')].find(x=>/i agree|authori[sz]e upload|terms/i.test(((x.labels&&[...x.labels].map(l=>l.innerText).join(' '))||'')+' '+(x.closest('label,div')?.innerText||'')));return !!b&&b.checked}).catch(()=>false);
+    const ok=await page.evaluate(()=>{const b=[...document.querySelectorAll(`input[type="checkbox"],input[type="radio"]`)].find(x=>/i agree|authori[sz]e upload|terms/i.test(((x.labels&&[...x.labels].map(l=>l.innerText).join(' '))||'')+' '+(x.closest('label,div')?.innerText||'')));return !!b&&b.checked}).catch(()=>false);
     if(ok)return true;
   }
   return false;
