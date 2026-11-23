@@ -169,7 +169,7 @@ async function pickPerson(page,patterns,name,label,picks=[]){
       const nodes=[...m.querySelectorAll('label,li,div,span,p,h3,h4,h5,h6,strong,td,option,button,a')].filter(n=>vis(n)||n.tagName==='OPTION');
       const exact=nodes.filter(n=>norm(n.innerText||n.textContent)===want).sort((a,b)=>(a.innerText||'').length-(b.innerText||'').length);
       if(!exact.length){const sel=[...m.querySelectorAll('select')].find(x=>[...x.options].some(o=>norm(o.text)===want));if(sel){const o=[...sel.options].find(o=>norm(o.text)===want);sel.value=o.value;o.selected=true;sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}));return {modal:true,via:'select'}}return {modal:true,found:false}}
-      const rowOf=n=>n.closest('[onclick],label,li,tr,[wire\\:click],[class*="item" i],[class*="option" i],[class*="artist" i],[class*="result" i],[class*="card" i]')||n;
+      const rowOf=n=>n.closest('[wire\\:click]:not(button)')||n.closest('[onclick]:not(button),label,li,tr')||n.closest('[class*="option" i],[class*="artist-" i],[class*="result" i]')||n;
       const hit=exact.find(n=>rowOf(n).querySelector('img'))||exact[0];const row=rowOf(hit);
       const isSel=r=>/(^|\s)selected(\s|$)/.test(norm(r.innerText))||!!r.querySelector('input:checked');
       // Vusic remembers earlier picks: leave Mohit selected if already ticked, and untick anyone else who is ticked
