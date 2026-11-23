@@ -31,7 +31,7 @@ permissions:
 jobs:
   vusic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 30
     env:
       RIDGE_CLOUD_URL: https://ridge-cloud-media.founder-f53.workers.dev
     steps:
