@@ -209,11 +209,11 @@ jobs:
              releasedPreviously:false,explicitContent:false,platforms:"all"} + . +
             {releaseDate:(.releaseDate // "earliest"),audioUrl:$a,audioName:$f,audioType:$t,
              artworkUrl:$c,artworkName:"cover.jpg",artworkType:"image/jpeg",confirmSubmit:($dry|not),dryRun:$dry}' "$DIR/release.json")"
-          for attempt in 1 2 3; do
+          for attempt in 1 2; do
             http="$(curl --silent --show-error --max-time 900 -o result.json -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
                       -H "Authorization: Bearer $oidc" -H 'Content-Type: application/json' --data "$payload")" || http=000
             if [ "$http" = 200 ] || ! grep -q -E 'ERR_CONNECTION|ERR_TIMED_OUT|ERR_NAME|net::|Navigation timeout' result.json 2>/dev/null; then break; fi
-            echo "Vusic network error on attempt $attempt; waiting before retry"; sleep $((attempt * 90))
+            echo "Vusic network error on attempt $attempt; waiting before retry"; sleep 600
           done
           echo "HTTP $http"; jq '{ok,submitted,dryRun,releaseDate,artistPicks,stage,message,code,error,pageUrl}' result.json || cat result.json
           node -e 'const x=JSON.parse(require("fs").readFileSync("result.json","utf8")),d=x.detail||{},snap=s=>s&&{url:s.url,headings:s.headings,labels:s.labels,alerts:s.alerts,buttons:(s.buttons||[]).map(b=>b.text).filter(t=>/next|back|add|select|save|create|new|artist/i.test(t||"")),fields:(s.inputs||[]).map(f=>({type:f.type,id:f.id,name:f.name,placeholder:f.placeholder,value:/pass/i.test(f.type+f.name)?"[redacted]":f.value,context:String(f.context||"").slice(0,90)}))};console.log(JSON.stringify({steps:(d.steps||[]).map(s=>s.step),alerts:d.alerts,before:snap(d.before||d.snapshot),after:snap(d.after),last:d.last,found:d.found,picked:d.picked,cardHtml:d.cardHtml,modalBefore:String(d.modalBefore||"").slice(0,7000),buttons:d.buttons,agreementHtml:d.agreementHtml,navHtml:d.navHtml,snapshot:snap(d.snapshot),html:String(d.html||"").slice(0,7000),pageText:String(d.pageText||"").slice(0,600)},null,1))' || true
