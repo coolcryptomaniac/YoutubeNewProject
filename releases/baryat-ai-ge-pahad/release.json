@@ -21,5 +21,7 @@
       ]
     }
   },
-  "releaseDate": "2026-12-01"
+  "releaseDate": "2026-12-01",
+  "mood": "Happy",
+  "subGenre": "Folk"
 }
