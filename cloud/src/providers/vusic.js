@@ -161,7 +161,7 @@ async function personField(page,patterns){
 }
 async function pickPerson(page,patterns,name,label){
   const field=await personField(page,patterns);
-  if(!field)throw new VusicProviderError(`Vusic ${label} field was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns,snapshot:await formSnapshot(page).catch(()=>null)}});
+  if(!field){const html=await retryVusicAction(()=>page.evaluate(pats=>{const norm=s=>String(s||'').trim().toLowerCase();const lab=[...document.querySelectorAll('label,legend,p,span,div,h4,h5,h6')].find(e=>e.children.length<=2&&pats.some(p=>norm(e.innerText).startsWith(p)));if(!lab)return '';let box=lab;for(let d=0;d<3&&box.parentElement;d++)box=box.parentElement;return box.outerHTML.replace(/\s+/g,' ').replace(/(value|src|href)="[^"]*"/g,'$1=""').slice(0,3500)},patterns.map(p=>p.toLowerCase()))).catch(()=>'');throw new VusicProviderError(`Vusic ${label} field was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns,html,snapshot:await formSnapshot(page).catch(()=>null)}})}
   const want=String(name).trim().toLowerCase();
   const chosen=()=>retryVusicAction(()=>page.evaluate(({id,want})=>{const box=document.querySelector(`[data-ridge-pick="${id}"]`);if(!box)return false;const sel=box.querySelector('select');if(sel){return [...sel.selectedOptions].some(o=>o.textContent.trim().toLowerCase().includes(want))}return String(box.innerText||'').toLowerCase().includes(want)&&!/select\s*(an?\s*)?(artist|option)|choose/i.test([...box.querySelectorAll('[class*="placeholder"]')].map(x=>x.innerText).join(' '))},{id:field.id,want}));
   if(field.hasSelect){
