@@ -210,6 +210,8 @@ jobs:
             {releaseDate:(.releaseDate // "earliest"),audioUrl:$a,audioName:$f,audioType:$t,
              artworkUrl:$c,artworkName:"cover.jpg",artworkType:"image/jpeg",confirmSubmit:($dry|not),dryRun:$dry}' "$DIR/release.json")"
           for attempt in 1 2; do
+            # OIDC tokens are short-lived: fetch a fresh one for every attempt
+            if [ "$attempt" -gt 1 ]; then token_json="$(curl --fail-with-body --silent --show-error --max-time 30 -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=ridge-vusic-canary")"; oidc="$(printf '%s' "$token_json" | jq -r '.value')"; echo "::add-mask::$oidc"; fi
             http="$(curl --silent --show-error --max-time 900 -o result.json -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
                       -H "Authorization: Bearer $oidc" -H 'Content-Type: application/json' --data "$payload")" || http=000
             if [ "$http" = 200 ] || ! grep -q -E 'ERR_CONNECTION|ERR_TIMED_OUT|ERR_NAME|net::|Navigation timeout' result.json 2>/dev/null; then break; fi
