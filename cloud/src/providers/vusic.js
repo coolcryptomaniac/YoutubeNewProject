@@ -165,7 +165,9 @@ async function pickPerson(page,patterns,name,label,picks=[]){
       const m=document.querySelector('[data-ridge-modal]')||document;
       const nodes=[...m.querySelectorAll('label,li,button,a,div,span,p,td,h3,h4,h5,h6,strong')].filter(vis).filter(n=>!n.matches('input'));
       const exact=nodes.filter(n=>norm(n.innerText)===want).sort((a,b)=>a.innerText.length-b.innerText.length);
-      let hit=exact[0];
+      const rowOf=n=>n.closest('label,li,tr,[class*="item" i],[class*="artist" i],[class*="result" i],[class*="card" i],[onclick],button')||n;
+      // the saved "Mohit Pandey" artist carries a profile picture; prefer that row over text-only entries
+      let hit=exact.find(n=>rowOf(n).querySelector('img'))||exact[0];
       if(!hit)hit=nodes.filter(n=>new RegExp('(^|[^a-z])'+want+'($|[^a-z])').test(norm(n.innerText))&&norm(n.innerText).length<80).sort((a,b)=>a.innerText.length-b.innerText.length)[0];
       if(!hit)return false;
       const row=hit.closest('label,li,tr,[class*="item" i],[class*="artist" i],[class*="result" i],[class*="card" i],[onclick],button')||hit;
@@ -180,7 +182,8 @@ async function pickPerson(page,patterns,name,label,picks=[]){
     await sleep(1200);
     if(await hasName()){picks.push({label,...(picked||{})});const open=await page.evaluate(()=>{const vis=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=="none"&&s.visibility!=="hidden"&&s.opacity!=="0"&&r.width>0&&r.height>0};const m=document.querySelector('[data-ridge-modal]');return !!(m&&vis(m))}).catch(()=>false);if(open)await page.keyboard.press('Escape').catch(()=>{});await settle(page,300);return true}
     const html=await modalHtml();
-    if(attempt===1)throw new VusicProviderError(picked?`Could not choose ${name} as Vusic ${label}`:`Could not find ${name} in the Vusic ${label} picker`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{card,found,picked,html}});
+    const cardHtml=await page.evaluate(id=>{const c=document.querySelector(`[data-ridge-card="${id}"]`);const sel=[...document.querySelectorAll('select')].map(x=>({id:x.id,name:x.name,multiple:x.multiple,selected:[...x.selectedOptions].map(o=>o.text).join('|'),options:[...x.options].slice(0,8).map(o=>o.text).join('|')}));return {card:c?c.outerHTML.replace(/\s+/g,' ').replace(/(src|href)="[^"]*"/g,'$1=""').replace(/class="[^"]{60,}"/g,'class="…"').slice(0,4000):'',selects:sel}},card.id).catch(()=>null);
+    if(attempt===1)throw new VusicProviderError(picked?`Could not choose ${name} as Vusic ${label}`:`Could not find ${name} in the Vusic ${label} picker`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{card,found,picked,html,cardHtml}});
     await page.keyboard.press('Escape').catch(()=>{});await sleep(600);
   }
 }
