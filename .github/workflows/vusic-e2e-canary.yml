@@ -202,7 +202,7 @@ jobs:
             {artist:"Mohit Pandey",primaryArtist:"Mohit Pandey",composer:"Mohit Pandey",lyricist:"Mohit Pandey",
              label:"Vusic Records",copyrightOwner:"Vusic Records",signatory:"Mohit Pandey",
              releasedPreviously:false,explicitContent:false,platforms:"all"} + . +
-            {releaseDate:(.releaseDate // $d),audioUrl:$a,audioName:$f,audioType:$t,
+            {releaseDate:(.releaseDate // "earliest"),audioUrl:$a,audioName:$f,audioType:$t,
              artworkUrl:$c,artworkName:"cover.jpg",artworkType:"image/jpeg",confirmSubmit:true}' "$DIR/release.json")"
           for attempt in 1 2 3; do
             http="$(curl --silent --show-error --max-time 480 -o result.json -w '%{http_code}' -X POST "$RIDGE_CLOUD_URL/api/release/vusic" \
