@@ -68,8 +68,9 @@ async function fillEarliestDate(page,maxDays=30){
   for(let d=start;d<=maxDays;d++){
     const iso=new Date(ist.getTime()+d*86400e3).toISOString().slice(0,10);
     const ok=await fillReleaseDate(page,iso).catch(()=>false);if(!ok)continue;
-    await settle(page,700);const now=await readDate(page);
-    if(now.value&&!now.err)return iso;
+    await retryVusicAction(()=>page.evaluate(()=>{const el=document.querySelector('#date_for_live')||document.activeElement;if(el){el.dispatchEvent(new Event('focusout',{bubbles:true}));el.blur&&el.blur()}const h=[...document.querySelectorAll('h1,h2,h3,label')].find(x=>/release date|go live/i.test(x.innerText||''));(h||document.body).dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));(h||document.body).click()}));
+    await settle(page,1600);const now=await readDate(page);
+    if(now.value&&!now.err){await settle(page,1200);const again=await readDate(page);if(again.value&&!again.err)return iso}
   }
   throw new VusicProviderError(`Vusic accepted no go-live date within ${maxDays} days`,{status:503,code:'VUSIC_DATE_REJECTED',detail:{snapshot:await formSnapshot(page).catch(()=>null)}});
 }
