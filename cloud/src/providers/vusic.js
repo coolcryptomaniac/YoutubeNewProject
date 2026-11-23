@@ -144,14 +144,16 @@ async function selectRequiredById(page,id,values,label,{timeout=10000}={}){
 async function pickPerson(page,patterns,name,label,picks=[]){
   const want=String(name).trim().toLowerCase();
   // Vusic step 4: each role card has an artist-stack and a "Search and Add Artist" button (toggleSpotify) that opens a search modal.
-  const card=await retryVusicAction(()=>page.evaluate(pats=>{
+  const locate=()=>retryVusicAction(()=>page.evaluate(pats=>{
     const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
     const lab=[...document.querySelectorAll('label,h3,h4,h5,p,span,div')].filter(l=>l.children.length<3).find(l=>{const t=norm(l.innerText);return t.length<40&&pats.some(p=>t.startsWith(p))&&!/secondary|featur|producer/.test(t)});
     if(!lab)return null;let box=lab.parentElement;for(let d=0;d<4&&box&&!box.querySelector('.add-btn,.artist-stack,#openModalBtn,[onclick*="toggleSpotify"],[onclick*="Modal" i]');d++)box=box.parentElement;
     if(!box)return null;const id='ridge-card-'+Math.random().toString(36).slice(2);box.setAttribute('data-ridge-card',id);return {id,label:norm(lab.innerText)};
   },patterns.map(p=>p.toLowerCase())));
+  const card=await locate();
   if(!card)throw new VusicProviderError(`Vusic ${label} card was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns,snapshot:await formSnapshot(page).catch(()=>null)}});
-  const hasName=()=>retryVusicAction(()=>page.evaluate(({id,want})=>{const box=document.querySelector(`[data-ridge-card="${id}"]`);if(!box)return false;const st=box.querySelector('.artist-stack')||box;const clone=st.cloneNode(true);clone.querySelectorAll('button,[role="dialog"],[class*="modal" i]').forEach(e=>e.remove());const bits=[clone.innerText||clone.textContent,...[...st.querySelectorAll('[title],[alt],[data-name],[aria-label]')].filter(e=>!e.closest('[class*="modal" i]')).map(e=>e.getAttribute('title')||e.getAttribute('alt')||e.getAttribute('data-name')||e.getAttribute('aria-label'))].join(' ').toLowerCase();return new RegExp('(^|[^a-z])'+want.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z])').test(bits)},{id:card.id,want}));
+  const ensure=async()=>{const ok=await page.evaluate(id=>!!document.querySelector(`[data-ridge-card="${id}"]`),card.id).catch(()=>false);if(!ok){const c=await locate();if(c){await page.evaluate((o,n)=>{const e=document.querySelector(`[data-ridge-card="${o}"]`);if(e)e.setAttribute('data-ridge-card',n)},c.id,card.id)}}};
+  const hasName=async()=>{await ensure();return retryVusicAction(()=>page.evaluate(({id,want})=>{const box=document.querySelector(`[data-ridge-card="${id}"]`);if(!box)return false;const st=box.querySelector('.artist-stack')||box;const clone=st.cloneNode(true);clone.querySelectorAll('button,[role="dialog"],[class*="modal" i]').forEach(e=>e.remove());const bits=[clone.innerText||clone.textContent,...[...st.querySelectorAll('[title],[alt],[data-name],[aria-label]')].filter(e=>!e.closest('[class*="modal" i]')).map(e=>e.getAttribute('title')||e.getAttribute('alt')||e.getAttribute('data-name')||e.getAttribute('aria-label'))].join(' ').toLowerCase();return new RegExp('(^|[^a-z])'+want.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'($|[^a-z])').test(bits)},{id:card.id,want}))};
   if(await hasName()){picks.push({label,already:true});return true}
   const modalHtml=()=>retryVusicAction(()=>page.evaluate(()=>{const m=document.querySelector('[data-ridge-modal]');return m?m.outerHTML.replace(/\s+/g,' ').replace(/(src|href)="[^"]*"/g,'$1=""').replace(/class="[^"]{60,}"/g,'class="…"').slice(0,7000):''})).catch(()=>'');
   for(let attempt=0;attempt<2;attempt++){
