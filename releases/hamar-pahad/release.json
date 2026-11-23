@@ -1,0 +1,27 @@
+{
+  "title": "Hamar Pahad",
+  "genre": "Folk",
+  "language": "Kumaoni",
+  "subGenre": "Folk",
+  "mood": "Calm",
+  "releaseDate": "2026-12-04",
+  "lyrics": "Before the cities, before the noise\nthere were ridges calling with a quiet voice\nDeodar shadows on a winding road\nmy grandmother singing where the river flowed\n\nIf you listen, the mountains breathe\nslow and steady, beneath the leaves\n\nहमर पहाड़, हमर पहाड़\nह्यूं की चादर, बुरांशि बहार\nHold them gently, hold them near\nहमर पहाड़, हमर पहाड़\n\nGlaciers whisper they are getting thin\nforests remember where the fires have been\nEvery spring of water, every terraced field\nis a wound that only kindness heals\n\nIf you listen, the mountains breathe\nslow and steady, beneath the leaves\n\nहमर पहाड़, हमर पहाड़\nह्यूं की चादर, बुरांशि बहार\nHold them gently, hold them near\nहमर पहाड़, हमर पहाड़\n\nधारा को पाणि, गाड़-गधेरा\nकाफल पाकि गे, घाम धार मा\nयो माटि हमरि, यो हमरि ईजा\nबचै दिया, सबै मिलि बेर\n\nहमर पहाड़, हमर पहाड़\nह्यूं की चादर, बुरांशि बहार\nFor the world, for the ones who come after\nहमर पहाड़, हमर पहाड़\n\nहमर पहाड़",
+  "choiceFallbacks": {
+    "language": {
+      "Kumaoni": [
+        "Kumaoni",
+        "English",
+        "Hindi",
+        "Other"
+      ]
+    },
+    "genre": {
+      "Folk": [
+        "Folk",
+        "Indian Folk",
+        "World",
+        "Pop"
+      ]
+    }
+  }
+}
