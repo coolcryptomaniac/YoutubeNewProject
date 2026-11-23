@@ -121,6 +121,52 @@ async function selectRequiredById(page,id,values,label,{timeout=10000}={}){
   throw new VusicProviderError(`Could not select required Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{id,choices,last,url:page.url()}});
 }
 
+
+// Artist-page pickers: Vusic lists saved artists in each role field. Works for a
+// native <select> (single or multiple) and for searchable custom dropdowns.
+async function personField(page,patterns){
+  return retryVusicAction(()=>page.evaluate(patterns=>{
+    const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' '),visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0};
+    const skip=/secondary|featur|producer/;
+    const labels=[...document.querySelectorAll('label,legend,p,span,div,h4,h5,h6')].filter(e=>visible(e)&&e.children.length<=2).filter(e=>{const t=norm(e.innerText||e.textContent);return t.length<60&&patterns.some(p=>t.includes(p))&&!skip.test(t)});
+    for(const lab of labels){
+      let box=lab;for(let d=0;d<4&&box;d++,box=box.parentElement){
+        const sel=box.querySelector('select');
+        const ctl=box.querySelector('[role="combobox"],.select2-selection,.choices,.multiselect,[class*="select__control"],[class*="-control"],input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio])');
+        if(sel||ctl){
+          const id='ridge-pick-'+Math.random().toString(36).slice(2);box.setAttribute('data-ridge-pick',id);
+          return {id,label:norm(lab.innerText),hasSelect:!!sel,selectId:sel?.id||'',text:norm(box.innerText).slice(0,160)};
+        }
+      }
+    }
+    return null;
+  },patterns.map(p=>p.toLowerCase())));
+}
+async function pickPerson(page,patterns,name,label){
+  const field=await personField(page,patterns);
+  if(!field)throw new VusicProviderError(`Vusic ${label} field was not found`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{patterns,snapshot:await formSnapshot(page).catch(()=>null)}});
+  const want=String(name).trim().toLowerCase();
+  const chosen=()=>retryVusicAction(()=>page.evaluate(({id,want})=>{const box=document.querySelector(`[data-ridge-pick="${id}"]`);if(!box)return false;const sel=box.querySelector('select');if(sel){return [...sel.selectedOptions].some(o=>o.textContent.trim().toLowerCase().includes(want))}return String(box.innerText||'').toLowerCase().includes(want)&&!/select\s*(an?\s*)?(artist|option)|choose/i.test([...box.querySelectorAll('[class*="placeholder"]')].map(x=>x.innerText).join(' '))},{id:field.id,want}));
+  if(field.hasSelect){
+    const ok=await retryVusicAction(()=>page.evaluate(({id,want})=>{const sel=document.querySelector(`[data-ridge-pick="${id}"] select`);if(!sel)return false;const opt=[...sel.options].find(o=>o.textContent.trim().toLowerCase()===want)||[...sel.options].find(o=>o.textContent.trim().toLowerCase().includes(want));if(!opt)return false;opt.selected=true;if(!sel.multiple)sel.value=opt.value;for(const t of ['input','change'])sel.dispatchEvent(new Event(t,{bubbles:true}));if(window.jQuery){try{window.jQuery(sel).trigger('change')}catch{}}return true},{id:field.id,want}));
+    if(ok){await settle(page,300);if(await chosen())return true}
+  }
+  // searchable dropdown: open it, type the name, click the matching option
+  for(let attempt=0;attempt<3;attempt++){
+    const opened=await retryVusicAction(()=>page.evaluate(id=>{const box=document.querySelector(`[data-ridge-pick="${id}"]`);const ctl=box&&box.querySelector('[role="combobox"],.select2-selection,.choices,.multiselect,[class*="select__control"],[class*="-control"],input:not([type=hidden]):not([type=file])');if(!ctl)return false;ctl.scrollIntoView({block:'center'});const r=ctl.getBoundingClientRect();return {x:r.left+Math.min(40,r.width/2),y:r.top+r.height/2}},field.id));
+    if(!opened)break;
+    await page.mouse.click(opened.x,opened.y);await sleep(400);
+    const search=await page.$('.select2-search__field,input[class*="__input"],.choices__input--cloned,.multiselect__input,[role="combobox"] input,input[aria-autocomplete]');
+    if(search){try{await search.type(String(name),{delay:20})}catch{}}else{await page.keyboard.type(String(name),{delay:20}).catch(()=>{})}
+    await sleep(900);
+    const clicked=await retryVusicAction(()=>page.evaluate(want=>{const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0};const opts=[...document.querySelectorAll('[role="option"],.select2-results__option,li[class*="option"],div[class*="option"],.choices__item--choice,.multiselect__option,.dropdown-item,li')].filter(visible);const hit=opts.find(o=>o.innerText.trim().toLowerCase()===want)||opts.find(o=>o.innerText.trim().toLowerCase().includes(want));if(!hit)return false;hit.scrollIntoView({block:'center'});hit.click();return true},want));
+    if(!clicked){await page.keyboard.press('Enter').catch(()=>{})}
+    await sleep(500);await page.keyboard.press('Escape').catch(()=>{});await settle(page,300);
+    if(await chosen())return true;
+  }
+  throw new VusicProviderError(`Could not choose ${name} as Vusic ${label}`,{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{field,snapshot:await formSnapshot(page).catch(()=>null)}});
+}
+
 function candidates(primary,fallback){return [...new Set([primary,...arr(fallback)].filter(Boolean))]}
 
 export async function distributeVusic(env,input={}){
@@ -136,7 +182,7 @@ export async function distributeVusic(env,input={}){
     await attachRemoteFile(page,selectors.artwork,safe(release.artworkUrl,2000),safe(release.artworkName||`${title}-cover.jpg`,180),safe(release.artworkType||'image/jpeg',120));await settle(page,700);await attachRemoteFile(page,selectors.audio,safe(release.audioUrl,2000),safe(release.audioName||`${title}.wav`,180),safe(release.audioType||'audio/wav',120));await settle(page,1100);mark('assets');await next(page);await requireDateStage(page);
     const releaseDate=safe(release.releaseDate||release.goLiveDate,30);if(releaseDate)await fillReleaseDate(page,releaseDate);await chooseField(page,['previously released','released previously','already released'],release.releasedPreviously?['Yes']:candidates('No',fb.releasedPreviously),'previously released',{optional:true});mark('go-live-date');await next(page);
     await inputByLabel(page,['song title','song name','track title','track name','title','name of song'],title);const genreKey=safe(release.genre||'default',80),genreValues=candidates(genreKey,fb.genre?.[genreKey]||fb.genre?.default||[]);await chooseField(page,['genre'],genreValues,'genre',{optional:true});const languageKey=safe(release.language||'default',80),languageValues=candidates(languageKey,fb.language?.[languageKey]||fb.language?.default||[]);await chooseField(page,['language','song language'],languageValues,'language',{optional:true});await selectRequiredById(page,'subGenre',candidates(safe(release.subGenre||'Electronic',80),['Electronic','Electronica','Ambient']),'sub-genre');await chooseField(page,['mood'],candidates(safe(release.mood||'Calm',80),['Calm','Passion','Inspirational']),'mood',{optional:false});await selectRequiredById(page,'labels',candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label');await chooseRadioNearQuestion(page,['I Want To Use My Own ISRC Code','own isrc'],['No'],'own ISRC',{optional:false});await chooseRadioNearQuestion(page,['Is your track Adult 18+','Adult 18+'],release.explicitContent?['Yes']:['No'],'Adult 18+',{optional:false});await chooseField(page,['explicit','explicit content'],release.explicitContent?['Yes','Explicit']:fb.explicitContent,'explicit content',{optional:true});await inputByLabel(page,['lyrics','song lyrics'],safe(release.lyrics,12000),{optional:true});await inputByLabel(page,['composer'],safe(release.composer||artist,180),{optional:true});await inputByLabel(page,['lyricist','lyrics writer','writer'],safe(release.lyricist||artist,180),{optional:true});await inputByLabel(page,['copyright owner','copyright'],safe(release.copyrightOwner,180),{optional:true});await selectRequiredById(page,'labels',candidates(safe(release.label||'Vusic Records',180),['Vusic Records']),'registered label');mark('song-details');await next(page);
-    await chooseField(page,['primary artist','select artist','artist'],[artist],'Primary Artist',{optional:true});await inputByLabel(page,['composer'],safe(release.composer||artist,180),{optional:true});await inputByLabel(page,['lyricist','lyrics writer'],safe(release.lyricist||artist,180),{optional:true});mark('artist');await next(page);
+    await pickPerson(page,['primary artist','singer'],artist,'Primary Artist');await pickPerson(page,['composer'],safe(release.composer||artist,180),'Composer');await pickPerson(page,['lyricist','lyrics writer'],safe(release.lyricist||artist,180),'Lyricist');mark('artist');await next(page);
     if(Array.isArray(release.platforms)&&release.platforms.length){for(const p of release.platforms)await chooseText(page,[p],`platform ${p}`,{optional:true})}else await chooseText(page,fb.platforms||['Select all','All platforms'],'all platforms',{optional:true});mark('platforms');
     if(canary==='pre-agreement')return{ok:true,provider:'vusic-browser',canary:true,stage:'pre-agreement',title,artist,steps,pageUrl:page.url(),message:'Vusic wizard canary reached the agreement boundary; no agreement was accepted and nothing was submitted'};
     await next(page);await inputByLabel(page,['signatory','signature','full name','name'],safe(release.signatory,180),{optional:true});const signed=await chooseText(page,fb.agreement||['I agree','Sign the agreement'],'agreement',{optional:true});if(!signed)throw new VusicProviderError('Could not sign Vusic agreement',{status:503,code:'VUSIC_SELECTOR_MISMATCH',detail:{url:page.url()}});mark('agreement');await next(page);
